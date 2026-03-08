@@ -1,6 +1,8 @@
 import { NewsGrid } from "@/components/ui/grid";
 import { CheckCircle2, XCircle, AlertCircle, ArrowRightLeft, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
+import CredibilityChart from "@/components/CredibilityChart";
+import StanceTimeline from "@/components/StanceTimeline";
 
 import { notFound } from "next/navigation";
 import { PoliticianService, ShiftEvent } from "@/lib/services/politician-service";
@@ -13,7 +15,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
         return notFound();
     }
 
-    const { politician, promises, methodology, derivedScores } = profile;
+    const { politician, promises, methodology, derivedScores, claims, evidenceMap, aiStanceChanges } = profile;
 
     // Helper to get right icon and color for promise status
     const getPromiseStyles = (status: string) => {
@@ -100,7 +102,12 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
 
                     {/* Consistency Tracker */}
                     <section>
-                        <h2 className="font-serif text-3xl md:text-4xl font-black uppercase tracking-tighter border-b-[3px] border-foreground pb-3 mb-8">Position Consistency: Shift & Stance</h2>
+                        {/* New Stance Timeline Component injected here */}
+                        <div className="mb-16">
+                            <StanceTimeline politicianName={politician.name} stanceChanges={aiStanceChanges || []} />
+                        </div>
+
+                        <h2 className="font-serif text-3xl md:text-4xl font-black uppercase tracking-tighter border-b-[3px] border-foreground pb-3 mb-8">Position Consistency: Reference Points</h2>
 
                         {derivedScores.consistencyBreakdown.shiftEvents.length === 0 ? (
                             <div className="p-8 border border-border bg-muted/10 text-center">
@@ -135,7 +142,12 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
 
                     {/* Promise Tracker */}
                     <section>
-                        <h2 className="font-serif text-3xl md:text-4xl font-black uppercase tracking-tighter border-b-[3px] border-foreground pb-3 mb-8 mt-4">The Receipt Desk (Promises)</h2>
+                        {/* Credibility Chart injected here */}
+                        <div className="mb-16">
+                            <CredibilityChart politicianName={politician.name} claims={claims || []} evidenceMap={evidenceMap || {}} />
+                        </div>
+
+                        <h2 className="font-serif text-3xl md:text-4xl font-black uppercase tracking-tighter border-b-[3px] border-foreground pb-3 mb-8 mt-4">The Receipt Desk (Legacy Promises)</h2>
 
                         {promises.length === 0 ? (
                             <div className="p-8 border border-border bg-muted/20 text-center">

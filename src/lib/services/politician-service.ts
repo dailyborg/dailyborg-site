@@ -183,7 +183,7 @@ export class PoliticianService {
 
         // Dynamic import protects the pure math functions above from breaking in Node Test CLI
         const { getD1Database } = await import("../db");
-        const db = getD1Database();
+        const db = await getD1Database();
 
         // Execute queries sequentially for local SQLite compatibility under OpenNext
         const politicianRes = await db.prepare(`SELECT * FROM politicians WHERE slug = ?`).bind(slug);
@@ -198,6 +198,45 @@ export class PoliticianService {
         const positions = (positionsRes?.results as PositionEvent[]) || (positionsRes?.[0]?.results as PositionEvent[]) || [];
         const activeMethodology = methodologyRes?.results?.[0] || methodologyRes?.[0]?.results?.[0] || null;
 
+        // Fetch new Verification Engine items
+        const rawClaimsRes = await db.prepare(`SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20`).bind(politician.id);
+        const rawClaims = rawClaimsRes?.results || rawClaimsRes?.[0]?.results || [];
+
+        let evidenceMap: Record<string, any[]> = {};
+        if (rawClaims.length > 0) {
+            const claimIds = rawClaims.map((c: any) => `'${c.id}'`).join(',');
+            const evidenceQuery = `SELECT * FROM evidence WHERE claim_id IN (${claimIds})`;
+            const evRes = await db.prepare(evidenceQuery).all();
+            const allEvidence = evRes?.results || [];
+
+            allEvidence.forEach((ev: any) => {
+                if (!evidenceMap[ev.claim_id]) evidenceMap[ev.claim_id] = [];
+                evidenceMap[ev.claim_id].push(ev);
+            });
+        }
+
+        const stanceChangesRes = await db.prepare(`
+           SELECT sc.*, 
+                  oc.content as old_content, oc.date as old_date, oc.context as old_context,
+                  nc.content as new_content, nc.date as new_date, nc.context as new_context
+           FROM stance_changes sc
+           JOIN claims oc ON sc.old_claim_id = oc.id
+           JOIN claims nc ON sc.new_claim_id = nc.id
+           WHERE sc.politician_id = ? 
+           ORDER BY sc.created_at DESC LIMIT 10
+        `).bind(politician.id);
+
+        const rawStanceChanges = stanceChangesRes?.results || stanceChangesRes?.[0]?.results || [];
+
+        const stanceChangesFormatted = rawStanceChanges.map((sc: any) => ({
+            id: sc.id,
+            topic: sc.topic,
+            shift_description: sc.shift_description,
+            dateOfChange: sc.new_date,
+            old_claim: { content: sc.old_content, date: sc.old_date, context: sc.old_context },
+            new_claim: { content: sc.new_content, date: sc.new_date, context: sc.new_context }
+        }));
+
         const promiseMetrics = this.calculatePromises(promises);
         const consistencyMetrics = this.calculateConsistency(positions);
 
@@ -205,6 +244,9 @@ export class PoliticianService {
             politician,
             promises,
             positions,
+            claims: rawClaims,
+            evidenceMap,
+            aiStanceChanges: stanceChangesFormatted,
             methodology: activeMethodology,
             derivedScores: {
                 promiseKeepsRate: promiseMetrics.rate,

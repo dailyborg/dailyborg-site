@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
         if (subscriberId) {
             console.log(`[STRIPE WEBHOOK] Successful payment for subscriber: ${subscriberId}`);
             try {
-                const db = getD1Database();
+                const db = await getD1Database();
+                if (!db) throw new Error("Could not find local DB bypass mock");
 
                 // Upgrade their account instantly
                 const updateRes = await db.prepare(`

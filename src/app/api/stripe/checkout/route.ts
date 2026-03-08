@@ -17,7 +17,10 @@ export async function POST(req: NextRequest) {
         }
 
         // 1. Verify user exists in the database
-        const db = getD1Database();
+        const db = await getD1Database();
+        if (!db) {
+            return NextResponse.json({ error: "Failed to connect to local database mock." }, { status: 500 });
+        }
         const userQuery = await db.prepare("SELECT * FROM subscribers WHERE id = ?").bind(subscriberId).first();
 
         if (!userQuery) {
