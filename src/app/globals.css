@@ -1,26 +1,209 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: var(--font-source-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-serif: var(--font-playfair), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-accent: hsl(var(--accent));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-success: hsl(var(--success));
+
+  --color-desk-politics: hsl(var(--desk-politics));
+  --color-desk-crime: hsl(var(--desk-crime));
+  --color-desk-business: hsl(var(--desk-business));
+  --color-desk-entertainment: hsl(var(--desk-entertainment));
+  --color-desk-sports: hsl(var(--desk-sports));
+  --color-desk-science: hsl(var(--desk-science));
+  --color-desk-education: hsl(var(--desk-education));
+  --color-desk-borg: hsl(var(--desk-borg));
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@keyframes sparkline {
+
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(234, 179, 8, 0));
+    color: hsl(40, 80%, 50%);
+  }
+
+  14% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+    color: #fff;
+  }
+
+  28% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(234, 179, 8, 0));
+    color: hsl(40, 80%, 50%);
+  }
+
+  42% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+    color: #fff;
+  }
+
+  70% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(234, 179, 8, 0));
+    color: hsl(40, 80%, 50%);
+  }
+}
+
+.animate-sparkline {
+  animation: sparkline 2.5s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+@layer base {
+  :root {
+    --background: 36 33% 97%;
+    --foreground: 220 20% 12%;
+    --primary: 220 60% 20%;
+    --primary-foreground: 36 33% 97%;
+    --muted: 36 20% 92%;
+    --muted-foreground: 220 10% 45%;
+    --border: 36 20% 88%;
+    --accent: 40 80% 50%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 145 60% 35%;
+
+    --desk-politics: 220 70% 45%;
+    --desk-crime: 0 70% 45%;
+    --desk-business: 145 60% 35%;
+    --desk-entertainment: 280 60% 50%;
+    --desk-sports: 25 90% 50%;
+    --desk-science: 185 70% 40%;
+    --desk-education: 45 80% 45%;
+    --desk-borg: 220 60% 20%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 220 20% 12%;
+      --foreground: 36 33% 97%;
+      --primary: 220 60% 20%;
+      --primary-foreground: 36 33% 97%;
+      --muted: 220 20% 18%;
+      --muted-foreground: 220 10% 60%;
+      --border: 220 20% 25%;
+      --accent: 40 80% 50%;
+      --destructive: 0 72% 51%;
+      --destructive-foreground: 0 0% 100%;
+      --success: 145 60% 35%;
+    }
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-serif);
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  /* Structural grids for "newsroom" feel */
+  .grid-newspaper {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+
+  .rule-line {
+    @apply border-t-2 border-foreground;
+  }
+
+  .rule-line-thin {
+    @apply border-t border-border;
+  }
+
+  .column-divider {
+    @apply border-r border-border;
+  }
+
+  @keyframes ticker-scroll {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .ticker-animate {
+    animation: ticker-scroll 30s linear infinite;
+  }
+
+  /* Custom scrollbar for the Live strip */
+  .custom-scrollbar-header::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .custom-scrollbar-header::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin: 0 4px;
+  }
+
+  .custom-scrollbar-header::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+  }
+
+  .custom-scrollbar-header::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.6);
+  }
 }

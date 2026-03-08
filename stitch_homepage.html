@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Daily Borg</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&amp;family=Source+Sans+3:ital,wght@0,200..900;1,200..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1d56c9",
+                        "borg-red": "#d32f2f",
+                        "borg-blue": "#14254b",
+                        "borg-dark-blue": "#0f1c3a",
+                        "borg-gray": "#f0f0f0",
+                        "borg-text-light": "#6b7280",
+                        "borg-border": "#e5e7eb",
+                        "background-light": "#ffffff",
+                        "background-dark": "#111621",
+                        "slate-900": "#111827",
+                        "slate-800": "#1f2937",
+                        "slate-700": "#374151",
+                        "slate-600": "#4b5563",
+                        "slate-500": "#6b7280",
+                        "slate-400": "#9ca3af",
+                        "slate-300": "#d1d5db",
+                        "slate-200": "#e5e7eb",
+                        "slate-100": "#f3f4f6",
+                        "slate-50": "#f9fafb",
+                    },
+                    fontFamily: {
+                        "display": ["Playfair Display", "serif"],
+                        "sans": ["Source Sans 3", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        .nav-link {
+            @apply text-xs font-bold tracking-widest text-slate-600 hover:text-borg-blue transition-colors px-4 py-3 font-display;
+        }
+        .nav-link.active {
+            @apply text-borg-blue border-b-2 border-borg-blue;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-sans">
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+<div class="bg-borg-red text-white flex items-center text-xs font-medium tracking-wide">
+<div class="flex items-center gap-2 px-4 py-2 border-r border-red-800 whitespace-nowrap bg-red-700 font-sans">
+<span class="material-symbols-outlined text-sm">warning</span>
+<span class="font-bold">BREAKING</span>
+</div>
+<div class="overflow-hidden whitespace-nowrap px-4 py-2 flex-1 font-sans">
+<span>DEVELOPING: Cybercrime ring dismantled across 12 countries — 47 arrested      LIVE: NASA Artemis IV deploys Lunar Gateway module successfully      UPDATE: Federal Reserve holds rates steady, signal</span>
+</div>
+</div>
+<div class="bg-borg-blue text-white text-xs font-medium flex justify-between items-center px-6 py-2 font-sans">
+<span>THURSDAY, MARCH 5, 2026</span>
+<div class="flex gap-4">
+<span>Morning Edition</span>
+<a class="hover:underline" href="#">Admin</a>
+</div>
+</div>
+<header class="flex flex-col border-b border-borg-border py-8 px-6 max-w-[1400px] mx-auto w-full">
+<div class="flex items-center justify-between w-full">
+<div class="flex flex-col items-center mx-auto text-center w-full">
+<h1 class="text-6xl font-bold tracking-tight font-display mb-1">The Daily Borg</h1>
+<span class="text-xs font-medium text-slate-400 tracking-[0.2em] uppercase font-sans">BROADCAST OPERATIONS &amp; REPORTING GRID</span>
+</div>
+<div class="flex items-center gap-4 absolute right-10">
+<button class="text-slate-700 hover:text-borg-blue transition-colors">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="text-slate-700 hover:text-borg-blue transition-colors">
+<span class="material-symbols-outlined">person</span>
+</button>
+<button class="bg-borg-blue text-white text-xs font-bold tracking-wider uppercase px-6 py-3 rounded-sm hover:bg-borg-dark-blue transition-colors font-sans">
+                            SUBSCRIBE
+                        </button>
+</div>
+</div>
+</header>
+<nav class="flex justify-center border-b border-borg-border max-w-[1400px] mx-auto w-full">
+<a class="nav-link" href="#">POLITICS</a>
+<a class="nav-link" href="#">CRIME</a>
+<a class="nav-link" href="#">BUSINESS</a>
+<a class="nav-link" href="#">ENTERTAINMENT</a>
+<a class="nav-link" href="#">SPORTS</a>
+<a class="nav-link" href="#">SCIENCE</a>
+<a class="nav-link" href="#">EDUCATION</a>
+<a class="nav-link active" href="#">BORG RECORD</a>
+</nav>
+<div class="bg-borg-blue text-white text-xs border-y border-borg-dark-blue flex items-center px-4 w-full font-sans">
+<div class="flex items-center gap-2 text-yellow-500 font-bold px-4 py-3 border-r border-slate-700 whitespace-nowrap">
+<span class="material-symbols-outlined text-sm">show_chart</span>
+<span>LIVE</span>
+</div>
+<div class="flex flex-1 overflow-x-auto no-scrollbar items-center">
+<div class="flex items-center gap-2 px-6 py-3 border-r border-slate-700 whitespace-nowrap text-slate-300">
+<span class="material-symbols-outlined text-sm">account_balance</span>
+<span>House Roll Call #127 — H.R. 4521 passed 231-198 <span class="text-slate-500 ml-1">2:45 PM</span></span>
+</div>
+<div class="flex items-center gap-2 px-6 py-3 border-r border-slate-700 whitespace-nowrap text-slate-300">
+<span class="material-symbols-outlined text-sm">account_balance</span>
+<span>Senate Vote #89 — Cloture invoked on infrastructure bill <span class="text-slate-500 ml-1">1:30 PM</span></span>
+</div>
+<div class="flex items-center gap-2 px-6 py-3 border-r border-slate-700 whitespace-nowrap text-slate-300">
+<span class="material-symbols-outlined text-sm">feed</span>
+<span>President signs Executive Order on clean energy procurement <span class="text-slate-500 ml-1">12:00 PM</span></span>
+</div>
+<div class="flex items-center gap-2 px-6 py-3 whitespace-nowrap text-slate-300">
+<span class="material-symbols-outlined text-sm">sports_basketball</span>
+<span>Lakers 112 — Celtics 108 (F)</span>
+</div>
+</div>
+</div>
+<div class="layout-container flex h-full grow flex-col max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8">
+<main class="grid grid-cols-1 lg:grid-cols-12 gap-10 py-10">
+<article class="lg:col-span-8 flex flex-col pr-0 lg:pr-10 border-r-0 lg:border-r border-borg-border">
+<div class="aspect-[16/9] w-full bg-borg-gray flex items-center justify-center mb-6">
+<span class="text-slate-400 text-sm tracking-widest uppercase font-sans">Lead Image</span>
+</div>
+<div>
+<span class="text-primary font-bold text-xs uppercase tracking-wider mb-3 block font-sans">CONGRESS</span>
+<h2 class="text-4xl md:text-[3.5rem] font-bold leading-[1.1] font-display text-slate-900 mb-6">Senate Advances Landmark Infrastructure Bill After Bipartisan Agreement</h2>
+<p class="text-xl text-slate-600 leading-relaxed font-sans">The Senate voted 68-29 to advance the $1.2 trillion infrastructure package, clearing a key procedural hurdle after weeks of negotiations between both parties.</p>
+<div class="flex items-center gap-2 text-xs text-slate-500 mt-4 font-sans">
+<span>The Daily Borg Political Desk</span>
+<span>•</span>
+<span>9:30 AM</span>
+<span>•</span>
+<span>6 min read</span>
+</div>
+</div>
+</article>
+<aside class="lg:col-span-4 flex flex-col gap-10">
+<article class="border-b border-borg-border pb-10">
+<span class="text-green-600 font-bold text-xs uppercase tracking-wider mb-3 block font-sans">ECONOMY</span>
+<h3 class="text-2xl font-bold leading-tight font-display text-slate-900 mb-3 hover:text-borg-blue cursor-pointer">Federal Reserve Signals Cautious Approach to Interest Rate Adjustments in 2026</h3>
+<p class="text-[15px] text-slate-600 leading-relaxed mb-4 font-sans">In a closely watched statement, the Federal Reserve indicated it will maintain its current policy stance, citing mixed economic signals and...</p>
+<div class="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-sans">
+<span>7:15 AM</span>
+<span>•</span>
+<span>8 min</span>
+</div>
+</article>
+<article class="border-b border-borg-border pb-10">
+<span class="text-teal-600 font-bold text-xs uppercase tracking-wider mb-3 block font-sans">SPACE</span>
+<h3 class="text-2xl font-bold leading-tight font-display text-slate-900 mb-3 hover:text-borg-blue cursor-pointer">NASA's Artemis IV Mission Successfully Deploys Lunar Gateway Module</h3>
+<p class="text-[15px] text-slate-600 leading-relaxed mb-4 font-sans">The first habitable module of the Lunar Gateway was deployed into orbit around the Moon, marking a critical milestone in humanity's return to...</p>
+<div class="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-sans">
+<span>5:45 AM</span>
+<span>•</span>
+<span>5 min</span>
+</div>
+</article>
+<article>
+<span class="text-red-600 font-bold text-xs uppercase tracking-wider mb-3 block font-sans">INVESTIGATIONS</span>
+<h3 class="text-2xl font-bold leading-tight font-display text-slate-900 mb-3 hover:text-borg-blue cursor-pointer">Major Cybercrime Ring Dismantled in Multi-Agency Operation Spanning 12 Countries</h3>
+<p class="text-[15px] text-slate-600 leading-relaxed mb-4 font-sans">Law enforcement agencies across three continents coordinated to arrest 47 suspects tied to a sophisticated ransomware network responsible f...</p>
+<div class="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-sans">
+<span>4:20 AM</span>
+<span>•</span>
+<span>7 min</span>
+</div>
+</article>
+</aside>
+</main>
+<section class="border-t border-borg-border py-10">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-xl font-bold font-display uppercase flex items-center gap-2">
+<span class="w-1 h-6 bg-primary inline-block"></span> POLITICS GRID
+        </h3>
+<a class="text-xs text-slate-500 hover:text-borg-blue font-sans" href="#">All stories &gt;</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+<article>
+<div class="aspect-[16/9] w-full bg-borg-gray flex items-center justify-center mb-4">
+<span class="text-slate-400 text-[10px] tracking-widest uppercase font-sans">Image</span>
+</div>
+<span class="text-primary font-bold text-[10px] uppercase tracking-wider mb-2 block font-sans">CONGRESS</span>
+<h4 class="text-xl font-bold leading-tight font-display text-slate-900 mb-2 hover:text-borg-blue cursor-pointer">Senate Advances Landmark Infrastructure Bill After Bipartisan Agreement</h4>
+<p class="text-sm text-slate-600 leading-relaxed mb-2 font-sans">The Senate voted 68-29 to advance the $1.2 trillion infrastructure package, clearing a key procedural hurdle after weeks of negotiations between both parties.</p>
+<div class="flex items-center gap-2 text-[10px] text-slate-500 font-sans">
+<span>The Daily Borg Political Desk</span>
+<span>•</span>
+<span>9:30 AM</span>
+</div>
+</article>
+<article>
+<span class="text-blue-600 font-bold text-[10px] uppercase tracking-wider mb-2 block font-sans">WHITE HOUSE</span>
+<h4 class="text-xl font-bold leading-tight font-display text-slate-900 mb-2 hover:text-borg-blue cursor-pointer">White House Announces New Executive Actions on Climate and Clean Energy</h4>
+<p class="text-sm text-slate-600 leading-relaxed mb-2 font-sans">A sweeping set of executive orders aims to accelerate the transition to renewable energy, setting ambitious federal procurement targets and new emission standards.</p>
+<div class="flex items-center gap-2 text-[10px] text-slate-500 font-sans">
+<span>6:00 AM</span>
+<span>•</span>
+<span>7 min</span>
+</div>
+</article>
+</div>
+</section>
+<section class="border-t border-borg-border py-10">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-xl font-bold font-display uppercase flex items-center gap-2">
+<span class="w-1 h-6 bg-red-600 inline-block"></span> CRIME GRID
+        </h3>
+<a class="text-xs text-slate-500 hover:text-borg-blue font-sans" href="#">All stories &gt;</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+<article>
+<div class="aspect-[16/9] w-full bg-borg-gray flex items-center justify-center mb-4">
+<span class="text-slate-400 text-[10px] tracking-widest uppercase font-sans">Image</span>
+</div>
+<span class="text-red-600 font-bold text-[10px] uppercase tracking-wider mb-2 block font-sans">INVESTIGATIONS</span>
+<h4 class="text-xl font-bold leading-tight font-display text-slate-900 mb-2 hover:text-borg-blue cursor-pointer">Major Cybercrime Ring Dismantled in Multi-Agency Operation Spanning 12 Countries</h4>
+<p class="text-sm text-slate-600 leading-relaxed mb-2 font-sans">Law enforcement agencies across three continents coordinated to arrest 47 suspects tied to a sophisticated ransomware network responsible for over $800 million in damages.</p>
+<div class="flex items-center gap-2 text-[10px] text-slate-500 font-sans">
+<span>The Daily Borg Crime Desk</span>
+<span>•</span>
+<span>4:20 AM</span>
+</div>
+</article>
+<article>
+<span class="text-red-700 font-bold text-[10px] uppercase tracking-wider mb-2 block font-sans">COURTS &amp; JUSTICE</span>
+<h4 class="text-xl font-bold leading-tight font-display text-slate-900 mb-2 hover:text-borg-blue cursor-pointer">Supreme Court to Hear Landmark Case on Digital Privacy Rights</h4>
+<p class="text-sm text-slate-600 leading-relaxed mb-2 font-sans">The court agreed to take up a case that could redefine the boundaries of government surveillance in the digital age, with oral arguments expected this fall.</p>
+<div class="flex items-center gap-2 text-[10px] text-slate-500 font-sans">
+<span>2:30 AM</span>
+<span>•</span>
+<span>9 min</span>
+</div>
+</article>
+</div>
+</section>
+<section class="border-t border-borg-border py-10">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-xl font-bold font-display uppercase flex items-center gap-2">
+<span class="w-1 h-6 bg-green-600 inline-block"></span> BUSINESS GRID
+        </h3>
+<a class="text-xs text-slate-500 hover:text-borg-blue font-sans" href="#">All stories &gt;</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+<article>
+<div class="aspect-[16/9] w-full bg-borg-gray flex items-center justify-center mb-4">
+<span class="text-slate-400 text-[10px] tracking-widest uppercase font-sans">Image</span>
+</div>
+<span class="text-green-600 font-bold text-[10px] uppercase tracking-wider mb-2 block font-sans">ECONOMY</span>
+<h4 class="text-xl font-bold leading-tight font-display text-slate-900 mb-2 hover:text-borg-blue cursor-pointer">Federal Reserve Signals Cautious Approach to Interest Rate Adjustments in 2026</h4>
+<p class="text-sm text-slate-600 leading-relaxed mb-2 font-sans">In a closely watched statement, the Federal Reserve indicated it will maintain its current policy stance, citing mixed economic signals and persistent global uncertainty.</p>
+<div class="flex items-center gap-2 text-[10px] text-slate-500 font-sans">
+<span>The Daily Borg Business Desk</span>
+<span>•</span>
+<span>7:15 AM</span>
+</div>
+</article>
+<article>
+<span class="text-green-700 font-bold text-[10px] uppercase tracking-wider mb-2 block font-sans">MARKETS</span>
+<h4 class="text-xl font-bold leading-tight font-display text-slate-900 mb-2 hover:text-borg-blue cursor-pointer">Tech Giants Report Record Q4 Earnings Amid AI Investment Surge</h4>
+<p class="text-sm text-slate-600 leading-relaxed mb-2 font-sans">The five largest technology companies posted combined revenues exceeding $500 billion, driven largely by enterprise AI adoption and cloud infrastructure demand.</p>
+<div class="flex items-center gap-2 text-[10px] text-slate-500 font-sans">
+<span>1:00 PM</span>
+<span>•</span>
+<span>6 min</span>
+</div>
+</article>
+</div>
+</section>
+<section class="border-t border-borg-border py-20 mt-10 flex flex-col items-center justify-center text-center">
+<span class="material-symbols-outlined text-4xl text-slate-400 mb-4">mail</span>
+<h3 class="text-4xl font-bold font-display text-slate-900 mb-3">Stay Informed</h3>
+<p class="text-slate-600 mb-8 font-sans">Get The Daily Borg delivered to your inbox. Source-backed reporting, every morning.</p>
+<div class="flex flex-col items-center w-full max-w-md gap-3">
+<div class="flex w-full gap-2">
+<input class="flex-1 border border-slate-300 rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-borg-blue focus:ring-1 focus:ring-borg-blue font-sans" placeholder="your@email.com" type="email"/>
+<button class="bg-borg-blue text-white text-xs font-bold tracking-wider uppercase px-8 py-3 rounded-sm hover:bg-borg-dark-blue transition-colors whitespace-nowrap font-sans">
+                            SUBSCRIBE
+                        </button>
+</div>
+<span class="text-xs text-slate-400 font-sans">No spam. Unsubscribe anytime. We respect your inbox.</span>
+</div>
+</section>
+</div>
+<footer class="bg-borg-blue text-white pt-16 pb-8 font-sans">
+<div class="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-12">
+<div class="flex flex-col">
+<h2 class="text-3xl font-bold font-display mb-1">The Daily Borg</h2>
+<span class="text-[10px] font-medium text-slate-400 tracking-[0.2em] uppercase mb-6 block font-sans">BROADCAST OPERATIONS &amp; REPORTING GRID</span>
+<p class="text-sm text-slate-300 leading-relaxed font-sans">Source-backed journalism. Transparent methods. Public record accountability.</p>
+</div>
+<div class="flex flex-col gap-4">
+<h4 class="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2 font-sans">SECTIONS</h4>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Politics Grid</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Crime Grid</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Business Grid</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Entertainment Grid</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Sports Grid</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Science Grid</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Education Grid</a>
+</div>
+<div class="flex flex-col gap-4">
+<h4 class="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2 font-sans">BORG RECORD</h4>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Promise Tracker</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Voting Record</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Consistency Tracker</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Compare Officials</a>
+</div>
+<div class="flex flex-col gap-4">
+<h4 class="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2 font-sans">ABOUT</h4>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">About Us</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Editorial Standards</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Methodology</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Corrections</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">AI Disclosure</a>
+<a class="text-sm text-slate-300 hover:text-white transition-colors font-sans" href="#">Contact</a>
+</div>
+</div>
+</footer>
+</div>
+</body></html>

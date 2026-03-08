@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Daily Borg: Politician Head-to-Head</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;700;800&amp;family=Playfair+Display:ital,wght@0,700;1,700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f2b90d",
+                        "background-light": "#f8f8f5",
+                        "background-dark": "#12110a",
+                        "card-dark": "#1c1a12",
+                        "accent-gold": "#d4af37",
+                        "success-emerald": "#10b981",
+                        "danger-crimson": "#dc2626"
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"],
+                        "serif": ["Playfair Display", "serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .custom-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+<!-- Header -->
+<header class="flex items-center bg-background-light dark:bg-background-dark p-4 pb-2 justify-between border-b border-primary/10 sticky top-0 z-50">
+<div class="text-primary flex size-10 shrink-0 items-center justify-center">
+<span class="material-symbols-outlined text-3xl">menu</span>
+</div>
+<h1 class="font-serif italic text-2xl font-bold text-center flex-1 tracking-tight">The Daily Borg</h1>
+<div class="flex w-10 items-center justify-end">
+<button class="text-primary">
+<span class="material-symbols-outlined text-3xl">search</span>
+</button>
+</div>
+</header>
+<!-- Trending Matchups -->
+<section class="py-6">
+<h3 class="text-primary text-xs font-bold uppercase tracking-widest px-4 pb-3">Trending Matchups</h3>
+<div class="flex w-full overflow-x-auto custom-scrollbar px-4 gap-6">
+<div class="flex flex-col items-center gap-2 min-w-[70px]">
+<div class="size-16 rounded-full border-2 border-primary p-0.5">
+<div class="w-full h-full rounded-full bg-cover bg-center" data-alt="Portrait of politician Eleanor Vance" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAOwVdxEXYVjUrHB66vrvAmgXZUv6GzzRpB99WBh0D9e7KVLqQ6qQmwU2yx6KzTKx42reoIpgMl77n68SA9SSQS9zk7iChRrTdKvDER5rGAljxxyfhttFS9gTGe3xnU09UtkdzZAFK1a_6qxDpiEVjMDx3uELXx47de1yTN2Clumsc76ooHSiXxadmolxGyzoqhA5a3gCAOmNBjsdDaC4yJceyP2JycF70gMapDcordxTz1Qk3g05CJpPOr4RKw84rcXn1mi3YklY0')"></div>
+</div>
+<p class="text-[11px] font-bold text-slate-400">VANCE</p>
+</div>
+<div class="flex flex-col items-center gap-2 min-w-[70px]">
+<div class="size-16 rounded-full border-2 border-slate-700 p-0.5">
+<div class="w-full h-full rounded-full bg-cover bg-center" data-alt="Portrait of politician Sarah Jenkins" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAydBJSHAZ-VG7h-0FZLdTdvUVscx-oS2qiXKwT4DIp5M7wG-UW3wNr0HLoNX9SeUzTESrVlIUBIBREkCvUisq-lO2h7pbKyyHgd09pzHQd1o6Htc5tsHKssUlX7HluHo7mj5SoNWQKroRKqZ7EDlSI0mMwMwg4XgmlTJpzndfbCSMH1foxHFRq08fXifULUIaZ8uzA_lCZ0kL19Oyn9jQIF6zeTrbDfPWgGDSGH-jmiYhXiI7DZW1yOt3H_jdgyq4cWfgNgS8l7MY')"></div>
+</div>
+<p class="text-[11px] font-bold text-slate-400 uppercase">Jenkins</p>
+</div>
+<div class="flex flex-col items-center gap-2 min-w-[70px]">
+<div class="size-16 rounded-full border-2 border-slate-700 p-0.5">
+<div class="w-full h-full rounded-full bg-cover bg-center" data-alt="Portrait of politician Michael Smith" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDCt5pIpK3-g4BMCkJsofaYesuY29EBuN0wrww5bhdqHeYs0QL4atnzT1gLuvEOOfGhDIe6aMA3-gpZjdv4Nu4IkSscxqu2dM7tXI-gN9xuD6HtXDfkIcThjPYm5oUPS4I8HOsgU5MgjafsdcbW86dc8TD8cDbAMjO1dYV0TcKNIfgZ2kX1CRCrpsDQBNC21FkNMY0vr3h7uZaW24P2Ua90XZmqb7nO9xyPcbby5zC6EFIS6DBomSTHHbO6H-7RioyoiqLkV1pIlLI')"></div>
+</div>
+<p class="text-[11px] font-bold text-slate-400 uppercase">Smith</p>
+</div>
+<div class="flex flex-col items-center gap-2 min-w-[70px]">
+<div class="size-16 rounded-full border-2 border-slate-700 p-0.5">
+<div class="w-full h-full rounded-full bg-cover bg-center" data-alt="Portrait of politician David Chen" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAFadS_h3Y7-KbsHZ710Axn-yp4-9xUtZ2z84pJ8wfo6AbzPHQxGlVI4Ynj8_c6YPRa5FcI_O8KSa0wTwzJNMZR4NLZ9fPnZ2gRyLxOEdLow-RjGFuUE-Q9GUyMKAbbrpY2IB8LezgCalc5SdkVc6h23-f9rN5HIK6QjzzfCDhPFptvHfctWmiZdCLHeIyURTRTWj1w9CcYYG5q6FUml6lZfpaLFUNSWNL8ac9AHrqgE6TY0o_19rn4B_7eheQ__T-NHoX91FoGd7w')"></div>
+</div>
+<p class="text-[11px] font-bold text-slate-400 uppercase">Chen</p>
+</div>
+<div class="flex flex-col items-center gap-2 min-w-[70px]">
+<div class="size-16 rounded-full border-2 border-slate-700 p-0.5">
+<div class="w-full h-full rounded-full bg-cover bg-center" data-alt="Portrait of politician Robert Ross" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC7fvetj-Ia1aYwzla6LvONA6BZXiJM0zJ38i9qfvNIpAnw47J4vV_EB6Pz6N8naNqOtQV7Acqm1Oeyl6N1VxdvhPNwRCtoZ7tQQXMBzK-Q3eLfmFR3UManhjrBPxRPg5vBvR5g9JRjY-WikIbhfvAsX33_COQQxDvFZ7cc2LqDigmtqp-WMOc7mQESK3wZrpTddxuZlDZT1PgtnPtVkWprm3LoXXJqAmlgDuDIHYoWvS-YvZzz3rWxLP4hGiQl_WOpO0uRyNde7vc')"></div>
+</div>
+<p class="text-[11px] font-bold text-slate-400 uppercase">Ross</p>
+</div>
+</div>
+</section>
+<!-- Head-to-Head Comparison -->
+<main class="flex-1 px-4">
+<h2 class="font-serif text-3xl font-bold mb-6 text-center">Head-to-Head</h2>
+<div class="grid grid-cols-2 gap-4 mb-8">
+<!-- Politician 1 -->
+<div class="flex flex-col gap-3">
+<div class="aspect-[3/4] rounded-xl overflow-hidden relative border border-primary/20">
+<img alt="Eleanor Vance" class="w-full h-full object-cover" data-alt="Large high resolution portrait of Eleanor Vance" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCERDjytbNJQYLLW53Fr1ONn7neq_ZtM-T65KXNPJJYPyMjCFfSOqCEOCi569he5r3cMMAGV_2EhfnvwD036qtT5iNEqzqoamy0OaMBjAKr28C0K4_EU3jCb4oboqGUO1UlFZ-wsMk_ok_tqQ3dDZG-7aYnl_kaJSrB3dMl7yC21PPJpcNUtUAZilx7YJlKKYVIEm7if_dIE_evMTfEKQm-zP-OacFCZ5z8EQ3uQzuVN7EM8XUMmk9rkp6D3LsjJ1fdnca70fBq81M"/>
+<div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+<p class="text-primary text-[10px] font-bold tracking-widest uppercase">Incumbent</p>
+<h4 class="font-serif text-lg leading-tight">Eleanor Vance</h4>
+</div>
+</div>
+</div>
+<!-- Politician 2 -->
+<div class="flex flex-col gap-3">
+<div class="aspect-[3/4] rounded-xl overflow-hidden relative border border-slate-700">
+<img alt="Sarah Jenkins" class="w-full h-full object-cover" data-alt="Large high resolution portrait of Sarah Jenkins" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2CJaHzHyTYZd5V_MwItRdPp0DXMtLGbX9CCeRypTNzvU5rsQkjEarjDegXor0Sx105ZGcSjFof_SXlVrjDdYkRM-dRCLADYyAbcVq1iPstHOGaGaoF80EmUAzp2Th2L9GzxL1280rukSBvJwLH8SXBcUEqxsZX1UydXaSQAiJA5coxMILK5av72xOWlXVksb6zXNpUuRtj9jGAY1-V-QTXpo_xzT3isqvT3Xm8-epV9YqFjQcVFg7MR85Vl56C_cdh6XSFyNTksU"/>
+<div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+<p class="text-slate-400 text-[10px] font-bold tracking-widest uppercase">Challenger</p>
+<h4 class="font-serif text-lg leading-tight">Sarah Jenkins</h4>
+</div>
+</div>
+</div>
+</div>
+<!-- Promises Kept Matrix -->
+<div class="bg-card-dark rounded-xl border border-primary/10 p-5 mb-8">
+<h3 class="font-serif text-xl mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">verified_user</span>
+                    Promises Kept Index
+                </h3>
+<div class="space-y-8">
+<!-- Economy -->
+<div>
+<div class="flex justify-between text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+<span>Economy</span>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<div class="space-y-1">
+<div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-success-emerald w-[88%]"></div>
+</div>
+<span class="text-xs font-bold text-success-emerald">88%</span>
+</div>
+<div class="space-y-1">
+<div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-danger-crimson w-[34%]"></div>
+</div>
+<span class="text-xs font-bold text-danger-crimson">34%</span>
+</div>
+</div>
+</div>
+<!-- Healthcare -->
+<div>
+<div class="flex justify-between text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+<span>Healthcare</span>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<div class="space-y-1">
+<div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-danger-crimson w-[42%]"></div>
+</div>
+<span class="text-xs font-bold text-danger-crimson">42%</span>
+</div>
+<div class="space-y-1">
+<div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-success-emerald w-[76%]"></div>
+</div>
+<span class="text-xs font-bold text-success-emerald">76%</span>
+</div>
+</div>
+</div>
+<!-- Education -->
+<div>
+<div class="flex justify-between text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+<span>Education</span>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<div class="space-y-1">
+<div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[65%]"></div>
+</div>
+<span class="text-xs font-bold text-primary">65%</span>
+</div>
+<div class="space-y-1">
+<div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[58%]"></div>
+</div>
+<span class="text-xs font-bold text-primary">58%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- National Party Metrics -->
+<section class="mb-8">
+<h3 class="font-serif text-xl mb-4">National Party Metrics</h3>
+<div class="grid grid-cols-1 gap-4">
+<div class="bg-card-dark p-4 rounded-xl border border-primary/5">
+<div class="flex items-center justify-between mb-4">
+<span class="text-sm font-medium">Party Approval Rating</span>
+<span class="material-symbols-outlined text-primary text-sm">trending_up</span>
+</div>
+<div class="flex items-end gap-1 h-24">
+<div class="flex-1 bg-primary/20 h-[40%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/20 h-[55%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/20 h-[45%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/40 h-[70%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary/40 h-[65%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary h-[85%] rounded-t-sm"></div>
+</div>
+<div class="flex justify-between text-[10px] text-slate-500 mt-2 uppercase font-bold tracking-tighter">
+<span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Connected Races -->
+<section class="mb-20">
+<h3 class="font-serif text-xl mb-4">Connected Races</h3>
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-4 bg-card-dark p-3 rounded-xl border border-primary/5">
+<div class="size-12 rounded-lg bg-cover bg-center" data-alt="Portrait of candidate Marcus Thorne" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCAsCTL90h8HqhA8v4vpXjt0IeGV_vk2zLGAI1d76QZ6eC0u7-4tFsC93I-gLkqvnIRhaq0CRWWzgKJbnz5GEa3yMlfoQk2GgxMU6FJUfjqsbQZE2R-6B1evyvCJp9x9kdmsLgJH9SxpPf3rjaDjYMpkarrY8U0BATKSwYFQmEok75uer-2D7URBuEXCCqfE2LL355H4az2BEs5wV4FpJYGICJ0Ttic5EXIkVap9uqKb7wwp3zu20rLbJl3UThLuRjEnF-3bJ_T5zY')"></div>
+<div class="flex-1">
+<h5 class="text-sm font-bold">District 4: Senate Seat</h5>
+<p class="text-xs text-slate-400">Marcus Thorne vs Lydia Kane</p>
+</div>
+<div class="text-primary">
+<span class="material-symbols-outlined">chevron_right</span>
+</div>
+</div>
+<div class="flex items-center gap-4 bg-card-dark p-3 rounded-xl border border-primary/5">
+<div class="size-12 rounded-lg bg-cover bg-center" data-alt="Portrait of candidate Helen Mirren" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDUlmM2fc3CKLi24zLTRLpoL5bhYpbZdHacj0eQ95dXxgqSZ235nNMbKg4XvQXW_L2BXdcC4VvEGv89jP8sOleUrKPLoRQUrRC_JOfW1x3cU9zPX5FKDzDJCe1gpeQIVoZ4POnuf8ya0aKTMtMgI8AV8tDfegUUuEwgjEw5EkslhYs_PoZlronojqrx19uEg_9rXNr6Hr3qdjpVKe9qRn2Ql6O1HiB6bSQCcUdzUdS-usX4F_hqdvT4Dye2lYUvPO5_s1-p9CFrz9s')"></div>
+<div class="flex-1">
+<h5 class="text-sm font-bold">Mayoral Election: Borg City</h5>
+<p class="text-xs text-slate-400">Helen Mirren vs Arthur Dent</p>
+</div>
+<div class="text-primary">
+<span class="material-symbols-outlined">chevron_right</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation -->
+<nav class="fixed bottom-0 w-full flex gap-2 border-t border-primary/20 bg-background-dark/95 backdrop-blur-md px-4 pb-6 pt-2 z-50">
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined">newspaper</span>
+<p class="text-[10px] font-medium leading-normal tracking-wide uppercase">News</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">compare_arrows</span>
+<p class="text-[10px] font-bold leading-normal tracking-wide uppercase">Compare</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined">poll</span>
+<p class="text-[10px] font-medium leading-normal tracking-wide uppercase">Polls</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined">account_circle</span>
+<p class="text-[10px] font-medium leading-normal tracking-wide uppercase">Profile</p>
+</a>
+</nav>
+</div>
+</body></html>

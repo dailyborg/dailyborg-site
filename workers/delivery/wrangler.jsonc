@@ -1,0 +1,18 @@
+{
+    "$schema": "../../node_modules/wrangler/config-schema.json",
+    "name": "dailyborg-delivery",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-03-05",
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "dailyborg-db",
+            "database_id": "bd0536ef-bd24-41d3-a9d9-f538cb1603ba" // Ensure this matches the main wrangler.jsonc
+        }
+    ],
+    "triggers": {
+        "crons": [
+            "0 12 * * *" // Run every day at noon UTC by default
+        ]
+    }
+}

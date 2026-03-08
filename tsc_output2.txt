@@ -1,0 +1,14 @@
+﻿next.config.ts(9,8): error TS2307: Cannot find module '@opennextjs/cloudflare' or its corresponding type declarations.
+open-next.config.ts(2,40): error TS2307: Cannot find module '@opennextjs/cloudflare' or its corresponding type declarations.
+open-next.config.ts(3,32): error TS2307: Cannot find module '@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache' or its corresponding type declarations.
+scripts/test-e2e-rss.ts(1,20): error TS2307: Cannot find module 'rss-parser' or its corresponding type declarations.
+scripts/test-e2e-rss.ts(38,51): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/app/api/ingest/route.ts(2,38): error TS2307: Cannot find module '@opennextjs/cloudflare' or its corresponding type declarations.
+src/app/api/subscribe/route.ts(2,38): error TS2307: Cannot find module '@opennextjs/cloudflare' or its corresponding type declarations.
+src/app/api/subscribe/route.ts(3,24): error TS2307: Cannot find module 'resend' or its corresponding type declarations.
+src/app/subscribe/page.tsx(62,53): error TS18046: 'data' is of type 'unknown'.
+src/app/subscribe/page.tsx(71,54): error TS18046: 'data' is of type 'unknown'.
+src/app/subscribe/page.tsx(246,146): error TS2304: Cannot find name 'AlertCircle'.
+src/lib/services/politician-service.ts(157,48): error TS2307: Cannot find module '@/lib/db' or its corresponding type declarations.
+src/lib/utils.ts(1,39): error TS2307: Cannot find module 'clsx' or its corresponding type declarations.
+src/lib/utils.ts(2,25): error TS2307: Cannot find module 'tailwind-merge' or its corresponding type declarations.

@@ -1,0 +1,21 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "dailyborg-social-publisher",
+    "main": "src/index.ts",
+    "compatibility_date": "2024-03-01",
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "dailyborg-db",
+            "database_id": "bd0536ef-bd24-41d3-a9d9-f538cb1603ba"
+        }
+    ],
+    "ai": {
+        "binding": "AI"
+    },
+    "triggers": {
+        "crons": [
+            "0 */4 * * *"
+        ]
+    }
+}
