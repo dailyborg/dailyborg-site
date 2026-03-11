@@ -1,0 +1,25 @@
+{
+    "$schema": "../../node_modules/wrangler/config-schema.json",
+    "name": "dailyborg-scraper",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-03-05",
+    "queues": {
+        "producers": [
+            {
+                "queue": "ingest-queue",
+                "binding": "INGEST_QUEUE"
+            }
+        ]
+    },
+    "kv_namespaces": [
+        {
+            "binding": "SENTINEL_CACHE",
+            "id": "e45edeb9186641e7be17fccce90289ab" // Fallback ID; user should provision a real one
+        }
+    ],
+    "triggers": {
+        "crons": [
+            "0 * * * *" // Run at minute 0 past every hour
+        ]
+    }
+}

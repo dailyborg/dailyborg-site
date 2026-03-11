@@ -16,7 +16,19 @@
         {
             "binding": "DB",
             "database_name": "dailyborg-db",
-            "database_id": "bd0536ef-bd24-41d3-a9d9-f538cb1603ba"
+            "database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3"
+        }
+    ],
+    "vectorize": [
+        {
+            "binding": "VECTORIZE",
+            "index_name": "dailyborg-claims"
+        }
+    ],
+    "r2_buckets": [
+        {
+            "binding": "IMAGE_BUCKET",
+            "bucket_name": "borg-images"
         }
     ],
     "triggers": {

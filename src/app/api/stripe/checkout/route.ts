@@ -1,66 +1,57 @@
-import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
-import { getD1Database } from "@/lib/db";
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
 
-// Edge runtime isn't strictly required here but is good practice for global Next.js compat
-export const runtime = "edge";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock", {});
-
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
     try {
-        const body = (await req.json()) as any;
-        const { subscriberId, email, channel } = body;
+        const body = await request.json() as any;
+        const { subscriberId, email } = body;
 
         if (!subscriberId) {
             return NextResponse.json({ error: "Missing subscriber ID" }, { status: 400 });
         }
 
-        // 1. Verify user exists in the database
-        const db = await getD1Database();
-        if (!db) {
-            return NextResponse.json({ error: "Failed to connect to local database mock." }, { status: 500 });
-        }
-        const userQuery = await db.prepare("SELECT * FROM subscribers WHERE id = ?").bind(subscriberId).first();
+        const stripeSecret = process.env.STRIPE_SECRET_KEY || (process.env as any).STRIPE_SECRET_KEY_MOCK || 'sk_test_MockToken123xyz';
 
-        if (!userQuery) {
-            return NextResponse.json({ error: "Subscriber not found in database" }, { status: 404 });
+        // For local testing without real keys, return a mock redirect
+        if (stripeSecret === 'sk_test_MockToken123xyz') {
+            console.warn("No Stripe Secret Key found. Mocking checkout success for dev environment.");
+            return NextResponse.json({ url: `/subscribe?success=true&mock_id=${subscriberId}` });
         }
 
-        // 2. Build Stripe Checkout Session
-        // We use client_reference_id to securely track who paid for what in the Webhook
-        const origin = req.headers.get("origin") || "http://localhost:3000";
+        const stripe = new Stripe(stripeSecret, {
+            apiVersion: '2026-02-25.clover',
+        });
+
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ["card"],
-            mode: "subscription",
-            client_reference_id: subscriberId, // VERY IMPORTANT: Links payment to our internal DB
-            customer_email: channel === "email" ? email : undefined, // Pre-fill if we have an email
+            payment_method_types: ['card'],
+            customer_email: email, // Pre-fill email so they don't have to type it again
+            client_reference_id: subscriberId, // Crucial connection back to our D1 database UUID
+            mode: 'subscription', // Since we don't have a pre-created price ID, we'll use inline price_data. For subscriptions, Stripe requires a saved Price ID or inline recurring prices.
             line_items: [
                 {
                     price_data: {
-                        currency: "usd",
+                        currency: 'usd',
                         product_data: {
-                            name: "Premium Director Access",
-                            description: "Full intelligence reports delivered directly to your vectors.",
+                            name: 'Premium Director Access',
+                            description: 'Full articles delivered securely to your inbox (Email / WhatsApp).',
                         },
                         unit_amount: 99, // $0.99
                         recurring: {
-                            interval: "month",
+                            interval: 'month',
                         },
                     },
                     quantity: 1,
                 },
             ],
-            success_url: `${origin}/subscribe?success=true&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${origin}/subscribe?canceled=true`,
+            success_url: `${baseUrl}/subscribe?success=true`,
+            cancel_url: `${baseUrl}/subscribe?canceled=true`,
         });
 
-        // 3. Return the exact Checkout URL for the frontend to visually redirect the user to
-        return NextResponse.json({ url: session.url });
-
+        return NextResponse.json({ url: session.url }, { status: 200 });
     } catch (err: any) {
         console.error("Stripe Checkout Error:", err);
-        return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 });
+        return NextResponse.json({ error: err.message }, { status: 500 });
     }
 }

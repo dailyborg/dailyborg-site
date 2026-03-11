@@ -1,0 +1,17 @@
+{
+    "name": "publisher-engine",
+    "main": "src/index.ts",
+    "compatibility_date": "2023-10-25",
+    "triggers": {
+        "crons": [
+            "*/30 * * * *"
+        ]
+    },
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "dailyborg-db",
+            "database_id": "4be75cbe-a1db-495d-ab63-d14cf1f391a8"
+        }
+    ]
+}

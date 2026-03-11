@@ -1,0 +1,51 @@
+{
+    "name": "dailyborg-feeder",
+    "main": "src/workers/feeder.ts",
+    "compatibility_date": "2026-03-05",
+    "triggers": {
+        "crons": [
+            "0 * * * *"
+        ]
+    },
+    "queues": {
+        "producers": [
+            {
+                "binding": "ENRICHMENT_QUEUE",
+                "queue": "enrichment-queue"
+            },
+            {
+                "binding": "PROCESSING_QUEUE",
+                "queue": "processing-queue"
+            }
+        ],
+        "consumers": [
+            {
+                "queue": "enrichment-queue",
+                "max_batch_size": 1,
+                "max_retries": 1
+            },
+            {
+                "queue": "processing-queue",
+                "max_batch_size": 1,
+                "max_retries": 1
+            }
+        ]
+    },
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "dailyborg-db",
+            "database_id": "bd0536ef-bd24-41d3-a9d9-f538cb1603ba",
+            "migrations_dir": "src/migrations"
+        }
+    ],
+    "vectorize": [
+        {
+            "binding": "VECTORIZE",
+            "index_name": "dailyborg-claims"
+        }
+    ],
+    "ai": {
+        "binding": "AI"
+    }
+}

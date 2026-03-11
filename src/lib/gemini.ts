@@ -61,7 +61,7 @@ export async function extractClaimsFromText(
         // AIML API routes through the OpenAI SDK structure
         const ai = getAIClient();
         const response = await ai.chat.completions.create({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-3-flash-preview',
             messages: [{ role: "user", content: prompt }],
             response_format: { type: "json_object" },
             temperature: 0.1, // Keep it highly deterministic for fact extraction
@@ -117,7 +117,7 @@ export async function detectStanceChange(
 
         const ai = getAIClient();
         const response = await ai.chat.completions.create({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-3-flash-preview',
             messages: [{ role: "user", content: prompt }],
             response_format: { type: "json_object" },
             temperature: 0.1,

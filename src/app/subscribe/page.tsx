@@ -61,11 +61,27 @@ export default function SubscribePage() {
             const data = (await res.json()) as any;
             if (res.ok) {
                 setResult({ success: true, message: data.message });
-                // If paid, we would redirect to a Stripe checkout link here
+                // Redirect to Stripe checkout for Premium
                 if (plan === "paid") {
-                    setTimeout(() => {
-                        alert("Redirecting to Stripe Checkout ($0.99/mo)...");
-                        // window.location.href = "https://buy.stripe.com/test_XYZ";
+                    setTimeout(async () => {
+                        try {
+                            const checkoutRes = await fetch("/api/stripe/checkout", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    subscriberId: data.id,
+                                    email: channel === "email" ? contactInfo : undefined
+                                })
+                            });
+                            const checkoutData = (await checkoutRes.json()) as any;
+                            if (checkoutData.url) {
+                                window.location.href = checkoutData.url;
+                            } else {
+                                setResult({ success: false, message: "Payment setup failed." });
+                            }
+                        } catch (err) {
+                            setResult({ success: false, message: "Payment network error." });
+                        }
                     }, 1500);
                 }
             } else {

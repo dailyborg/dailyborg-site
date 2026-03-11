@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS politicians (
     party TEXT,
     district_state TEXT,
     time_in_office TEXT,
+    country TEXT DEFAULT 'US',
+    region_level TEXT DEFAULT 'Federal',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -119,8 +121,11 @@ CREATE TABLE IF NOT EXISTS articles (
     confidence_score INTEGER,
     publish_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     desk TEXT,
-    hero_image_url TEXT
+    hero_image_url TEXT,
+    social_published BOOLEAN DEFAULT 0
 );
+
+CREATE INDEX IF NOT EXISTS idx_articles_social_published ON articles(social_published);
 
 CREATE TABLE IF NOT EXISTS article_sources (
     id TEXT PRIMARY KEY,
@@ -202,3 +207,18 @@ CREATE INDEX IF NOT EXISTS idx_claims_politician ON claims(politician_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_claim ON evidence(claim_id);
 CREATE INDEX IF NOT EXISTS idx_stance_changes_politician ON stance_changes(politician_id);
 CREATE INDEX IF NOT EXISTS idx_stance_changes_topic ON stance_changes(topic);
+
+-- Politician Request Engine
+CREATE TABLE IF NOT EXISTS politician_requests (
+    id TEXT PRIMARY KEY,
+    requested_name TEXT NOT NULL,
+    user_email TEXT NOT NULL,
+    reference_link TEXT,
+    status TEXT DEFAULT 'Pending', -- Pending, Verified, Rejected, Generated
+    verification_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_requests_status ON politician_requests(status);
+CREATE INDEX IF NOT EXISTS idx_politicians_country ON politicians(country);

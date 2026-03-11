@@ -4,7 +4,7 @@ import { Resend } from 'resend';
 
 export async function POST(request: Request) {
   try {
-    const { email, phone_number, plan_type, delivery_channel, frequency, topics } = await request.json() as any;
+    const { email, phone_number, plan_type, delivery_channel, frequency, topics, tracked_politician } = await request.json() as any;
 
     if (!email && !phone_number) {
       return NextResponse.json({ error: "Email or Phone Number is required" }, { status: 400 });
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
             delivery_channel TEXT DEFAULT 'email',
             frequency TEXT DEFAULT 'daily',
             topics TEXT,
+            tracked_politicians TEXT DEFAULT '[]',
             stripe_customer_id TEXT,
             stripe_subscription_id TEXT,
             stripe_status TEXT,
@@ -65,19 +66,32 @@ export async function POST(request: Request) {
     const channel = delivery_channel || 'email';
     const freq = frequency || 'daily';
 
-    // Check if user already exists
+    // Fetch Existing User if applicable
     let userQuery;
     let existingUser = null;
 
     if (email) {
-      userQuery = await db.prepare('SELECT id FROM subscribers WHERE email = ?').bind(email).all();
+      userQuery = await db.prepare('SELECT id, tracked_politicians FROM subscribers WHERE email = ?').bind(email).all();
       existingUser = userQuery.results?.[0];
     } else if (phone_number) {
-      userQuery = await db.prepare('SELECT id FROM subscribers WHERE phone_number = ?').bind(phone_number).all();
+      userQuery = await db.prepare('SELECT id, tracked_politicians FROM subscribers WHERE phone_number = ?').bind(phone_number).all();
       existingUser = userQuery.results?.[0];
     }
 
     const finalId = existingUser ? (existingUser as any).id : crypto.randomUUID();
+
+    // Reconcile tracked_politicians JSON array
+    let currentTracked: string[] = [];
+    if (existingUser && (existingUser as any).tracked_politicians) {
+      try {
+        currentTracked = JSON.parse((existingUser as any).tracked_politicians);
+      } catch (e) { }
+    }
+
+    if (tracked_politician && !currentTracked.includes(tracked_politician)) {
+      currentTracked.push(tracked_politician);
+    }
+    const trackedJson = JSON.stringify(currentTracked);
 
     if (existingUser) {
       // Update existing record
@@ -89,6 +103,7 @@ export async function POST(request: Request) {
                 delivery_channel = ?, 
                 frequency = ?, 
                 topics = ?,
+                tracked_politicians = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `).bind(
@@ -98,13 +113,14 @@ export async function POST(request: Request) {
         channel,
         freq,
         topicsJson,
+        trackedJson,
         finalId
       ).run();
     } else {
       // Insert new record
       await db.prepare(`
-            INSERT INTO subscribers (id, email, phone_number, plan_type, delivery_channel, frequency, topics)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO subscribers (id, email, phone_number, plan_type, delivery_channel, frequency, topics, tracked_politicians)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
         finalId,
         email || null,
@@ -112,7 +128,8 @@ export async function POST(request: Request) {
         plan,
         channel,
         freq,
-        topicsJson
+        topicsJson,
+        trackedJson
       ).run();
     }
 
@@ -129,6 +146,7 @@ export async function POST(request: Request) {
             <p>You are now officially subscribed to verified intelligence updates.</p>
             <p><strong>Plan:</strong> ${plan === 'paid' ? 'Premium ($0.99/mo)' : 'Free'}</p>
             <p><strong>Frequency:</strong> ${freq}</p>
+            ${tracked_politician ? `<p><strong>Borg Alert Active:</strong> You will now be notified of priority stance shifts or broken promises regarding ${tracked_politician.toUpperCase().replace('-', ' ')}.</p>` : ''}
             ${topics?.length ? `<p><strong>Topics Tracked:</strong> ${topics.join(', ')}</p>` : ''}
             <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;" />
             <p style="color: #666; font-size: 12px; font-family: sans-serif; text-transform: uppercase;">The Daily Borg - Broadcast Operations & Reporting Grid</p>

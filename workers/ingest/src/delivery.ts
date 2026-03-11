@@ -25,18 +25,39 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
     }
 
     const articles = articlesQuery.results as any[];
-    if (articles.length === 0) {
-        console.log(`[DELIVERY ENGINE] No new articles published in the last ${timeWindowMs / (60 * 60 * 1000)} hours. Sleeping.`);
+
+    // 1b. Fetch recent Borg Alerts (Contradictions & Broken Promises)
+    const stanceChangesQuery = await env.DB.prepare(`
+        SELECT sc.id, sc.topic, sc.shift_description, sc.created_at, p.name as politician_name, p.slug as politician_slug
+        FROM stance_changes sc
+        JOIN politicians p ON sc.politician_id = p.id
+        WHERE sc.created_at >= ?
+    `).bind(windowStart).all();
+
+    const brokenPromisesQuery = await env.DB.prepare(`
+        SELECT pr.id, pr.promise_text, pr.status_date, p.name as politician_name, p.slug as politician_slug
+        FROM promises pr
+        JOIN politicians p ON pr.politician_id = p.id
+        WHERE pr.status = 'Broken' AND pr.status_date >= ?
+    `).bind(windowStart).all();
+
+    const alerts = {
+        stances: (stanceChangesQuery.results as any[]) || [],
+        promises: (brokenPromisesQuery.results as any[]) || []
+    };
+
+    if (articles.length === 0 && alerts.stances.length === 0 && alerts.promises.length === 0) {
+        console.log(`[DELIVERY ENGINE] No new articles or alerts published in the last ${timeWindowMs / (60 * 60 * 1000)} hours. Sleeping.`);
         return;
     }
 
-    console.log(`[DELIVERY ENGINE] Found ${articles.length} new articles to distribute.`);
+    console.log(`[DELIVERY ENGINE] Found ${articles.length} articles, ${alerts.stances.length} stance shifts, ${alerts.promises.length} broken promises.`);
 
     // 2. Fetch subscribers
     const frequencyTarget = timeWindowMs > (48 * 60 * 60 * 1000) ? 'weekly' : 'daily';
 
     const subscribersQuery = await env.DB.prepare(`
-        SELECT id, email, phone_number, plan_type, delivery_channel, frequency, topics
+        SELECT id, email, phone_number, plan_type, delivery_channel, frequency, topics, tracked_politicians
         FROM subscribers
         WHERE frequency = ?
     `).bind(frequencyTarget).all();
@@ -57,8 +78,12 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
 
     for (const sub of subscribers) {
         let userTopics: string[] = [];
+        let trackedPoliticians: string[] = [];
         try {
             userTopics = JSON.parse(sub.topics || '[]');
+        } catch (e) { }
+        try {
+            trackedPoliticians = JSON.parse(sub.tracked_politicians || '[]');
         } catch (e) { }
 
         const relevantArticles = articles.filter(art => {
@@ -69,8 +94,13 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
             });
         });
 
-        if (relevantArticles.length === 0) {
-            console.log(`  -> Skip: No relevant news for ${sub.email || sub.phone_number}`);
+        const relevantAlerts = {
+            stances: alerts.stances.filter(s => trackedPoliticians.includes(s.politician_slug)),
+            promises: alerts.promises.filter(p => trackedPoliticians.includes(p.politician_slug))
+        };
+
+        if (relevantArticles.length === 0 && relevantAlerts.stances.length === 0 && relevantAlerts.promises.length === 0) {
+            console.log(`  -> Skip: No relevant news or alerts for ${sub.email || sub.phone_number}`);
             continue;
         }
 
@@ -80,11 +110,11 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
         // 3b. Assemble Message
         if (isEmail) {
             if (!canSendEmails) {
-                console.log(`  -> Dev Mode: Would dispatch EMAIL to ${sub.email} with ${relevantArticles.length} articles.`);
+                console.log(`  -> Dev Mode: Would dispatch EMAIL to ${sub.email} with ${relevantArticles.length} articles and ${relevantAlerts.stances.length + relevantAlerts.promises.length} alerts.`);
                 continue;
             }
 
-            const htmlContent = buildEmailHtml(relevantArticles, isPaid, frequencyTarget, userTopics);
+            const htmlContent = buildEmailHtml(relevantArticles, relevantAlerts, isPaid, frequencyTarget, userTopics);
 
             try {
                 const resendRes = await fetch("https://api.resend.com/emails", {
@@ -111,10 +141,10 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
             }
 
         } else if (sub.delivery_channel === 'whatsapp') {
-            const mdContent = buildWhatsAppMarkdown(relevantArticles, isPaid);
+            const mdContent = buildWhatsAppMarkdown(relevantArticles, relevantAlerts, isPaid);
 
             if (!env.TWILIO_SID || !env.TWILIO_TOKEN) {
-                console.log(`  -> Dev Mode: Would dispatch WHATSAPP to ${sub.phone_number} with ${relevantArticles.length} items.`);
+                console.log(`  -> Dev Mode: Would dispatch WHATSAPP to ${sub.phone_number}`);
                 continue;
             }
 
@@ -146,7 +176,7 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
     console.log(`[DELIVERY ENGINE] Complete. Sent ${emailsSent} emails, logged ${whatsappTracked} whatsapp triggers.`);
 }
 
-function buildEmailHtml(articles: any[], isPaid: boolean, frequency: string, topics: string[]): string {
+function buildEmailHtml(articles: any[], alerts: any, isPaid: boolean, frequency: string, topics: string[]): string {
     let output = `
         <div style="font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb; padding: 20px; color: #1a2b4c;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-top: 5px solid #1a2b4c;">
@@ -154,6 +184,35 @@ function buildEmailHtml(articles: any[], isPaid: boolean, frequency: string, top
             <p style="color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 30px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: bold;">${frequency} Intelligence Brief</p>
             <p style="font-size: 12px; color: #94a3b8; margin-bottom: 30px;">Tracked Subjects: ${topics.join(', ')}</p>
     `;
+
+    // Inject High-Priority Borg Alerts First
+    if (alerts.stances.length > 0 || alerts.promises.length > 0) {
+        output += `<div style="background-color: #fef2f2; border: 2px solid #ef4444; padding: 20px; margin-bottom: 40px;">
+            <h2 style="color: #ef4444; font-size: 16px; font-weight: 900; margin-top: 0; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.1em;">⚠️ Priority Borg Alerts</h2>
+        `;
+
+        alerts.stances.forEach((stance: any) => {
+            output += `
+                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #fca5a5;">
+                    <strong style="color: #7f1d1d; font-size: 14px; text-transform: uppercase;">STANCE SHIFT DETECTED: ${stance.politician_name}</strong>
+                    <p style="margin: 5px 0 0 0; color: #991b1b; font-weight: bold;">Topic: ${stance.topic}</p>
+                    <p style="margin: 5px 0 0 0; color: #b91c1c; font-size: 14px;">${stance.shift_description || 'A notable contradiction or evolution was logged in the public record.'}</p>
+                    <a href="https://thedailyborg.com/borg-record/politicians/${stance.politician_slug}" style="color: #ef4444; font-size: 12px; font-weight: bold; text-decoration: none; margin-top: 8px; display: inline-block;">VIEW THE MATRIX &rarr;</a>
+                </div>
+            `;
+        });
+
+        alerts.promises.forEach((promise: any) => {
+            output += `
+                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #fca5a5;">
+                    <strong style="color: #7f1d1d; font-size: 14px; text-transform: uppercase;">BROKEN PROMISE: ${promise.politician_name}</strong>
+                    <p style="margin: 5px 0 0 0; color: #b91c1c; font-size: 14px;">"${promise.promise_text}"</p>
+                    <a href="https://thedailyborg.com/borg-record/politicians/${promise.politician_slug}" style="color: #ef4444; font-size: 12px; font-weight: bold; text-decoration: none; margin-top: 8px; display: inline-block;">VIEW THE MATRIX &rarr;</a>
+                </div>
+            `;
+        });
+        output += `</div>`;
+    }
 
     articles.forEach(art => {
         const urlPath = art.desk.toLowerCase().replace(' grid', '').replace(/ /g, '-');
@@ -189,8 +248,24 @@ function buildEmailHtml(articles: any[], isPaid: boolean, frequency: string, top
     return output;
 }
 
-function buildWhatsAppMarkdown(articles: any[], isPaid: boolean): string {
+function buildWhatsAppMarkdown(articles: any[], alerts: any, isPaid: boolean): string {
     let output = `*THE DAILY BORG* 🦅\n_Verified Intelligence Update_\n\n`;
+
+    if (alerts.stances.length > 0 || alerts.promises.length > 0) {
+        output += `🚨 *PRIORITY BORG ALERTS* 🚨\n\n`;
+        alerts.stances.forEach((stance: any) => {
+            output += `*STANCE SHIFT: ${stance.politician_name}*\n`;
+            output += `Topic: ${stance.topic}\n`;
+            output += `_${stance.shift_description || 'A notable change was logged.'}_\n`;
+            output += `Matrix: https://thedailyborg.com/borg-record/politicians/${stance.politician_slug}\n\n`;
+        });
+        alerts.promises.forEach((promise: any) => {
+            output += `*BROKEN PROMISE: ${promise.politician_name}*\n`;
+            output += `_${promise.promise_text}_\n`;
+            output += `Matrix: https://thedailyborg.com/borg-record/politicians/${promise.politician_slug}\n\n`;
+        });
+        output += `---\n\n`;
+    }
 
     articles.forEach(art => {
         const urlPath = art.desk.toLowerCase().replace(' grid', '').replace(/ /g, '-');

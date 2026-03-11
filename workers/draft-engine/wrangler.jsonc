@@ -1,0 +1,18 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "dailyborg-draft-engine",
+    "main": "src/index.ts",
+    "compatibility_date": "2024-04-05",
+    "triggers": {
+        "crons": [
+            "*/15 * * * *"
+        ] // Run every 15 minutes
+    },
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "dailyborg-db",
+            "database_id": "c161cd57-41e9-4089-9fc6-0dd8f3ea708b"
+        }
+    ]
+}

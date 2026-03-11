@@ -13,15 +13,13 @@ function getMetricColor(percentage: number) {
     return "bg-emerald-600"; // Excellent
 }
 
-export default async function CompareOfficialsPage({
-    searchParams,
-}: {
-    searchParams: { [key: string]: string | string[] | undefined };
+export default async function CompareOfficialsPage(props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-    const sp = await Promise.resolve(searchParams || {});
+    const searchParams = await props.searchParams;
     // Default to the two mock politicians we know exist in the DB seeded earlier
-    const p1Slug = (sp?.p1 as string) || "eleanor-vance";
-    const p2Slug = (sp?.p2 as string) || "sarah-jenkins";
+    const p1Slug = (searchParams?.p1 as string) || "eleanor-vance";
+    const p2Slug = (searchParams?.p2 as string) || "sarah-jenkins";
 
     const p1Profile = await PoliticianService.getProfile(p1Slug);
     const p2Profile = await PoliticianService.getProfile(p2Slug);
@@ -95,13 +93,13 @@ export default async function CompareOfficialsPage({
                             <div className={`size-16 rounded-full border-2 ${p1Slug === 'eleanor-vance' ? 'border-[#f2b90d]' : 'border-slate-700'} p-0.5`}>
                                 <div className="w-full h-full rounded-full bg-cover bg-center" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAOwVdxEXYVjUrHB66vrvAmgXZUv6GzzRpB99WBh0D9e7KVLqQ6qQmwU2yx6KzTKx42reoIpgMl77n68SA9SSQS9zk7iChRrTdKvDER5rGAljxxyfhttFS9gTGe3xnU09UtkdzZAFK1a_6qxDpiEVjMDx3uELXx47de1yTN2Clumsc76ooHSiXxadmolxGyzoqhA5a3gCAOmNBjsdDaC4yJceyP2JycF70gMapDcordxTz1Qk3g05CJpPOr4RKw84rcXn1mi3YklY0')" }}></div>
                             </div>
-                            <p className="text-[11px] font-bold text-[#f2b90d] uppercase">Vance</p>
+                            <p className={`text-[11px] font-bold ${p1.party === 'Democrat' ? 'text-blue-500' : p1.party === 'Republican' ? 'text-red-500' : 'text-[#f2b90d]'} uppercase`}>Vance</p>
                         </Link>
                         <Link href="/borg-record/compare?p1=eleanor-vance&p2=sarah-jenkins" className="flex flex-col items-center gap-2 min-w-[70px] opacity-60 hover:opacity-100 transition-opacity cursor-pointer">
                             <div className="size-16 rounded-full border-2 border-slate-700 p-0.5">
                                 <div className="w-full h-full rounded-full bg-cover bg-center" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAydBJSHAZ-VG7h-0FZLdTdvUVscx-oS2qiXKwT4DIp5M7wG-UW3wNr0HLoNX9SeUzTESrVlIUBIBREkCvUisq-lO2h7pbKyyHgd09pzHQd1o6Htc5tsHKssUlX7HluHo7mj5SoNWQKroRKqZ7EDlSI0mMwMwg4XgmlTJpzndfbCSMH1foxHFRq08fXifULUIaZ8uzA_lCZ0kL19Oyn9jQIF6zeTrbDfPWgGDSGH-jmiYhXiI7DZW1yOt3H_jdgyq4cWfgNgS8l7MY')" }}></div>
                             </div>
-                            <p className="text-[11px] font-bold text-slate-400 uppercase">Jenkins</p>
+                            <p className={`text-[11px] font-bold ${p2.party === 'Democrat' ? 'text-blue-500' : p2.party === 'Republican' ? 'text-red-500' : 'text-slate-400'} uppercase`}>Jenkins</p>
                         </Link>
                     </div>
                 </section>

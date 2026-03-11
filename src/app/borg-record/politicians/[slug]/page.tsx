@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, AlertCircle, ArrowRightLeft, ArrowUpRight } from
 import Link from "next/link";
 import CredibilityChart from "@/components/CredibilityChart";
 import StanceTimeline from "@/components/StanceTimeline";
+import { BorgAlertSubscribe } from "@/components/BorgAlertSubscribe";
 
 import { notFound } from "next/navigation";
 import { PoliticianService, ShiftEvent } from "@/lib/services/politician-service";
@@ -41,7 +42,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                 </div>
                 <div className="w-full md:w-2/3 lg:w-3/4 space-y-6">
                     <div className="flex flex-wrap items-center gap-4">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-accent border border-accent/50 bg-accent/5 w-fit px-3 py-1.5">{politician.party}</span>
+                        <span className={`text-[10px] font-black uppercase tracking-[0.2em] border w-fit px-3 py-1.5 ${politician.party === 'Democrat' ? 'text-blue-500 border-blue-500/50 bg-blue-500/5' : politician.party === 'Republican' ? 'text-red-500 border-red-500/50 bg-red-500/5' : 'text-accent border-accent/50 bg-accent/5'}`}>{politician.party}</span>
                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">In Office: <span className="text-foreground">{politician.time_in_office}</span></span>
                     </div>
                     <h1 className="font-serif text-6xl md:text-7xl lg:text-[5rem] font-black tracking-tighter leading-[0.9] text-foreground">
@@ -223,6 +224,9 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                         <p className="text-background/80 text-sm mb-8 leading-relaxed font-medium">Compare {politician.name}'s voting record and position consistency against another official side-by-side to expose voting parallels.</p>
                         <Link href="/borg-record/compare" className="w-full bg-background text-foreground hover:bg-accent hover:text-accent-foreground font-black uppercase tracking-[0.2em] text-[10px] py-4 text-center block transition-all border border-transparent hover:border-accent">Select Opponent</Link>
                     </div>
+
+                    {/* Borg Alerts Integration */}
+                    <BorgAlertSubscribe politicianSlug={slug} politicianName={politician.name} />
 
                     {/* Recent Votes */}
                     <div className="p-6 border border-border bg-muted/10">

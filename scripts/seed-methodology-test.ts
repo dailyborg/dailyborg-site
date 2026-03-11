@@ -3,7 +3,7 @@ import path from "path";
 import Database from 'better-sqlite3';
 
 function getLocalDB() {
-    const d1Dir = path.join(process.cwd(), "workers", "ingest", ".wrangler", "state", "v3", "d1", "miniflare-D1DatabaseObject");
+    const d1Dir = path.join(process.cwd(), ".wrangler", "state", "v3", "d1", "miniflare-D1DatabaseObject");
     const files = fs.readdirSync(d1Dir)
         .filter(f => f.endsWith(".sqlite"))
         .map(name => ({ name, time: fs.statSync(path.join(d1Dir, name)).mtime.getTime() }))

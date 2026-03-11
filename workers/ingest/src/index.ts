@@ -105,6 +105,8 @@ export default {
                         const existing = await env.DB.prepare('SELECT id FROM articles WHERE slug = ?').bind(articleObject.canonical_event_slug).first();
                         if (existing) {
                             console.log(`❌ Event '${articleObject.canonical_event_slug}' already exists in DB. Dropping duplicate story.`);
+                            await env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                                .bind(crypto.randomUUID(), articleObject.canonical_event_slug, 'duplicate', `Dropped duplicate for source: ${sourceUrl}`).run();
                             message.ack();
                             return;
                         }
@@ -212,6 +214,9 @@ export default {
                     await env.DB.batch(stmts);
                     console.log(`✅ Inserted ${stmts.length} sources linked to ${id}`);
                 }
+
+                await env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                    .bind(crypto.randomUUID(), articleObject.canonical_event_slug, 'inserted', `Successfully inserted article id: ${id}`).run();
 
                 message.ack();
             } catch (error: any) {

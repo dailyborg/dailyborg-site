@@ -156,7 +156,7 @@ export class PoliticianService {
         if (slug === 'sample-slug') {
             return {
                 politician: {
-                    id: 'pol_mock', slug: 'sample-slug', name: 'Eleanor Vance', office_held: 'U.S. Senate', party: 'Democrat', district_state: 'OH', time_in_office: '4 Years, 2 Months'
+                    id: 'pol_mock', slug: 'sample-slug', name: 'Eleanor Vance', office_held: 'U.S. Senate', party: 'Democrat', district_state: 'OH', time_in_office: '4 Years, 2 Months', country: 'US', region_level: 'Federal'
                 },
                 promises: [
                     { promise_text: 'Codify metadata guidelines into federal law', date_said: '2022-10-14', issue_area: 'Tech Policy', status: 'In Progress' },
@@ -186,9 +186,9 @@ export class PoliticianService {
         const db = await getD1Database();
 
         // Execute queries sequentially for local SQLite compatibility under OpenNext
-        const politicianRes = await db.prepare(`SELECT * FROM politicians WHERE slug = ?`).bind(slug);
-        const promisesRes = await db.prepare(`SELECT * FROM promises WHERE politician_id = (SELECT id FROM politicians WHERE slug = ?) ORDER BY date_said DESC`).bind(slug);
-        const positionsRes = await db.prepare(`SELECT * FROM positions WHERE politician_id = (SELECT id FROM politicians WHERE slug = ?) ORDER BY topic ASC, statement_date DESC`).bind(slug);
+        const politicianRes = await db.prepare(`SELECT * FROM politicians WHERE slug = ? AND country = 'US'`).bind(slug);
+        const promisesRes = await db.prepare(`SELECT * FROM promises WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY date_said DESC`).bind(slug);
+        const positionsRes = await db.prepare(`SELECT * FROM positions WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY topic ASC, statement_date DESC`).bind(slug);
         const methodologyRes = await db.prepare(`SELECT * FROM methodology_versions WHERE is_active = 1 LIMIT 1`);
 
         const politician = politicianRes?.results?.[0] || politicianRes?.[0]?.results?.[0]; // Handle varying return shapes between D1 / BetterSQLite
@@ -206,7 +206,7 @@ export class PoliticianService {
         if (rawClaims.length > 0) {
             const claimIds = rawClaims.map((c: any) => `'${c.id}'`).join(',');
             const evidenceQuery = `SELECT * FROM evidence WHERE claim_id IN (${claimIds})`;
-            const evRes = await db.prepare(evidenceQuery).all();
+            const evRes = await db.prepare(evidenceQuery).bind().all();
             const allEvidence = evRes?.results || [];
 
             allEvidence.forEach((ev: any) => {

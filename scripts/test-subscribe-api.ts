@@ -1,4 +1,3 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 // test script to verify local D1 works
 async function test() {
