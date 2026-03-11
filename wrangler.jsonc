@@ -6,7 +6,7 @@
 		"nodejs_compat"
 	],
 	"assets": {
-		"directory": ".open-next/assets",
+		"directory": ".vercel/output/static",
 		"binding": "ASSETS"
 	},
 	"services": [],
