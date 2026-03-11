@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 
 export async function POST(request: Request) {
     try {
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
                 let db;
                 try {
-                    const context = await getCloudflareContext();
+                    const context = getRequestContext();
                     db = (context.env as any).DB;
                 } catch (e) {
                     console.warn("Running outside Cloudflare context. Falling back to local DB.");
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
 
             let db;
             try {
-                const context = await getCloudflareContext();
+                const context = getRequestContext();
                 db = (context.env as any).DB;
             } catch (e) {
                 const { getD1Database } = await import('../../../../lib/db');

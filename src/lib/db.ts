@@ -1,4 +1,4 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 
 const dummyDb = {
     prepare: () => ({
@@ -24,7 +24,7 @@ export async function getDbBinding() {
         return getD1Database();
     }
     try {
-        const { env } = await getCloudflareContext();
+        const { env } = getRequestContext();
         console.log("Cloudflare Context DB exists?", !!(env as any).DB);
         if ((env as any).DB) return (env as any).DB;
     } catch (e) {

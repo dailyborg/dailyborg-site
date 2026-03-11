@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { Resend } from 'resend';
 
 export async function POST(request: Request) {
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     let resendApiKey;
 
     try {
-      const context = await getCloudflareContext();
+      const context = getRequestContext();
       const env = context.env as any;
       db = env.DB;
       resendApiKey = process.env.RESEND_API_KEY || env.RESEND_API_KEY;
