@@ -6,6 +6,8 @@ declare namespace Cloudflare {
 		NEXT_CACHE: R2Bucket;
 		IMAGE_BUCKET: R2Bucket;
 		DB: D1Database;
+		VECTORIZE: VectorizeIndex;
+		AI: any;
 		INGEST_QUEUE: Queue;
 		IMAGES: ImagesBinding;
 		ASSETS: Fetcher;

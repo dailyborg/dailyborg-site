@@ -39,8 +39,9 @@ export async function POST(req: NextRequest) {
         const vectorize = env.VECTORIZE as unknown as VectorizeIndex | undefined;
         const ai = env.AI as unknown as any | undefined;
 
-        if (!d1 && !vectorize) {
-            console.warn("D1/Vectorize bindings not found in context. env keys:", Object.keys(env));
+        if (!d1 || !vectorize) {
+            console.error("D1 or Vectorize bindings missing");
+            return NextResponse.json({ error: "Infrastructure bindings missing (D1/Vectorize)" }, { status: 500 });
         }
 
         const insertedClaims = [];
