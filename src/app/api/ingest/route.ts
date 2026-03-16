@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractClaimsFromText, detectStanceChange } from "@/lib/gemini";
 
-// Assuming we have a getRequestContext from OpenNext/Cloudflare runtime
-// We'll define a basic type for the Cloudflare execution context
+import { getRequestContext } from '@cloudflare/next-on-pages';
 export const runtime = "edge";
 
 interface IngestPayload {
@@ -35,21 +34,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: "No relevant claims found in the provided text." }, { status: 200 });
         }
 
-        // We need to access Cloudflare bindings (D1, Vectorize, Cache)
-        // In Next.js App Router on Cloudflare, bindings are usually available via the standard request context 
-        // provided by whatever adapter is being used (e.g., next-on-pages or open-next). 
-        // We will assume `req.cf` or a custom context property holds `env`. 
-        // For standard local dev, we might need a fallback, but we'll assume Cloudflare Env is exposed globally or via context.
-        // As per standard @cloudflare/next-on-pages or similar bindings injection:
-        const d1 = (process.env as any).DB as D1Database | undefined;
-        const vectorize = (process.env as any).VECTORIZE as VectorizeIndex | undefined;
+        const { env } = getRequestContext();
+        const d1 = env.DB as unknown as D1Database | undefined;
+        const vectorize = env.VECTORIZE as unknown as VectorizeIndex | undefined;
+        const ai = env.AI as unknown as any | undefined;
 
-        // Let's use `process.env` as a fallback, but properly Next.js edge runtime usually binds to `process.env` or a request context.
-        // Note: For open-next, bindings might be on the global `env` object or `request.cf`.
-
-        if (!process.env.DB && !process.env.VECTORIZE) {
-            // Log a warning, but we cannot proceed dynamically without DB.
-            console.warn("D1/Vectorize bindings not found in process.env. Proceeding with dummy response for testing.");
+        if (!d1 && !vectorize) {
+            console.warn("D1/Vectorize bindings not found in context. env keys:", Object.keys(env));
         }
 
         const insertedClaims = [];
@@ -59,14 +50,13 @@ export async function POST(req: NextRequest) {
             const claimId = crypto.randomUUID();
 
             // Store in D1
-            if (process.env.DB) {
-                const db = process.env.DB as any as D1Database;
-                await db.prepare(
+            if (d1) {
+                await d1.prepare(
                     `INSERT INTO claims (id, politician_id, type, content, date, context) VALUES (?, ?, ?, ?, ?, ?)`
                 ).bind(claimId, body.politician_id, claim.claim_type, claim.claim_text, claim.date_said, claim.context).run();
 
                 const evidenceId = crypto.randomUUID();
-                await db.prepare(
+                await d1.prepare(
                     `INSERT INTO evidence (id, claim_id, url, source_name) VALUES (?, ?, ?, ?)`
                 ).bind(evidenceId, claimId, body.source_url, body.source_name).run();
             }
@@ -75,13 +65,13 @@ export async function POST(req: NextRequest) {
 
             // 3. Generate Embeddings & Vectorize using Cloudflare Workers AI
             let vector: number[] = [];
-            if (process.env.AI) {
-                const embeddingResponse = await (process.env.AI as any).run('@cf/baai/bge-base-en-v1.5', { text: [claim.claim_text] });
+            if (ai) {
+                const embeddingResponse = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [claim.claim_text] });
                 // AI bindings often return data in shape { shape: [...], data: [...] }
                 vector = embeddingResponse.data?.[0] || embeddingResponse.data;
 
-                if (process.env.VECTORIZE && vector && vector.length > 0) {
-                    await (process.env.VECTORIZE as any).upsert([
+                if (vectorize && vector && vector.length > 0) {
+                    await vectorize.upsert([
                         {
                             id: claimId,
                             values: vector,
@@ -92,14 +82,14 @@ export async function POST(req: NextRequest) {
             }
 
             // 4. Contradiction Detection (Vector Search)
-            if (process.env.VECTORIZE && vector && vector.length > 0) {
+            if (vectorize && vector && vector.length > 0) {
                 // Search for similar statements by the same politician
-                const matches = await (process.env.VECTORIZE as any).query(vector, { topK: 5, filter: { politician_id: body.politician_id } });
+                const matches = await vectorize.query(vector, { topK: 5, filter: { politician_id: body.politician_id } });
 
                 for (const match of matches.matches) {
                     if (match.score > 0.85 && match.id !== claimId) { // High similarity threshold
                         // Fetch older claim text from DB
-                        const olderClaim = await (process.env.DB as any as D1Database).prepare('SELECT content, topic FROM claims WHERE id = ?').bind(match.id).first();
+                        const olderClaim = await d1.prepare('SELECT content, topic FROM claims WHERE id = ?').bind(match.id).first();
 
                         if (olderClaim) {
                             // Compare using Gemini
@@ -107,7 +97,7 @@ export async function POST(req: NextRequest) {
 
                             if (comparison && comparison.has_changed) {
                                 const changeId = crypto.randomUUID();
-                                await (process.env.DB as any as D1Database).prepare(
+                                await d1.prepare(
                                     `INSERT INTO stance_changes (id, politician_id, old_claim_id, new_claim_id, topic, shift_description) VALUES (?, ?, ?, ?, ?, ?)`
                                 ).bind(changeId, body.politician_id, match.id, claimId, olderClaim.topic || "Policy Issue", comparison.shift_description).run();
                             }
