@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDbBinding } from "@/lib/db";
 
+export const runtime = 'edge';
+
 export async function POST(req: Request) {
     try {
         const body: any = await req.json();
@@ -23,7 +25,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, id }, { status: 201 });
     } catch (error: any) {
         console.error("Politician Request API Error:", error);
-        require('fs').writeFileSync('apicrash.log', String(error) + '\n' + String(error.stack));
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
     try {
         const payload = await request.text();

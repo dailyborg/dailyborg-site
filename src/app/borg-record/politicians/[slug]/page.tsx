@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NewsGrid } from "@/components/ui/grid";
 import { CheckCircle2, XCircle, AlertCircle, ArrowRightLeft, ArrowUpRight } from "lucide-react";
 import Link from "next/link";

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { Resend } from 'resend';
 
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
   try {
     const { email, phone_number, plan_type, delivery_channel, frequency, topics, tracked_politician } = await request.json() as any;

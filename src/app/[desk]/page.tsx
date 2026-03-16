@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NewsGrid } from "@/components/ui/grid";
 import Link from 'next/link';
 import { notFound } from "next/navigation";

@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import Link from 'next/link';
 
 export default async function ArticlePage({ params }: { params: Promise<{ desk: string, slug: string }> }) {

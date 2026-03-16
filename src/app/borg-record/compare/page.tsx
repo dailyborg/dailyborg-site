@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NewsGrid } from "@/components/ui/grid";
 import { ArrowRightLeft, VerifiedIcon, TrendingUp, ChevronRight } from "lucide-react";
 import Image from "next/image";
