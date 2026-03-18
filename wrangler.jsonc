@@ -19,5 +19,12 @@
 			"pattern": "www.dailyborg.com",
 			"custom_domain": true
 		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "dailyborg-db",
+			"database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3"
+		}
 	]
 }

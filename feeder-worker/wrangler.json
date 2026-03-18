@@ -37,8 +37,8 @@
     "d1_databases": [
         {
             "binding": "DB",
-            "database_name": "dailyborg-prod-db",
-            "database_id": "7d5cfb30-7de4-44cc-8294-2817cb5b4b5c",
+            "database_name": "dailyborg-db",
+            "database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3",
             "migrations_dir": "../src/migrations"
         }
     ],
