@@ -10,7 +10,7 @@ export interface Env {
     AI: any;
     ENRICHMENT_QUEUE: import('@cloudflare/workers-types').Queue;
     PROCESSING_QUEUE: import('@cloudflare/workers-types').Queue;
-    GEMINI_API_KEY: string;
+    AIML_API_KEY: string;
 }
 
 const TRUSTED_FEEDS = [
@@ -78,7 +78,7 @@ export default {
                     const response = await fetch("https://api.aimlapi.com/chat/completions", {
                         method: "POST",
                         headers: {
-                            "Authorization": `Bearer ${env.GEMINI_API_KEY}`,
+                            "Authorization": `Bearer ${env.AIML_API_KEY}`,
                             "Content-Type": "application/json"
                         },
                         body: JSON.stringify({
@@ -166,7 +166,7 @@ export default {
                     const geminiResponse = await fetch("https://api.aimlapi.com/chat/completions", {
                         method: "POST",
                         headers: {
-                            "Authorization": `Bearer ${env.GEMINI_API_KEY}`,
+                            "Authorization": `Bearer ${env.AIML_API_KEY}`,
                             "Content-Type": "application/json"
                         },
                         body: JSON.stringify({
@@ -204,7 +204,7 @@ export default {
                             const imageResponse = await fetch("https://api.aimlapi.com/images/generations", {
                                 method: "POST",
                                 headers: {
-                                    "Authorization": `Bearer ${env.GEMINI_API_KEY}`,
+                                    "Authorization": `Bearer ${env.AIML_API_KEY}`,
                                     "Content-Type": "application/json"
                                 },
                                 body: JSON.stringify({
