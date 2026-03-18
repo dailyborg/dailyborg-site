@@ -9,12 +9,5 @@
 	"assets": {
 		"directory": ".vercel/output/static",
 		"binding": "ASSETS"
-	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "dailyborg-prod-db",
-			"database_id": "7d5cfb30-7de4-44cc-8294-2817cb5b4b5c"
-		}
-	]
+	}
 }
