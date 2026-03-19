@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "pages:build": "npx @cloudflare/next-on-pages",
-    "deploy": "npm run pages:build && npx wrangler deploy",
+    "deploy": "npm run pages:build && npx wrangler pages deploy .vercel/output/static --project-name dailyborg",
     "start": "next start",
     "lint": "eslint",
     "worker:feeder": "cd feeder-worker && wrangler dev",
