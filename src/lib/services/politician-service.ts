@@ -182,8 +182,8 @@ export class PoliticianService {
         }
 
         // Dynamic import protects the pure math functions above from breaking in Node Test CLI
-        const { getD1Database } = await import("../db");
-        const db = await getD1Database();
+        const { getDbBinding } = await import("../db");
+        const db = await getDbBinding();
 
         // Execute queries sequentially for local SQLite compatibility under OpenNext
         const politicianRes = await db.prepare(`SELECT * FROM politicians WHERE slug = ? AND country = 'US'`).bind(slug);

@@ -50,8 +50,8 @@ export async function POST(request: Request) {
                     db = (context.env as any).DB;
                 } catch (e) {
                     console.warn("Running outside Cloudflare context. Falling back to local DB.");
-                    const { getD1Database } = await import('../../../../lib/db');
-                    db = await getD1Database();
+                    const { getDbBinding } = await import('../../../../lib/db');
+                    db = await getDbBinding();
                 }
 
                 if (db) {
@@ -83,8 +83,8 @@ export async function POST(request: Request) {
                 const context = getRequestContext();
                 db = (context.env as any).DB;
             } catch (e) {
-                const { getD1Database } = await import('../../../../lib/db');
-                db = await getD1Database();
+                const { getDbBinding } = await import('../../../../lib/db');
+                db = await getDbBinding();
             }
 
             if (db) {

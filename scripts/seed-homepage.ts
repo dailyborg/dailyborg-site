@@ -1,7 +1,7 @@
-import { getD1Database } from '../src/lib/db';
+import { getDbBinding } from '../src/lib/db';
 
 async function seed() {
-    const db = await getD1Database();
+    const db = await getDbBinding();
 
     if (!db) {
         console.log("No DB found");

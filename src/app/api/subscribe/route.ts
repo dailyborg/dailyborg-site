@@ -31,8 +31,8 @@ export async function POST(request: Request) {
     } catch (e) {
       // Fallback for local Node.js Next dev server testing
       console.warn("Running outside Cloudflare context. Falling back to local DB module.");
-      const { getD1Database } = await import('../../../lib/db');
-      db = await getD1Database();
+      const { getDbBinding } = await import('../../../lib/db');
+      db = await getDbBinding();
       resendApiKey = process.env.RESEND_API_KEY;
     }
 
