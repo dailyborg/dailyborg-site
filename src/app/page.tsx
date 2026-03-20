@@ -253,6 +253,7 @@ function NewsletterSidebar() {
 
 // MAIN PAGE COMPONENT
 export const dynamic = 'force-dynamic'; // Bypass Cloudflare/Next.js caching
+export const runtime = 'edge'; // Required for dynamic routes on Cloudflare Pages
 
 export default async function Home() {
   const db = await getDbBinding();
