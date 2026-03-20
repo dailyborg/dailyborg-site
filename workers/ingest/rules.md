@@ -9,6 +9,12 @@ Worker Names:
 Ingest worker: dailyborg-ingest
 Feeder worker: dailyborg-site-feeder
 Domain: dailyborg.com (also dailyborg-site.pages.dev)
+
+🔴 AI/ML Specification (ULTRA-FAST GRID)
+- **Text Ingest & Analysis**: ALWAYS use **Gemini 3 Flash**. Never use 1.5 Pro unless explicitly asked for deep historical research that Flash cannot handle.
+- **Image Generation**: ALWAYS use **Nano Banana 2** (Gemini 3.1 Flash Image). Optimized for speed and high-volume grid visuals.
+- **Research Capability**: Integrated with **Perplexity AI** (Sonar Pro) for real-time internet scouting with citations.
+
 🔴 Cloudflare Pages — ALWAYS do this
 Every server-rendered file MUST have export const runtime = 'edge'; — This includes 
 
@@ -93,3 +99,4 @@ We have several core things set up in infrastructure:
 - We have a credibility and truth system.
 - We ensure that information is real and accurate.
 For everything else there's structure. Make sure that when you are implementing changes you're not taking away what we've already done; you're just adding on or fixing. If you're about to take away anything, you need to stop and let me know. Explain why and how you will make up for the issues or the ones that you are changing.
+Note that we're using specific language models through AIML so ensure that we're not changing or including additional models without checking up with me first. Gemini 3 Flash and Gemini 3.1 Flash and Perplexity or Claude workers are being used for different purposes so try to check with me if you need to update anything. 

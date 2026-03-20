@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { AlertTriangle, Search, User, Menu, Activity, Landmark, Building, Trophy } from "lucide-react";
+import { AlertTriangle, Search, User, Menu, Activity, Landmark, Building, Trophy, ShieldAlert } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
+import { DynamicTicker } from "./dynamic-ticker";
+import { useSearchParams } from "next/navigation";
 
 interface LiveUpdate {
     icon: any;
@@ -27,16 +29,31 @@ export function SiteHeader({
         { icon: Landmark, text: "Public Record Sync: Complete", time: "NOW" }
     ]
 }: SiteHeaderProps) {
+    const searchParams = useSearchParams();
+    const isAdmin = searchParams.get("admin") === "true";
+
     const [liveIndex, setLiveIndex] = useState(0);
+    const [edition, setEdition] = useState("Grid Edition");
+
+    useEffect(() => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) setEdition("Morning Grid Edition");
+        else if (hour >= 12 && hour < 17) setEdition("Afternoon Grid Edition");
+        else if (hour >= 17 && hour < 21) setEdition("Evening Grid Edition");
+        else setEdition("Night Grid Edition");
+    }, []);
+
+    // Helper for ticker
+    const getTickerHeadlines = (h: string[]) => {
+        const items = h.length > 0 ? h : headlines;
+        return [...items, ...items];
+    };
 
     // Dynamic live updates are typically passed as sets, but for simplicity we can just slice them
     const liveUpdateSets = [
         liveUpdates.slice(0, 4),
         liveUpdates.slice(4, 8)
     ].filter(set => set.length > 0);
-
-    // Duplicate for seamless scroll
-    const tickerHeadlines = [...headlines, ...headlines];
 
     useEffect(() => {
         if (liveUpdateSets.length <= 1) return;
@@ -64,24 +81,33 @@ export function SiteHeader({
                     <span className="font-bold uppercase tracking-widest">Breaking</span>
                 </div>
                 {/* Scrolling Headlines */}
-                <div className="overflow-hidden whitespace-nowrap px-4 py-1.5 flex-1 font-sans flex items-center relative">
-                    <div className="ticker-animate flex gap-12 items-center min-w-max">
-                        {tickerHeadlines.map((headline, idx) => (
-                            <span key={idx} className="opacity-90">{headline}</span>
-                        ))}
-                    </div>
-                </div>
+                <DynamicTicker>
+                    {(currentHeadlines) => (
+                        <div className="overflow-hidden whitespace-nowrap px-4 py-1.5 flex-1 font-sans flex items-center relative">
+                            <div className="ticker-animate flex gap-12 items-center min-w-max">
+                                {getTickerHeadlines(currentHeadlines).map((headline, idx) => (
+                                    <span key={idx} className="opacity-90">{headline}</span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </DynamicTicker>
             </div>
 
             {/* Header Block container */}
             <div className="bg-[#fcfbfc] dark:bg-background sticky top-0 z-40 w-full font-sans">
 
                 {/* 2. Date Bar (Navy Bar) - Edge to Edge, narrower */}
-                <div className="bg-primary text-primary-foreground w-full flex justify-between items-center px-6 h-8 text-xs font-sans uppercase tracking-wide">
+                <div className="bg-primary text-primary-foreground w-full flex justify-between items-center px-6 h-8 text-[10px] sm:text-xs font-sans uppercase tracking-wide">
                     <span className="opacity-80">{currentDate}</span>
-                    <div className="hidden sm:flex items-center gap-5 opacity-80">
-                        <span className="cursor-pointer hover:opacity-100 transition-opacity">Morning Grid Edition v2</span>
-                        <span className="cursor-pointer hover:underline transition-opacity">Admin</span>
+                    <div className="flex items-center gap-3 sm:gap-5">
+                        <span className="opacity-80 hover:opacity-100 transition-opacity cursor-default">{edition}</span>
+                        {isAdmin && (
+                            <Link href="/admin" className="flex items-center gap-1.5 px-2 py-0.5 bg-yellow-400 text-black font-bold rounded-sm animate-pulse">
+                                <ShieldAlert className="w-3 h-3" />
+                                Admin Mode
+                            </Link>
+                        )}
                         <ThemeToggle />
                     </div>
                 </div>
