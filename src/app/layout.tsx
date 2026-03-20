@@ -1,4 +1,3 @@
-// Build Trigger: 2026-03-20T00:40:00
 import type { Metadata } from "next";
 import { Source_Sans_3, Playfair_Display } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -23,42 +22,11 @@ export const metadata: Metadata = {
   description: "Broadcast Operations & Reporting Grid - The Public Record, Documented.",
 };
 
-import { getDbBinding } from "@/lib/db";
-import { Activity, Landmark } from "lucide-react";
-
-export const runtime = 'edge';
-
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  let headlines: string[] = [];
-  let liveUpdates: any[] = [];
-
-  try {
-    const db = await getDbBinding();
-    
-    // Fetch latest 10 approved articles for the ticker
-    const { results: rawArticles } = await db.prepare(`
-      SELECT title, desk, publish_date FROM articles 
-      WHERE approval_status = 'approved' 
-      ORDER BY publish_date DESC 
-      LIMIT 10
-    `).bind().all();
-
-    const articles = (rawArticles as any[]) || [];
-    headlines = articles.map(a => `${a.desk?.toUpperCase() || 'UPDATE'}: ${a.title}`);
-    
-    liveUpdates = articles.slice(0, 4).map(a => ({
-      icon: a.desk === 'Politics' ? Landmark : Activity,
-      text: a.title,
-      time: "NEW"
-    }));
-  } catch (e) {
-    // Silently fail - header will use defaults
-  }
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${sourceSans.variable} ${playfair.variable} antialiased bg-background text-foreground selection:bg-accent selection:text-white`}>
@@ -69,7 +37,7 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <div className="flex min-h-screen flex-col">
-            <SiteHeader headlines={headlines.length > 0 ? headlines : undefined} liveUpdates={liveUpdates.length > 0 ? liveUpdates : undefined} />
+            <SiteHeader />
             <main className="flex-1">{children}</main>
             <SiteFooter />
           </div>
