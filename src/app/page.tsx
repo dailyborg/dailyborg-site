@@ -252,7 +252,7 @@ function NewsletterSidebar() {
 }
 
 // MAIN PAGE COMPONENT
-export const revalidate = 60; // Cache refresh every 60s
+export const dynamic = 'force-dynamic'; // Bypass Cloudflare/Next.js caching
 
 export default async function Home() {
   const db = await getDbBinding();

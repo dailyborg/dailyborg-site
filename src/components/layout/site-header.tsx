@@ -80,7 +80,7 @@ export function SiteHeader({
                 <div className="bg-primary text-primary-foreground w-full flex justify-between items-center px-6 h-8 text-xs font-sans uppercase tracking-wide">
                     <span className="opacity-80">{currentDate}</span>
                     <div className="hidden sm:flex items-center gap-5 opacity-80">
-                        <span className="cursor-pointer hover:opacity-100 transition-opacity">Morning Edition</span>
+                        <span className="cursor-pointer hover:opacity-100 transition-opacity">Morning Grid Edition v2</span>
                         <span className="cursor-pointer hover:underline transition-opacity">Admin</span>
                         <ThemeToggle />
                     </div>
