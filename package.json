@@ -3,16 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
+    "dev": "next dev",
     "pages:build": "npx @cloudflare/next-on-pages",
-    "deploy": "npm run pages:build && npx wrangler pages deploy .vercel/output/static --project-name dailyborg",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "start": "next start",
     "lint": "eslint",
     "worker:feeder": "cd feeder-worker && wrangler dev",
     "worker:scraper": "cd workers/scraper && wrangler dev",
     "worker:publisher": "cd workers/publisher && wrangler dev",
-    "boot": "concurrently \"npm run dev\" \"npm run worker:feeder\" \"npm run worker:scraper\" \"npm run worker:publisher\""
+    "boot": "concurrently \"npm run dev\" \"npm run worker:feeder\" \"npm run worker:scraper\" \"npm run worker:publisher\"",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
@@ -31,11 +34,11 @@
     "stripe": "^20.4.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
-    "twilio": "^5.12.2",
-    "wrangler": "^4.72.0"
+    "twilio": "^5.12.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260307.1",
+    "@opennextjs/cloudflare": "^1.17.1",
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
@@ -44,6 +47,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.75.0"
   }
 }
