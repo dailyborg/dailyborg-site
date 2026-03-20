@@ -1,5 +1,5 @@
 {
-    "name": "dailyborg-feeder",
+    "name": "dailyborg-site-feeder",
     "main": "src/workers/feeder.ts",
     "compatibility_date": "2026-03-05",
     "triggers": {
