@@ -26,29 +26,38 @@ export const metadata: Metadata = {
 import { getDbBinding } from "@/lib/db";
 import { Activity, Landmark } from "lucide-react";
 
+export const runtime = 'edge';
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const db = await getDbBinding();
-  
-  // Fetch latest 10 approved articles for the ticker
-  const { results: rawArticles } = await db.prepare(`
-    SELECT title, desk, publish_date FROM articles 
-    WHERE approval_status = 'approved' 
-    ORDER BY publish_date DESC 
-    LIMIT 10
-  `).bind().all();
+  let headlines: string[] = [];
+  let liveUpdates: any[] = [];
 
-  const articles = (rawArticles as any[]) || [];
-  const headlines = articles.map(a => `${a.desk?.toUpperCase() || 'UPDATE'}: ${a.title}`);
-  
-  const liveUpdates = articles.slice(0, 4).map(a => ({
-    icon: a.desk === 'Politics' ? Landmark : Activity,
-    text: a.title,
-    time: "NEW"
-  }));
+  try {
+    const db = await getDbBinding();
+    
+    // Fetch latest 10 approved articles for the ticker
+    const { results: rawArticles } = await db.prepare(`
+      SELECT title, desk, publish_date FROM articles 
+      WHERE approval_status = 'approved' 
+      ORDER BY publish_date DESC 
+      LIMIT 10
+    `).bind().all();
+
+    const articles = (rawArticles as any[]) || [];
+    headlines = articles.map(a => `${a.desk?.toUpperCase() || 'UPDATE'}: ${a.title}`);
+    
+    liveUpdates = articles.slice(0, 4).map(a => ({
+      icon: a.desk === 'Politics' ? Landmark : Activity,
+      text: a.title,
+      time: "NEW"
+    }));
+  } catch (e) {
+    // Silently fail - header will use defaults
+  }
 
   return (
     <html lang="en" suppressHydrationWarning>
