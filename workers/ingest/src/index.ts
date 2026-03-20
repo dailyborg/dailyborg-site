@@ -54,7 +54,8 @@ export default {
           - contentHtml (full article HTML with calm, credible newspaper formatting, no inline citations)
           - keyTakeaways (an array of strings)
           - confidenceScore (1-100 based on source authority)
-          - suggestedHeroImagePrompt (a detailed prompt for gemini-3-1-flash-image-preview)
+          - suggestedHeroImagePrompt (a detailed prompt for nano-banana-2)
+          - desk (ONE of: 'Politics', 'Business', 'Crime', 'Entertainment', 'Sports', 'Science', 'Education')
           - sources (an array of objects, each with 'source_name', 'source_url' (if available, otherwise leave blank) and 'source_type')
         `;
 
@@ -202,7 +203,7 @@ export default {
                     `auth_${String(Math.floor(Math.random() * 25) + 1).padStart(2, '0')}`,
                     finalArticleType,
                     articleObject.confidenceScore,
-                    "Politics Grid",
+                    articleObject.desk || "Politics",
                     heroImageUrl || `https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?q=80&w=2070&auto=format&fit=crop`,
                     approvalStatus
                 ).run();
