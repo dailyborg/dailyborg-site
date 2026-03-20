@@ -69,7 +69,7 @@ export default {
                                 "Authorization": `Bearer ${env.AIML_API_KEY}`
                             },
                             body: JSON.stringify({
-                                model: "gemini-3-flash-preview",
+                                model: "gemini-3-flash",
                                 messages: [{ role: "user", content: enrichmentPrompt }],
                                 response_format: { type: "json_object" }
                             })
@@ -156,7 +156,7 @@ export default {
                                 "Authorization": `Bearer ${env.AIML_API_KEY}`
                             },
                             body: JSON.stringify({
-                                model: "gemini-3-1-flash-image-preview",
+                                model: "nano-banana-2",
                                 prompt: articleObject.suggestedHeroImagePrompt
                             })
                         });
