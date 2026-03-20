@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Source_Sans_3, Playfair_Display } from "next/font/google";
+import { Suspense } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -37,7 +38,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <div className="flex min-h-screen flex-col">
-            <SiteHeader />
+            <Suspense fallback={<div className="h-40 w-full" />}>
+              <SiteHeader />
+            </Suspense>
             <main className="flex-1">{children}</main>
             <SiteFooter />
           </div>
