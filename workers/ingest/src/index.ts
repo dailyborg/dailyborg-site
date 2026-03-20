@@ -190,14 +190,15 @@ export default {
 
                 console.log(`Inserting ${finalArticleType} article ${id} into D1...`);
                 const { success } = await env.DB.prepare(`
-          INSERT INTO articles (id, slug, title, excerpt, content_html, article_type, confidence_score, desk, hero_image_url)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO articles (id, slug, title, excerpt, content_html, author_id, article_type, confidence_score, desk, hero_image_url)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
                     id,
                     articleObject.canonical_event_slug,
                     articleObject.title,
                     articleObject.excerpt,
                     articleObject.contentHtml,
+                    `auth_${String(Math.floor(Math.random() * 25) + 1).padStart(2, '0')}`,
                     finalArticleType,
                     articleObject.confidenceScore,
                     "Politics Grid",

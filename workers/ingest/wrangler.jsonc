@@ -1,40 +1,40 @@
 {
-    "$schema": "../../node_modules/wrangler/config-schema.json",
-    "name": "dailyborg-ingest",
-    "main": "src/index.ts",
-    "compatibility_date": "2026-03-05",
-    "queues": {
-        "consumers": [
-            {
-                "queue": "ingest-queue",
-                "max_batch_size": 1,
-                "max_retries": 1
-            }
-        ]
-    },
-    "d1_databases": [
-        {
-            "binding": "DB",
-            "database_name": "dailyborg-db",
-            "database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3"
-        }
-    ],
-    "vectorize": [
-        {
-            "binding": "VECTORIZE",
-            "index_name": "dailyborg-claims"
-        }
-    ],
-    "r2_buckets": [
-        {
-            "binding": "IMAGE_BUCKET",
-            "bucket_name": "borg-images"
-        }
-    ],
-    "triggers": {
-        "crons": [
-            "0 8 * * *",
-            "0 8 * * 5"
-        ]
-    }
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "dailyborg-ingest",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-03-05",
+	"queues": {
+		"consumers": [
+			{
+				"queue": "ingest-queue",
+				"max_batch_size": 1,
+				"max_retries": 1
+			}
+		]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "dailyborg-db",
+			"database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3"
+		}
+	],
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "dailyborg-claims"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "IMAGE_BUCKET",
+			"bucket_name": "borg-images"
+		}
+	],
+	"triggers": {
+		"crons": [
+			"0 8 * * *",
+			"0 8 * * 5"
+		]
+	}
 }

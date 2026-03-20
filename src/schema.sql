@@ -110,19 +110,33 @@ CREATE INDEX IF NOT EXISTS idx_positions_politician ON positions(politician_id);
 CREATE INDEX IF NOT EXISTS idx_positions_topic ON positions(topic);
 
 -- Newsroom & Articles
+CREATE TABLE IF NOT EXISTS authors (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    bio TEXT,
+    email TEXT,
+    avatar_url TEXT,
+    twitter_handle TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
 CREATE TABLE IF NOT EXISTS articles (
     id TEXT PRIMARY KEY,
     slug TEXT UNIQUE NOT NULL,
     title TEXT NOT NULL,
     excerpt TEXT,
     content_html TEXT NOT NULL,
+    author_id TEXT,
     read_time INTEGER,
     article_type TEXT,
     confidence_score INTEGER,
     publish_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     desk TEXT,
     hero_image_url TEXT,
-    social_published BOOLEAN DEFAULT 0
+    social_published BOOLEAN DEFAULT 0,
+    FOREIGN KEY (author_id) REFERENCES authors(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_articles_social_published ON articles(social_published);
