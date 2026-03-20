@@ -186,13 +186,14 @@ export default {
                 }
 
                 const finalArticleType = isDraft ? "draft" : (type || "standard");
+                const approvalStatus = isDraft ? 'pending' : 'approved';
                 const id = crypto.randomUUID();
 
-                console.log(`Inserting ${finalArticleType} article ${id} into D1...`);
+                console.log(`Inserting ${finalArticleType} article ${id} into D1 (Status: ${approvalStatus})...`);
                 const { success } = await env.DB.prepare(`
-          INSERT INTO articles (id, slug, title, excerpt, content_html, author_id, article_type, confidence_score, desk, hero_image_url)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).bind(
+                  INSERT INTO articles (id, slug, title, excerpt, content_html, author_id, article_type, confidence_score, desk, hero_image_url, approval_status)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `).bind(
                     id,
                     articleObject.canonical_event_slug,
                     articleObject.title,
@@ -202,7 +203,8 @@ export default {
                     finalArticleType,
                     articleObject.confidenceScore,
                     "Politics Grid",
-                    heroImageUrl
+                    heroImageUrl || `https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?q=80&w=2070&auto=format&fit=crop`,
+                    approvalStatus
                 ).run();
 
                 if (!success) throw new Error("Database insertion failed");

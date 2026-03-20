@@ -5,39 +5,46 @@ import Link from "next/link";
 import { AlertTriangle, Search, User, Menu, Activity, Landmark, Building, Trophy } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 
-const headlines = [
-    "DEVELOPING: Cybercrime ring dismantled across 12 countries — 47 arrested",
-    "LIVE: NASA Artemis IV deploys Lunar Gateway module successfully",
-    "UPDATE: Federal Reserve holds rates steady, signaling cautious approach",
-    "BREAKING: Senate advances infrastructure bill 68-29"
-];
-// Duplicate for seamless scroll
-const tickerHeadlines = [...headlines, ...headlines];
+interface LiveUpdate {
+    icon: any;
+    text: string;
+    time: string;
+}
 
-const liveUpdateSets = [
-    [
-        { icon: Landmark, text: "House Roll Call #127 — H.R. 4521 passed 231-198", time: "2:45 PM" },
-        { icon: Landmark, text: "Senate Vote #89 — Cloture invoked on infrastructure bill", time: "1:30 PM" },
-        { icon: Building, text: "President signs Executive Order on clean energy procurement", time: "12:00 PM" },
-        { icon: Trophy, text: "Lakers 112 — Celtics 108 (F)", time: "10:15 AM" }
+interface SiteHeaderProps {
+    headlines?: string[];
+    liveUpdates?: LiveUpdate[];
+}
+
+export function SiteHeader({ 
+    headlines = [
+        "DAILY BORG: Algorithmic news matrix active",
+        "STATUS: Establishing connection to the grid...",
+        "UPDATE: Autonomous feeders deployed and scouting"
     ],
-    [
-        { icon: AlertTriangle, text: "Cybercrime ring dismantled across 12 countries — 47 arrested", time: "3:10 PM" },
-        { icon: Activity, text: "NASA Artemis IV deploys Lunar Gateway module successfully", time: "2:55 PM" },
-        { icon: Building, text: "Federal Reserve holds rates steady, signaling cautious approach", time: "1:45 PM" },
-        { icon: Landmark, text: "Senate advances infrastructure bill 68-29", time: "11:20 AM" }
+    liveUpdates = [
+        { icon: Activity, text: "Grid Status: Operational", time: "LIVE" },
+        { icon: Landmark, text: "Public Record Sync: Complete", time: "NOW" }
     ]
-];
-
-export function SiteHeader() {
+}: SiteHeaderProps) {
     const [liveIndex, setLiveIndex] = useState(0);
 
+    // Dynamic live updates are typically passed as sets, but for simplicity we can just slice them
+    const liveUpdateSets = [
+        liveUpdates.slice(0, 4),
+        liveUpdates.slice(4, 8)
+    ].filter(set => set.length > 0);
+
+    // Duplicate for seamless scroll
+    const tickerHeadlines = [...headlines, ...headlines];
+
     useEffect(() => {
+        if (liveUpdateSets.length <= 1) return;
         const timer = setInterval(() => {
             setLiveIndex((prev) => (prev + 1) % liveUpdateSets.length);
-        }, 12000); // 12 seconds total cycle to give plenty of reading time
+        }, 12000); 
         return () => clearInterval(timer);
-    }, []);
+    }, [liveUpdateSets.length]);
 
     const currentDate = new Date().toLocaleDateString("en-US", {
         weekday: "long",

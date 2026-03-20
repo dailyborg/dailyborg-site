@@ -22,11 +22,33 @@ export const metadata: Metadata = {
   description: "Broadcast Operations & Reporting Grid - The Public Record, Documented.",
 };
 
-export default function RootLayout({
+import { getDbBinding } from "@/lib/db";
+import { Activity, Landmark } from "lucide-react";
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const db = await getDbBinding();
+  
+  // Fetch latest 10 approved articles for the ticker
+  const { results: rawArticles } = await db.prepare(`
+    SELECT title, desk, publish_date FROM articles 
+    WHERE approval_status = 'approved' 
+    ORDER BY publish_date DESC 
+    LIMIT 10
+  `).bind().all();
+
+  const articles = (rawArticles as any[]) || [];
+  const headlines = articles.map(a => `${a.desk?.toUpperCase() || 'UPDATE'}: ${a.title}`);
+  
+  const liveUpdates = articles.slice(0, 4).map(a => ({
+    icon: a.desk === 'Politics' ? Landmark : Activity,
+    text: a.title,
+    time: "NEW"
+  }));
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${sourceSans.variable} ${playfair.variable} antialiased bg-background text-foreground selection:bg-accent selection:text-white`}>
@@ -37,7 +59,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <div className="flex min-h-screen flex-col">
-            <SiteHeader />
+            <SiteHeader headlines={headlines.length > 0 ? headlines : undefined} liveUpdates={liveUpdates.length > 0 ? liveUpdates : undefined} />
             <main className="flex-1">{children}</main>
             <SiteFooter />
           </div>
