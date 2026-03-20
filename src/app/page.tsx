@@ -256,22 +256,34 @@ export const dynamic = 'force-dynamic'; // Bypass Cloudflare/Next.js caching
 export const runtime = 'edge'; // Required for dynamic routes on Cloudflare Pages
 
 export default async function Home() {
-  const db = await getDbBinding();
 
-  const { results: rawArticles } = await db.prepare(`
-      SELECT * FROM articles 
-      WHERE approval_status = 'approved' 
-      ORDER BY publish_date DESC 
-      LIMIT 8
-  `).bind().all();
+  const articles: any[] = [];
+  let errorState: string | null = null;
 
-  const articles = (rawArticles as any[]) || [];
+  try {
+    const db = await getDbBinding();
+    const { results } = await db.prepare(`
+        SELECT * FROM articles 
+        WHERE approval_status = 'approved' 
+        ORDER BY publish_date DESC 
+        LIMIT 8
+    `).bind().all();
+
+    if (results) articles.push(...(results as any[]));
+  } catch (e: any) {
+    errorState = e.message;
+  }
 
   // Fallback to empty UI if database strictly has literally zero live reports yet
   if (articles.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-muted-foreground font-mono uppercase tracking-widest border p-8 bg-muted/10">No Intelligence Verified For Broadcast</div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="text-muted-foreground font-mono uppercase tracking-widest border p-8 bg-muted/10">
+          {errorState ? `Grid Error: ${errorState}` : "No Intelligence Verified For Broadcast"}
+        </div>
+        {errorState && (
+          <Link href="/debug" className="text-xs text-primary underline">Run Diagnostic</Link>
+        )}
       </div>
     );
   }
