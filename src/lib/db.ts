@@ -15,7 +15,7 @@ export async function getDbBinding() {
     try {
         const { env } = getRequestContext();
         if ((env as any)?.DB) return (env as any).DB;
-        if ((env as any)?.['dailyborg-db']) return (env as any).['dailyborg-db'];
+        if ((env as any)?.['dailyborg-db']) return (env as any)['dailyborg-db'];
         if ((env as any)?.dailyborg_db) return (env as any).dailyborg_db;
     } catch (e) {
         // Not in Cloudflare Pages/Worker context, return local mock
