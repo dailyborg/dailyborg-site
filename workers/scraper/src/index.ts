@@ -6,7 +6,14 @@ export interface Env {
 const RSS_FEEDS = [
     { url: 'http://feeds.bbci.co.uk/news/world/rss.xml', type: 'standard' },
     { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?profile=120000000&id=10000115', type: 'business' },
-    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml', type: 'politics' }
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml', type: 'politics' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Science.xml', type: 'science' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Education.xml', type: 'education' },
+    { url: 'https://www.usnews.com/rss/education', type: 'education' }, // Backup
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml', type: 'entertainment' },
+    { url: 'https://www.espn.com/espn/rss/news', type: 'sports' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Crime.xml', type: 'crime' }, // Note: NYT often rolls crime into NY Region or general news, but some feeds exist. Let's add a generic crime one just in case, or Fox News Crime.
+    { url: 'https://moxie.foxnews.com/google-publisher/us-crime.xml', type: 'crime' }
 ];
 
 export default {
@@ -44,8 +51,8 @@ export default {
                 // Simple regex parser to extract <item> blocks from RSS XML without relying on heavy external parsers
                 const items = xmlData.match(/<item>([\s\S]*?)<\/item>/g) || [];
 
-                // Only process the 3 most recent articles per feed per hour to prevent AI API rate limiting
-                const recentItems = items.slice(0, 3);
+                // Only process the 4 most recent articles per feed per hour to prevent AI API rate limiting
+                const recentItems = items.slice(0, 4);
 
                 for (const itemXml of recentItems) {
                     const titleMatch = itemXml.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || itemXml.match(/<title>(.*?)<\/title>/);
