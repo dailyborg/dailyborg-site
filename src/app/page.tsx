@@ -78,6 +78,9 @@ function StandardNewspaperLayout({ data }: { data: NewsMatrix }) {
         {data.secondaryStories.slice(0, 2).map((story: any, idx: number) => (
           <article key={idx} className="border-b border-border pb-6 flex flex-col gap-2">
             <span className={`uppercase text-[10px] font-bold tracking-wider ${story.desk === 'Politics' ? 'text-desk-politics' : 'text-desk-business'}`}>{story.desk}</span>
+            <div className="bg-muted aspect-video w-full relative mb-1 overflow-hidden">
+              <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform hover:scale-105 duration-500" />
+            </div>
             <h3 className="font-serif font-bold text-xl leading-tight hover:underline cursor-pointer">
               <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
                 {story.title}
@@ -178,6 +181,9 @@ function HeroFocusLayout({ data }: { data: NewsMatrix }) {
         {data.secondaryStories.slice(2, 5).map((story: any, idx: number) => (
           <article key={idx} className="border-b border-border pb-6 flex flex-col gap-2">
             <span className="uppercase text-[10px] font-bold tracking-wider text-desk-business">{story.desk}</span>
+            <div className="bg-muted aspect-[3/2] w-full relative mb-1 overflow-hidden">
+              <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform hover:scale-105 duration-500" />
+            </div>
             <h3 className="font-serif font-bold text-2xl leading-tight hover:underline cursor-pointer">
               <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
                 {story.title}
@@ -314,7 +320,8 @@ export default async function Home() {
       timeAgo: formatTimeAgo(s.publish_date),
       excerpt: s.excerpt,
       slug: s.slug,
-      readTime: `${s.read_time || 4} min`
+      readTime: `${s.read_time || 4} min`,
+      aiGeneratedImageUrl: s.hero_image_url || null
     }))
   };
 
