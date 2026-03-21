@@ -6,11 +6,12 @@ This profile adapts Superpowers workflows for Antigravity with strict single-flo
 
 ## Core Rules
 
-1. Prefer local skills in `.agent/skills/<skill-name>/SKILL.md`.
-2. Execute one core task at a time with `task_boundary`.
-3. Use `browser_subagent` only for browser automation tasks.
-4. Track checklist progress in `<project-root>/docs/plans/task.md` (table-only live tracker).
-5. Keep changes scoped to the requested task and verify before completion claims.
+1. **Mandatory Context Loading**: Before executing any tool call (edit, search, or deploy), you MUST read the root `rules.md` to ensure compliance with naming conventions, project architecture, and deployment guardrails.
+2. Prefer local skills in `.agent/skills/<skill-name>/SKILL.md`.
+3. Execute one core task at a time with `task_boundary`.
+4. Use `browser_subagent` only for browser automation tasks.
+5. Track checklist progress in `<project-root>/docs/plans/task.md` (table-only live tracker).
+6. Keep changes scoped to the requested task and verify before completion claims.
 
 ## Tool Translation Contract
 
