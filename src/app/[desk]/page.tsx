@@ -46,10 +46,10 @@ export default async function DeskPage({ params }: { params: Promise<{ desk: str
         const db = await getDbBinding();
         const { results } = await db.prepare(`
             SELECT * FROM articles 
-            WHERE LOWER(desk) = ? AND approval_status = 'approved' 
+            WHERE LOWER(desk) LIKE ? AND approval_status = 'approved' 
             ORDER BY publish_date DESC 
             LIMIT 20
-        `).bind(desk).all();
+        `).bind(`%${desk}%`).all();
         if (results) articles.push(...(results as any[]));
     } catch (e) {
         // Fallback to empty

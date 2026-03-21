@@ -1,7 +1,9 @@
 export function getImageForContext(dataPayload: any): string {
+  const primaryImage = dataPayload.aiGeneratedImageUrl || dataPayload.hero_image_url;
+
   // 1. If the AI actively generated an image for this post
-  if (dataPayload.aiGeneratedImageUrl && dataPayload.aiGeneratedImageUrl !== "https://example.com/generated-hero.jpg") {
-    return dataPayload.aiGeneratedImageUrl;
+  if (primaryImage && primaryImage !== "https://example.com/generated-hero.jpg") {
+    return primaryImage;
   }
 
   // 2. Fallbacks to high-quality relevant Unsplash images based on desk
