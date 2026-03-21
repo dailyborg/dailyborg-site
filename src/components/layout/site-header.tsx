@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, Search, User, Menu, Activity, Landmark, Building, Trophy, ShieldAlert } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { DynamicTicker } from "./dynamic-ticker";
+import { DynamicLiveStrip } from "./dynamic-live-strip";
 import { useSearchParams } from "next/navigation";
 
 interface LiveUpdate {
@@ -177,49 +178,8 @@ export function SiteHeader({
                 </div>
 
                 {/* 5. Live Strip */}
-                <div className="bg-primary w-full font-sans overflow-hidden">
-                    <div className="flex items-center w-full max-w-[1400px] mx-auto px-4 md:px-6 py-3">
-                        <div className="flex flex-shrink-0 items-center gap-2 text-accent font-bold uppercase tracking-wider text-xs whitespace-nowrap">
-                            <Activity className="w-3.5 h-3.5 animate-sparkline" />
-                            <span>Live</span>
-                        </div>
+                <DynamicLiveStrip />
 
-                        {/* Partition after LIVE */}
-                        <div className="w-px h-4 bg-primary-foreground/20 ml-4 mr-4 flex-shrink-0"></div>
-
-                        <div className="flex flex-1 overflow-hidden relative items-center min-h-[20px]">
-                            {liveUpdateSets.map((set, setIndex) => {
-                                const isActive = setIndex === liveIndex;
-
-                                return (
-                                    <div
-                                        key={setIndex}
-                                        className={`absolute inset-0 flex items-center gap-4 w-max transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-                                    >
-                                        {set.map((update, index) => {
-                                            const Icon = update.icon;
-
-                                            return (
-                                                <React.Fragment key={index}>
-                                                    <div className="flex items-center gap-2 flex-shrink-0 font-sans text-xs text-primary-foreground/80 hover:text-primary-foreground cursor-pointer transition-colors">
-                                                        <Icon className="w-3.5 h-3.5 text-primary-foreground" />
-                                                        <span>{update.text}</span>
-                                                        <span className="text-[10px] text-primary-foreground/60 ml-1">{update.time}</span>
-                                                    </div>
-
-                                                    {/* Render divider for all items EXCEPT the last one */}
-                                                    {index < set.length - 1 && (
-                                                        <div className="w-px h-3 bg-primary-foreground/20 ml-2 flex-shrink-0"></div>
-                                                    )}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
 
             </div>
         </header>
