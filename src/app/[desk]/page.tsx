@@ -2,118 +2,12 @@ export const runtime = 'edge';
 
 import { NewsGrid } from "@/components/ui/grid";
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound } from "next/navigation";
+import { getDbBinding } from '@/lib/db';
+import { getImageForContext } from '@/lib/image-utils';
 
 const VALID_DESKS = ["politics", "crime", "business", "entertainment", "sports", "science", "education"];
-
-// Category-specific mock data for a polished, robust placeholder experience
-const deskDataMap: Record<string, any> = {
-    politics: {
-        title: "Politics",
-        lead: {
-            headline: "Senate Appropriations Committee Clashes Over Defense Budget Allocations",
-            excerpt: "Hours of testimony revealed deep partisan divides on modernization priorities, with specific focus on maritime autonomous systems and strategic defensive infrastructure.",
-            author: "Capitol Bureau",
-            time: "2h ago"
-        },
-        secondary: [
-            { tag: "Elections", headline: "New Polls Indicate Shifting Demographics in Key Swing Counties", excerpt: "A comprehensive voter registration analysis shows surprising migration patterns." },
-            { tag: "Policy", headline: "Bipartisan Coalition Proposes Sweeping Privacy Legislation", excerpt: "The draft bill aims to unify state patchwork laws into a cohesive federal framework." },
-            { tag: "Diplomacy", headline: "Secretary of State Concludes Summit with Trade Partners", excerpt: "Negotiations focused on securing vital supply chains for the technology sector." },
-            { tag: "Analysis", headline: "What the Latest Executive Order Means for Local Municipalities", excerpt: "Breaking down the immediate budgetary impact on city-level infrastructure planning." }
-        ]
-    },
-    crime: {
-        title: "Crime & Justice",
-        lead: {
-            headline: "Major Cybercrime Ring Dismantled in Multi-Agency Operation Spanning 12 Countries",
-            excerpt: "Law enforcement agencies across three continents coordinated to arrest 47 suspects tied to a sophisticated ransomware network responsible for hundreds of corporate breaches.",
-            author: "Justice Desk",
-            time: "4h ago"
-        },
-        secondary: [
-            { tag: "Investigation", headline: "Audit Reveals $4.2B in Misallocated Infrastructure Funds", excerpt: "Official records indicate billions diverted from bridge repair into untracked municipal funds." },
-            { tag: "Courts", headline: "Supreme Court to Hear Landmark Digital Rights Case This Term", excerpt: "The ruling could fundamentally alter how data brokers operate across borders." },
-            { tag: "Local", headline: "City Police Department Announces New Community Liaison Initiative", excerpt: "The program aims to bridge the trust gap through designated neighborhood officers." },
-            { tag: "Federal", headline: "DOJ Indicts Three in Interstate Counterfeit Operations", excerpt: "The year-long sting operation recovered millions in forged currency and documents." }
-        ]
-    },
-    business: {
-        title: "Business",
-        lead: {
-            headline: "Market Recovers Sharply Following Better-Than-Expected CPI Data Release",
-            excerpt: "Core inflation met expectations, cooling fears of an aggressive rate hike in the upcoming FOMC meeting and sending tech shares to a four-week high.",
-            author: "Financial Desk",
-            time: "1h ago"
-        },
-        secondary: [
-            { tag: "Markets", headline: "Federal Reserve Signals Cautious Approach to Interest Rate Adjustments", excerpt: "The central bank indicated it will maintain its current policy stance for the quarter." },
-            { tag: "Tech", headline: "Industry Giant Announces $10B Investment in Domestic Chip Manufacturing", excerpt: "The new facility is expected to bring 5,000 high-paying jobs to the region." },
-            { tag: "Labor", headline: "National Logistics Union Reaches Tentative Contract Agreement", excerpt: "The last-minute deal averts a strike that threatened to paralyze holiday shipping." },
-            { tag: "Analysis", headline: "The Silent Rise of AI-Driven Boutique Hedge Funds", excerpt: "How small algorithmic trading desks are outperforming traditional Wall Street behemoths." }
-        ]
-    },
-    entertainment: {
-        title: "Entertainment",
-        lead: {
-            headline: "Independent Studio Sweeps Major Categories at International Film Festival",
-            excerpt: "The psychological thriller captivated judges, securing Best Picture and Best Director in a historic upset against major Hollywood productions.",
-            author: "Culture Desk",
-            time: "6h ago"
-        },
-        secondary: [
-            { tag: "Streaming", headline: "Global Streaming Platform Announces Major Strategy Pivot", excerpt: "The focus will shift from volume to prestige limited series and live events." },
-            { tag: "Music", headline: "Legendary Rock Venue Reopens After Complete Heritage Restoration", excerpt: "The acoustic properties have been preserved while modernizing the infrastructure." },
-            { tag: "Box Office", headline: "Summer Blockbuster Unexpectedly Underperforms Opening Weekend", excerpt: "Analysts point to franchise fatigue and strong competition from independent releases." },
-            { tag: "Arts", headline: "Modern Art Museum Acquires Controversial Digital Collection", excerpt: "The purchase sparks a debate about the long-term archival value of digital media." }
-        ]
-    },
-    sports: {
-        title: "Sports",
-        lead: {
-            headline: "Underdog Franchise Secures Championship Following Dramatic Overtime Victory",
-            excerpt: "In a series that defined the season, the team executed a flawless final play to break the deadlock and secure their first title in three decades.",
-            author: "Athletics Desk",
-            time: "3h ago"
-        },
-        secondary: [
-            { tag: "League", headline: "Commissioner Announces Expansion Plans for Four New Cities", excerpt: "The highly anticipated move will bring professional franchises to emerging markets." },
-            { tag: "Medical", headline: "Breakthrough in Recovery Protocols Could Extend Player Careers", excerpt: "New regenerative therapies are dramatically reducing downtime from ligament injuries." },
-            { tag: "Draft", headline: "Analysts Divided Over Top Prospect's Transition to Professional League", excerpt: "Questions remain about how the collegiate star will adapt to the faster pace." },
-            { tag: "Global", headline: "International Tournament Sets New Broadcast Viewership Records", excerpt: "The final match drew an estimated 1.5 billion viewers globally." }
-        ]
-    },
-    science: {
-        title: "Science",
-        lead: {
-            headline: "NASA's Artemis IV Mission Successfully Deploys Lunar Gateway Module",
-            excerpt: "The first habitable module of the Lunar Gateway was deployed into orbit around the Moon, marking a critical milestone in humanity's return to deep space exploration.",
-            author: "Space Desk",
-            time: "5h ago"
-        },
-        secondary: [
-            { tag: "Climate", headline: "Oceanographic Survey Maps Unprecedented Deep Sea Coral Habitats", excerpt: "The discovery challenges existing models of biodiversity in extreme environments." },
-            { tag: "Physics", headline: "CERN Researchers Report Anomalous Reading in Latest Collision Data", excerpt: "The results, if verified, could indicate physics beyond the Standard Model." },
-            { tag: "Medicine", headline: "Phase III Trials Confirm Efficacy of Novel Targeted Immunotherapy", excerpt: "The treatment shows significant promise in managing previously untreatable conditions." },
-            { tag: "Materials", headline: "Engineers Develop Biodegradable Polymer Stronger Than Steel", excerpt: "The synthetic material could revolutionize packaging and manufacturing processes." }
-        ]
-    },
-    education: {
-        title: "Education",
-        lead: {
-            headline: "National Board Introduces Comprehensive Overhaul of STEM Curriculum Standards",
-            excerpt: "The new guidelines focus on computational thinking and data literacy, shifting away from rote memorization toward project-based applied learning architectures.",
-            author: "Education Desk",
-            time: "8h ago"
-        },
-        secondary: [
-            { tag: "Policy", headline: "Federal Grant Program Targets Rural Connectivity Gaps in Public Schools", excerpt: "The initiative aims to ensure all students have access to high-speed broadband." },
-            { tag: "Higher Ed", headline: "University System Freezes Tuition for Fourth Consecutive Year", excerpt: "Administrators cite aggressive endowment restructuring and operational efficiencies." },
-            { tag: "Research", headline: "Longitudinal Study Links Early Arts Access to Improved Graduation Rates", excerpt: "The data suggests comprehensive arts education is a critical factor in student retention." },
-            { tag: "Tech", headline: "Districts Grapple with Integrating AI Tools Authentically in Classrooms", excerpt: "Educators are developing new frameworks to treat AI as a collaborator rather than a shortcut." }
-        ]
-    }
-};
 
 const SUBSECTIONS: Record<string, string[]> = {
     politics: ["All", "White House", "Congress", "Federal Agencies", "Campaigns & Elections", "State of the Race", "Policy Tracker"],
@@ -125,6 +19,17 @@ const SUBSECTIONS: Record<string, string[]> = {
     education: ["All", "Standardized Testing", "Education Funding", "Curriculum Reform", "School Technology", "Higher Education", "K-12 Policy"]
 };
 
+function formatTimeAgo(dateString: string) {
+    const diff = Date.now() - new Date(dateString).getTime();
+    if (isNaN(diff)) return "Just now";
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    if (hours < 1) return 'Just now';
+    if (hours === 1) return '1 hour ago';
+    if (hours < 24) return `${hours} hours ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+}
+
 export default async function DeskPage({ params }: { params: Promise<{ desk: string }> }) {
     const resolvedParams = await params;
     const desk = resolvedParams.desk.toLowerCase();
@@ -133,10 +38,38 @@ export default async function DeskPage({ params }: { params: Promise<{ desk: str
         notFound();
     }
 
-    const data = deskDataMap[desk];
     const tabs = SUBSECTIONS[desk] || ["All"];
+    
+    // Fetch live data from D1
+    const articles: any[] = [];
+    try {
+        const db = await getDbBinding();
+        const { results } = await db.prepare(`
+            SELECT * FROM articles 
+            WHERE LOWER(desk) = ? AND approval_status = 'approved' 
+            ORDER BY publish_date DESC 
+            LIMIT 20
+        `).bind(desk).all();
+        if (results) articles.push(...(results as any[]));
+    } catch (e) {
+        // Fallback to empty
+    }
 
-    const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    if (articles.length === 0) {
+        return (
+            <div className="container max-w-[1400px] mx-auto px-4 md:px-6 py-8 md:py-12 flex flex-col items-center justify-center min-h-[60vh]">
+                <div className="text-muted-foreground font-mono uppercase tracking-widest border p-8 bg-muted/10">
+                    No Intelligence Verified For {desk.toUpperCase()} Desk
+                </div>
+            </div>
+        );
+    }
+
+    const leadArticle = articles[0];
+    const secondaryArticles = articles.slice(1, 5);
+    const gridArticles = articles.slice(5);
+
+    const deskTitle = desk === 'crime' ? 'Crime & Justice' : desk.charAt(0).toUpperCase() + desk.slice(1);
 
     return (
         <div className="container max-w-[1400px] mx-auto px-4 md:px-6 py-8 md:py-12 space-y-12 min-h-screen">
@@ -144,7 +77,7 @@ export default async function DeskPage({ params }: { params: Promise<{ desk: str
             {/* Header Area */}
             <div className="flex flex-col gap-6 border-b border-border pb-0">
                 <div className="flex justify-between items-end pb-4 border-b-4 border-foreground">
-                    <h1 className="font-[family-name:var(--font-playfair)] text-5xl md:text-7xl font-black tracking-tight uppercase leading-none">{data.title}</h1>
+                    <h1 className="font-[family-name:var(--font-playfair)] text-5xl md:text-7xl font-black tracking-tight uppercase leading-none">{deskTitle}</h1>
                     <span className="font-[family-name:var(--font-source-sans)] text-xs font-bold text-accent uppercase tracking-[0.2em] hidden md:inline-block">The Daily Borg</span>
                 </div>
 
@@ -166,85 +99,92 @@ export default async function DeskPage({ params }: { params: Promise<{ desk: str
             <NewsGrid>
                 {/* Lead Desk Story */}
                 <div className="col-span-1 md:col-span-4 lg:col-span-8 flex flex-col gap-6 group cursor-pointer max-w-4xl">
-                    <Link href={`/${desk}/${slugify(data.lead.headline)}`} className="aspect-[21/9] bg-muted border border-border flex items-center justify-center hover:opacity-90 transition-opacity">
-                        <span className="font-sans text-xs uppercase tracking-widest text-muted-foreground">LEAD IMAGE: {data.title.toUpperCase()}</span>
+                    <Link href={`/${desk}/${leadArticle.slug}`} className="aspect-[21/9] bg-muted border border-border relative overflow-hidden flex items-center justify-center">
+                        <Image src={getImageForContext(leadArticle)} alt={leadArticle.title} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
                     </Link>
                     <div className="flex flex-col gap-3">
-                        <Link href={`/${desk}/${slugify(data.lead.headline)}`}>
+                        <Link href={`/${desk}/${leadArticle.slug}`}>
                             <h2 className="font-[family-name:var(--font-playfair)] text-4xl md:text-6xl font-black leading-[1.1] tracking-tight hover:text-accent transition-colors">
-                                {data.lead.headline}
+                                {leadArticle.title}
                             </h2>
                         </Link>
-                        <p className="text-xl md:text-2xl text-muted-foreground font-[family-name:var(--font-playfair)] leading-relaxed mt-2">
-                            {data.lead.excerpt}
+                        <p className="text-xl md:text-2xl text-muted-foreground font-[family-name:var(--font-playfair)] leading-relaxed mt-2 line-clamp-3">
+                            {leadArticle.excerpt}
                         </p>
                     </div>
                     <div className="font-[family-name:var(--font-source-sans)] text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-4 mt-2">
-                        <span>By {data.lead.author}</span>
+                        <span>By The Borg Syndicate</span>
                         <span>•</span>
-                        <span>{data.lead.time}</span>
+                        <span>{formatTimeAgo(leadArticle.publish_date)}</span>
                     </div>
                 </div>
 
                 {/* Supporting News Sidebar */}
                 <div className="col-span-1 md:col-span-4 lg:col-span-4 flex flex-col gap-8 md:pl-8 md:border-l border-border mt-8 md:mt-0">
-                    {data.secondary.map((story: any, i: number) => (
-                        <div key={i} className="group cursor-pointer">
-                            <span className="font-[family-name:var(--font-source-sans)] block text-[10px] font-bold text-accent uppercase tracking-wider mb-2">
-                                {story.tag}
+                    {secondaryArticles.map((story: any, i: number) => (
+                        <div key={i} className="group cursor-pointer flex flex-col gap-3">
+                            <span className="font-[family-name:var(--font-source-sans)] block text-[10px] font-bold text-accent uppercase tracking-wider mb-0">
+                                {story.article_type || "Intel"}
                             </span>
-                            <Link href={`/${desk}/${slugify(story.headline)}`}>
-                                <h3 className="font-[family-name:var(--font-playfair)] text-2xl font-black mb-3 group-hover:underline underline-offset-4 decoration-2 leading-tight tracking-tight">
-                                    {story.headline}
+                            <div className="aspect-[16/9] bg-muted relative overflow-hidden w-full">
+                                <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                            </div>
+                            <Link href={`/${desk}/${story.slug}`}>
+                                <h3 className="font-[family-name:var(--font-playfair)] text-2xl font-black mb-2 group-hover:underline underline-offset-4 decoration-2 leading-tight tracking-tight mt-2">
+                                    {story.title}
                                 </h3>
-                                <p className="font-[family-name:var(--font-source-sans)] text-sm md:text-base text-muted-foreground mb-4 leading-relaxed">
+                                <p className="font-[family-name:var(--font-source-sans)] text-sm md:text-base text-muted-foreground mb-4 leading-relaxed line-clamp-2">
                                     {story.excerpt}
                                 </p>
                             </Link>
-                            {i < data.secondary.length - 1 && <hr className="mt-8 border-border" />}
+                            {i < secondaryArticles.length - 1 && <hr className="mt-4 border-border" />}
                         </div>
                     ))}
                 </div>
             </NewsGrid>
 
-            {/* Subsections Content Rows */}
-            {tabs.length > 1 && (
+            {/* Subsections Content Rows (If enough articles exist) */}
+            {tabs.length > 1 && gridArticles.length > 0 && (
                 <div className="flex flex-col gap-16 mt-20 pb-16">
-                    {tabs.filter(t => t !== "All").map((subsection, idx) => (
-                        <div key={idx} className="flex flex-col gap-8">
-
-                            {/* Row Header */}
-                            <div className="border-t-2 border-border pt-4 flex flex-col md:flex-row md:justify-between md:items-end gap-2">
-                                <h3 className="font-[family-name:var(--font-playfair)] text-3xl md:text-4xl font-black uppercase tracking-tight">{subsection}</h3>
-                                <div className="font-[family-name:var(--font-source-sans)] text-[10px] sm:text-xs text-muted-foreground uppercase tracking-widest font-bold">
-                                    More from the {desk} desk
+                    {tabs.filter(t => t !== "All").slice(0, Math.ceil(gridArticles.length / 3)).map((subsection, idx) => {
+                        const rowArticles = gridArticles.slice(idx * 3, (idx * 3) + 3);
+                        if (rowArticles.length === 0) return null;
+                        
+                        return (
+                            <div key={idx} className="flex flex-col gap-8">
+                                {/* Row Header */}
+                                <div className="border-t-2 border-border pt-4 flex flex-col md:flex-row md:justify-between md:items-end gap-2">
+                                    <h3 className="font-[family-name:var(--font-playfair)] text-3xl md:text-4xl font-black uppercase tracking-tight">{subsection}</h3>
+                                    <div className="font-[family-name:var(--font-source-sans)] text-[10px] sm:text-xs text-muted-foreground uppercase tracking-widest font-bold">
+                                        More from the {desk} desk
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Row Stories Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                {[1, 2, 3].map((item) => (
-                                    <div key={item} className="flex flex-col gap-4 group cursor-pointer group">
-                                        <div className="aspect-[4/3] bg-muted border border-border flex items-center justify-center overflow-hidden">
-                                            <span className="font-sans text-[10px] uppercase tracking-widest text-muted-foreground">IMAGE: {subsection}</span>
-                                        </div>
-                                        <div className="flex flex-col gap-2">
-                                            <Link href={`/${desk}/${slugify(`Latest ongoing developments and detailed analysis surrounding ${subsection.toLowerCase()} operations`)}`}>
-                                                <h4 className="font-[family-name:var(--font-playfair)] text-2xl font-black leading-tight hover:underline underline-offset-4 decoration-2">
-                                                    Latest ongoing developments and detailed analysis surrounding {subsection.toLowerCase()} operations.
-                                                </h4>
-                                            </Link>
-                                            <div className="font-[family-name:var(--font-source-sans)] text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-2 flex items-center gap-3">
-                                                <span>{Math.floor(Math.random() * 12) + 1}h ago</span>
-                                                <span>•</span>
-                                                <span className="text-accent">{subsection} Desk</span>
+                                {/* Row Stories Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    {rowArticles.map((item, idxx) => (
+                                        <div key={idxx} className="flex flex-col gap-4 group cursor-pointer group">
+                                            <div className="aspect-[4/3] bg-muted border border-border relative overflow-hidden">
+                                                 <Image src={getImageForContext(item)} alt={item.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                <Link href={`/${desk}/${item.slug}`}>
+                                                    <h4 className="font-[family-name:var(--font-playfair)] text-2xl font-black leading-tight hover:underline underline-offset-4 decoration-2">
+                                                        {item.title}
+                                                    </h4>
+                                                </Link>
+                                                <div className="font-[family-name:var(--font-source-sans)] text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-2 flex items-center gap-3">
+                                                    <span>{formatTimeAgo(item.publish_date)}</span>
+                                                    <span>•</span>
+                                                    <span className="text-accent">{deskTitle} Desk</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             )}
         </div>

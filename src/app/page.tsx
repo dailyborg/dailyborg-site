@@ -3,28 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Clock, MapPin } from 'lucide-react';
 
-// Contextual Image Router
-function getImageForContext(dataPayload: any): string {
-  // 1. If the AI actively generated an image for this post
-  if (dataPayload.aiGeneratedImageUrl && dataPayload.aiGeneratedImageUrl !== "https://example.com/generated-hero.jpg") {
-    return dataPayload.aiGeneratedImageUrl;
-  }
-
-  // 2. Fallback to a high-quality relevant Unsplash image based on desk
-  const desk = (dataPayload.desk || "Politics").toLowerCase();
-  
-  const fallbacks: Record<string, string> = {
-    politics: "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?q=80&w=2070&auto=format&fit=crop",
-    business: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop",
-    science: "https://images.unsplash.com/photo-1507413245164-6160d8298b31?q=80&w=2070&auto=format&fit=crop",
-    sports: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=2070&auto=format&fit=crop",
-    entertainment: "https://images.unsplash.com/photo-1514525253344-99a343467669?q=80&w=2062&auto=format&fit=crop",
-    crime: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=2070&auto=format&fit=crop",
-    education: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=2070&auto=format&fit=crop"
-  };
-
-  return fallbacks[desk] || fallbacks.politics;
-}
+import { getImageForContext } from '@/lib/image-utils';
 
 import { getDbBinding } from '@/lib/db';
 
