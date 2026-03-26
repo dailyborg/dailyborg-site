@@ -70,7 +70,7 @@ export default {
                                 "Authorization": `Bearer ${env.AIML_API_KEY}`
                             },
                             body: JSON.stringify({
-                                model: "gemini-3-flash",
+                                model: "google/gemini-3-flash-preview",
                                 messages: [{ role: "user", content: enrichmentPrompt }],
                                 response_format: { type: "json_object" }
                             })
@@ -157,7 +157,7 @@ export default {
                                 "Authorization": `Bearer ${env.AIML_API_KEY}`
                             },
                             body: JSON.stringify({
-                                model: "nano-banana-2",
+                                model: "google/nano-banana-2",
                                 prompt: articleObject.suggestedHeroImagePrompt
                             })
                         });
@@ -174,7 +174,7 @@ export default {
                                 httpMetadata: { contentType: "image/jpeg" }
                             });
 
-                            heroImageUrl = `https://pub-YOUR_BUCKET_ID.r2.dev/${fileKey}`;
+                            heroImageUrl = `https://dailyborg.com/api/images/${fileKey}`;
                             console.log(`Successfully generated and stored image at ${heroImageUrl}`);
                         } else {
                             console.warn(`Image generation failed: ${imageRes.statusText}`);
