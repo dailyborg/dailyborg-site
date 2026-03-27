@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Clock, MapPin } from 'lucide-react';
+import { ArrowRight, Clock, MapPin, TrendingUp, Zap, BookOpen } from 'lucide-react';
 
 import { getImageForContext } from '@/lib/image-utils';
 
@@ -18,160 +18,110 @@ function formatTimeAgo(dateString: string) {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
-type NewsMatrix = {
-  leadStory: {
-    title: string;
-    desk: string;
-    location: string;
-    author: string;
-    readTime: string;
-    excerpt: string;
-    slug: string;
-    category: string;
-    primaryPolitician: string;
-    emotionalContext: string;
-    aiGeneratedImageUrl: string | null;
-    severity: number;
-    hasHighResHero: boolean;
-  };
-  secondaryStories: {
-    title: string;
-    desk: string;
-    timeAgo: string;
-    excerpt: string;
-    slug: string;
-    readTime?: string;
-  }[];
+function getDeskColor(desk: string): string {
+  const d = desk?.toLowerCase() || '';
+  if (d.includes('politic') || d.includes('congress')) return 'text-desk-politics';
+  if (d.includes('crime')) return 'text-desk-crime';
+  if (d.includes('business')) return 'text-desk-business';
+  if (d.includes('entertain') || d.includes('arts')) return 'text-desk-entertainment';
+  if (d.includes('sport')) return 'text-desk-sports';
+  if (d.includes('science')) return 'text-desk-science';
+  if (d.includes('education')) return 'text-desk-education';
+  return 'text-desk-borg';
+}
+
+function getDeskBgColor(desk: string): string {
+  const d = desk?.toLowerCase() || '';
+  if (d.includes('politic') || d.includes('congress')) return 'bg-desk-politics';
+  if (d.includes('crime')) return 'bg-desk-crime';
+  if (d.includes('business')) return 'bg-desk-business';
+  if (d.includes('entertain') || d.includes('arts')) return 'bg-desk-entertainment';
+  if (d.includes('sport')) return 'bg-desk-sports';
+  if (d.includes('science')) return 'bg-desk-science';
+  if (d.includes('education')) return 'bg-desk-education';
+  return 'bg-desk-borg';
+}
+
+type ArticleData = {
+  title: string;
+  desk: string;
+  timeAgo: string;
+  excerpt: string;
+  slug: string;
+  readTime?: string;
+  aiGeneratedImageUrl?: string | null;
+  hero_image_url?: string | null;
+  article_type?: string;
 };
 
-// Layout A: Standard 3-Column Newspaper (Original)
-function StandardNewspaperLayout({ data }: { data: NewsMatrix }) {
+// =============================================
+// SECTION: Lead Hero + Sidebar (Top of Page)
+// =============================================
+function LeadHeroSection({ lead, sideStories }: { lead: ArticleData; sideStories: ArticleData[] }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative">
-      {/* Left Column - Secondary Stories (col-span-3) */}
-      <div className="lg:col-span-3 flex flex-col gap-6 order-2 lg:order-1 border-r-0 lg:border-r border-border pr-0 lg:pr-6">
-        <div className="border-b-4 border-foreground pb-2 mb-2">
-          <h2 className="font-sans uppercase font-bold text-sm tracking-wider">National Desk</h2>
-        </div>
-
-        {data.secondaryStories.slice(0, 2).map((story: any, idx: number) => (
-          <article key={idx} className="border-b border-border pb-6 flex flex-col gap-2">
-            <span className={`uppercase text-[10px] font-bold tracking-wider ${story.desk === 'Politics' ? 'text-desk-politics' : 'text-desk-business'}`}>{story.desk}</span>
-            <div className="bg-muted aspect-video w-full relative mb-1 overflow-hidden">
-              <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform hover:scale-105 duration-500" />
-            </div>
-            <h3 className="font-serif font-bold text-xl leading-tight hover:underline cursor-pointer">
-              <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
-                {story.title}
-              </Link>
-            </h3>
-            <p className="text-sm text-muted-foreground line-clamp-3">
-              {story.excerpt}
-            </p>
-            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground font-sans">
-              <Clock className="w-3 h-3" />
-              <span>{story.timeAgo}</span>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {/* Center Column - Lead Story (col-span-6) */}
-      <div className="lg:col-span-6 flex flex-col gap-4 border-r-0 lg:border-r border-border pr-0 lg:pr-6 order-1 lg:order-2">
+      {/* Center Column - Lead Story (col-span-8) */}
+      <div className="lg:col-span-8 flex flex-col gap-4 border-r-0 lg:border-r border-border pr-0 lg:pr-6">
         <article className="flex flex-col gap-4">
-          <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
-            {/* Dynamic Contextual Image from Feeder Tags */}
-            <Image
-              src={getImageForContext(data.leadStory)}
-              alt={data.leadStory.title}
-              fill
-              className="object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-          </div>
+          <Link href={`/${lead.desk.toLowerCase()}/${lead.slug}`} className="block">
+            <div className="bg-muted aspect-[16/9] w-full relative overflow-hidden group">
+              <Image
+                src={getImageForContext(lead)}
+                alt={lead.title}
+                fill
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+            </div>
+          </Link>
 
           <div className="flex flex-col gap-3 px-2">
             <div className="flex items-center gap-3">
-              <span className="bg-desk-borg text-primary-foreground px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold">{data.leadStory.desk}</span>
-              <span className="text-muted-foreground text-xs font-sans flex items-center gap-1">
-                <MapPin className="w-3 h-3" /> {data.leadStory.location}
-              </span>
+              <span className={`${getDeskBgColor(lead.desk)} text-white px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold`}>{lead.desk}</span>
             </div>
 
-            <h2 className="font-[family-name:var(--font-playfair)] font-black text-4xl md:text-5xl leading-tight tracking-tight hover:text-primary transition-colors cursor-pointer">
-              <Link href={`/${data.leadStory.desk.toLowerCase()}/${data.leadStory.slug}`}>
-                {data.leadStory.title}
+            <h2 className="font-[family-name:var(--font-playfair)] font-black text-4xl md:text-5xl leading-tight tracking-tight hover:opacity-70 transition-opacity cursor-pointer">
+              <Link href={`/${lead.desk.toLowerCase()}/${lead.slug}`}>
+                {lead.title}
               </Link>
             </h2>
 
-            <div className="flex items-center gap-2 mt-1 mb-2">
-              <div className="text-sm font-sans">By <span className="font-bold">{data.leadStory.author}</span></div>
+            <div className="flex items-center gap-2 mt-1 mb-1">
+              <div className="text-sm font-sans">By <span className="font-bold">The Borg Syndicate</span></div>
               <span className="text-muted-foreground mx-1">•</span>
-              <span className="text-sm text-muted-foreground font-sans">{data.leadStory.readTime}</span>
+              <span className="text-sm text-muted-foreground font-sans">{lead.readTime}</span>
             </div>
 
             <p className="text-lg text-foreground/80 leading-relaxed font-serif">
-              {data.leadStory.excerpt}
+              {lead.excerpt}
             </p>
+
+            <Link href={`/${lead.desk.toLowerCase()}/${lead.slug}`} className="inline-flex items-center gap-1 text-sm font-sans font-bold uppercase tracking-wider hover:opacity-70 transition-opacity mt-1 text-foreground">
+              Continue reading <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </article>
       </div>
 
-      {/* Right Column - Borg Record & Newsletter (col-span-3) */}
-      <div className="lg:col-span-3 flex flex-col gap-6 order-3">
-        <BorgRecordSidebar />
-        <NewsletterSidebar />
-      </div>
-    </div>
-  );
-}
-
-// Layout B: Hero Focus (2-Column, huge image left)
-function HeroFocusLayout({ data }: { data: NewsMatrix }) {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative">
-      {/* Left Column - Massive Lead Story (col-span-8) */}
-      <div className="lg:col-span-8 flex flex-col gap-6 order-1 border-r-0 lg:border-r border-border pr-0 lg:pr-6">
-        <div className="bg-[#e9e6df] aspect-[21/9] w-full relative overflow-hidden flex items-center justify-center text-muted-foreground/50 text-xs tracking-widest font-sans uppercase">
-          {/* Dynamic Contextual Image from Feeder Tags */}
-          <Image
-            src={getImageForContext(data.leadStory)}
-            alt={data.leadStory.title}
-            fill
-            className="object-cover"
-          />
-        </div>
-        <div className="flex flex-col gap-4 max-w-3xl flex-1 justify-center">
-          <div className="flex items-center gap-3">
-            <span className="text-desk-politics font-bold text-[10px] uppercase tracking-wider">Congress</span>
-          </div>
-          <h2 className="font-[family-name:var(--font-playfair)] font-black text-5xl md:text-6xl leading-[1.1] tracking-tight hover:text-primary transition-colors cursor-pointer">
-            <Link href={`/${data.leadStory.desk.toLowerCase()}/${data.leadStory.slug}`}>
-              {data.leadStory.title}
+      {/* Right Column - Stacked Side Stories (col-span-4) */}
+      <div className="lg:col-span-4 flex flex-col gap-6">
+        {sideStories.map((story, idx) => (
+          <article key={idx} className="border-b border-border pb-5 flex flex-col gap-2">
+            <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)}`}>{story.desk}</span>
+            <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block">
+              <div className="bg-muted aspect-[3/2] w-full relative mb-1 overflow-hidden">
+                <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform hover:scale-105 duration-500" />
+              </div>
             </Link>
-          </h2>
-          <p className="text-xl text-foreground/80 leading-relaxed font-serif mt-2">
-            {data.leadStory.excerpt}
-          </p>
-        </div>
-      </div>
-
-      {/* Right Column - Stacked Secondary Stories (col-span-4) */}
-      <div className="lg:col-span-4 flex flex-col gap-6 order-2">
-        {data.secondaryStories.slice(2, 5).map((story: any, idx: number) => (
-          <article key={idx} className="border-b border-border pb-6 flex flex-col gap-2">
-            <span className="uppercase text-[10px] font-bold tracking-wider text-desk-business">{story.desk}</span>
-            <div className="bg-muted aspect-[3/2] w-full relative mb-1 overflow-hidden">
-              <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform hover:scale-105 duration-500" />
-            </div>
-            <h3 className="font-serif font-bold text-2xl leading-tight hover:underline cursor-pointer">
+            <h3 className="font-serif font-bold text-xl leading-tight hover:opacity-70 transition-opacity cursor-pointer">
               <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
                 {story.title}
               </Link>
             </h3>
-            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+            <p className="text-sm text-muted-foreground line-clamp-2">
               {story.excerpt}
             </p>
-            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground font-sans">
+            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground font-sans">
+              <Clock className="w-3 h-3" />
               <span>{story.timeAgo}</span>
               {story.readTime && (
                 <>
@@ -187,7 +137,175 @@ function HeroFocusLayout({ data }: { data: NewsMatrix }) {
   );
 }
 
-// Extracted Sidebars for reuse
+// =============================================
+// SECTION: Trending Split (2-col: text left, image right)
+// =============================================
+function TrendingSplitSection({ stories }: { stories: ArticleData[] }) {
+  if (stories.length < 2) return null;
+  const leftStory = stories[0];
+  const rightStory = stories[1];
+
+  return (
+    <section className="border-t-4 border-foreground pt-6 mt-10">
+      <div className="flex items-center gap-2 mb-5">
+        <TrendingUp className="w-4 h-4 text-destructive" />
+        <h2 className="font-sans uppercase font-bold text-xs tracking-widest">Trending Now</h2>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Left: text-heavy article */}
+        <article className="flex flex-col gap-3 border-r-0 md:border-r border-border pr-0 md:pr-6">
+          <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(leftStory.desk)}`}>{leftStory.desk}</span>
+          <h3 className="font-serif font-bold text-3xl leading-tight hover:opacity-70 transition-opacity cursor-pointer">
+            <Link href={`/${leftStory.desk.toLowerCase()}/${leftStory.slug}`}>
+              {leftStory.title}
+            </Link>
+          </h3>
+          <p className="text-base text-foreground/75 leading-relaxed font-serif line-clamp-4">
+            {leftStory.excerpt}
+          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-sans mt-1">
+            <Clock className="w-3 h-3" />
+            <span>{leftStory.timeAgo}</span>
+            {leftStory.readTime && <><span className="mx-1">•</span><span>{leftStory.readTime}</span></>}
+          </div>
+        </article>
+
+        {/* Right: image-heavy article */}
+        <article className="flex flex-col gap-3">
+          <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(rightStory.desk)}`}>{rightStory.desk}</span>
+          <Link href={`/${rightStory.desk.toLowerCase()}/${rightStory.slug}`} className="block">
+            <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
+              <Image src={getImageForContext(rightStory)} alt={rightStory.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
+            </div>
+          </Link>
+          <h3 className="font-serif font-bold text-2xl leading-tight hover:opacity-70 transition-opacity cursor-pointer">
+            <Link href={`/${rightStory.desk.toLowerCase()}/${rightStory.slug}`}>
+              {rightStory.title}
+            </Link>
+          </h3>
+          <p className="text-sm text-muted-foreground line-clamp-2">{rightStory.excerpt}</p>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+// =============================================
+// SECTION: Headlines Grid (3-col compact)
+// =============================================
+function HeadlinesGridSection({ stories }: { stories: ArticleData[] }) {
+  if (stories.length === 0) return null;
+
+  return (
+    <section className="border-t-2 border-border pt-6 mt-10">
+      <div className="flex items-center gap-2 mb-5">
+        <Zap className="w-4 h-4 text-desk-sports" />
+        <h2 className="font-sans uppercase font-bold text-xs tracking-widest">More Headlines</h2>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {stories.map((story, idx) => (
+          <article key={idx} className="flex gap-4 border-b border-border pb-4">
+            <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="flex-shrink-0 block">
+              <div className="bg-muted w-24 h-24 relative overflow-hidden">
+                <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform hover:scale-105 duration-500" />
+              </div>
+            </Link>
+            <div className="flex flex-col gap-1 min-w-0">
+              <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)}`}>{story.desk}</span>
+              <h3 className="font-serif font-bold text-base leading-snug hover:opacity-70 transition-opacity cursor-pointer line-clamp-3">
+                <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
+                  {story.title}
+                </Link>
+              </h3>
+              <span className="text-xs text-muted-foreground font-sans mt-auto">{story.readTime || '4 min'}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// =============================================
+// SECTION: In-Depth Feature (full-width)
+// =============================================
+function InDepthSection({ story }: { story: ArticleData }) {
+  return (
+    <section className="border-t-4 border-foreground pt-6 mt-10">
+      <div className="flex items-center gap-2 mb-5">
+        <BookOpen className="w-4 h-4" />
+        <h2 className="font-sans uppercase font-bold text-xs tracking-widest">In Depth</h2>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <div className="flex flex-col gap-3">
+          <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)}`}>{story.desk}</span>
+          <h3 className="font-[family-name:var(--font-playfair)] font-black text-3xl md:text-4xl leading-tight hover:opacity-70 transition-opacity cursor-pointer">
+            <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
+              {story.title}
+            </Link>
+          </h3>
+          <p className="text-base text-foreground/75 leading-relaxed font-serif">
+            {story.excerpt}
+          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-sans mt-2">
+            <Clock className="w-3 h-3" />
+            <span>{story.timeAgo}</span>
+            {story.readTime && <><span className="mx-1">•</span><span>{story.readTime}</span></>}
+          </div>
+          <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="inline-flex items-center gap-1 text-sm font-sans font-bold uppercase tracking-wider hover:opacity-70 transition-opacity mt-2 text-foreground">
+            Read full analysis <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block">
+          <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
+            <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform duration-700 group-hover:scale-105" />
+          </div>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+// =============================================
+// SECTION: Second Feature Row (reversed: image left, text right)
+// =============================================
+function ReversedFeatureSection({ story }: { story: ArticleData }) {
+  return (
+    <section className="border-t-2 border-border pt-6 mt-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block order-2 md:order-1">
+          <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
+            <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform duration-700 group-hover:scale-105" />
+          </div>
+        </Link>
+
+        <div className="flex flex-col gap-3 order-1 md:order-2">
+          <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)}`}>{story.desk}</span>
+          <h3 className="font-[family-name:var(--font-playfair)] font-black text-3xl leading-tight hover:opacity-70 transition-opacity cursor-pointer">
+            <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
+              {story.title}
+            </Link>
+          </h3>
+          <p className="text-base text-foreground/75 leading-relaxed font-serif line-clamp-4">
+            {story.excerpt}
+          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-sans mt-1">
+            <Clock className="w-3 h-3" />
+            <span>{story.timeAgo}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// =============================================
+// Extracted Sidebars (unchanged)
+// =============================================
 function BorgRecordSidebar() {
   return (
     <div className="bg-primary/5 border border-primary/20 p-5 shadow-sm">
@@ -199,7 +317,7 @@ function BorgRecordSidebar() {
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-1 border-b border-primary/10 pb-4">
           <span className="text-xs text-muted-foreground font-sans">Just Updated</span>
-          <Link href="/borg-record/politicians/senator-smith" className="font-serif font-bold text-lg hover:text-primary leading-tight">
+          <Link href="/borg-record/politicians/senator-smith" className="font-serif font-bold text-lg hover:opacity-70 transition-opacity leading-tight">
             Senator Jane Smith (D-NY) Promise Tracker Adjusted
           </Link>
           <span className="inline-flex mt-1 text-[10px] items-center text-destructive font-bold uppercase tracking-wider">
@@ -208,7 +326,7 @@ function BorgRecordSidebar() {
         </div>
         <div className="flex flex-col gap-1 border-b border-primary/10 pb-4">
           <span className="text-xs text-muted-foreground font-sans">Key Vote Added</span>
-          <Link href="/borg-record/votes/hr-4521" className="font-serif font-bold text-lg hover:text-primary leading-tight">
+          <Link href="/borg-record/votes/hr-4521" className="font-serif font-bold text-lg hover:opacity-70 transition-opacity leading-tight">
             H.R. 4521: Clean Energy Procurement Act
           </Link>
           <p className="text-sm text-muted-foreground mt-1 line-clamp-2">Complete roll call data now available in the public grid.</p>
@@ -224,7 +342,7 @@ function BorgRecordSidebar() {
 function NewsletterSidebar() {
   return (
     <div className="bg-foreground text-background p-6 rounded-sm mt-4">
-      <h3 className="font-serif font-bold text-2xl mb-2">The Morning Briefing</h3>
+      <h3 className="font-serif font-bold text-2xl mb-2">The Borg Briefing</h3>
       <p className="text-sm text-background/80 mb-4">Unfiltered intelligence from the grid, delivered daily.</p>
       <div className="flex flex-col gap-2">
         <input type="email" placeholder="Your email address" className="bg-background/10 border border-background/20 px-3 py-2 text-sm text-background placeholder:text-background/50 focus:outline-none focus:border-background transition-colors" />
@@ -236,9 +354,11 @@ function NewsletterSidebar() {
   );
 }
 
+// =============================================
 // MAIN PAGE COMPONENT
-export const dynamic = 'force-dynamic'; // Bypass Cloudflare/Next.js caching
-export const runtime = 'edge'; // Required for dynamic routes on Cloudflare Pages
+// =============================================
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 export default async function Home() {
 
@@ -251,7 +371,7 @@ export default async function Home() {
         SELECT * FROM articles 
         WHERE approval_status = 'approved' 
         ORDER BY publish_date DESC 
-        LIMIT 8
+        LIMIT 20
     `).bind().all();
 
     if (results) articles.push(...(results as any[]));
@@ -273,69 +393,41 @@ export default async function Home() {
     );
   }
 
-  const dbLead = articles[0];
-  const dbSecondary = articles.slice(1);
+  // Map all articles into a common shape
+  const allStories: ArticleData[] = articles.map(s => ({
+    title: s.title,
+    desk: s.desk || "Intel",
+    timeAgo: formatTimeAgo(s.publish_date),
+    excerpt: s.excerpt,
+    slug: s.slug,
+    readTime: `${s.read_time || 4} min`,
+    aiGeneratedImageUrl: s.hero_image_url || null,
+    hero_image_url: s.hero_image_url || null,
+    article_type: s.article_type || 'standard',
+  }));
 
-  // Re-map the raw SQLite results back into the strict React Props shape
-  const newsMatrix = {
-    leadStory: {
-      title: dbLead.title,
-      desk: dbLead.desk || "Verification",
-      location: "The Grid",
-      author: "The Borg Syndicate",
-      readTime: `${dbLead.read_time || 5} min read`,
-      excerpt: dbLead.excerpt,
-      slug: dbLead.slug,
-      category: dbLead.article_type || "Politics",
-      primaryPolitician: "unknown",
-      emotionalContext: "neutral",
-      aiGeneratedImageUrl: dbLead.hero_image_url || null,
-      severity: dbLead.article_type === 'breaking' ? 5 : 3,
-      hasHighResHero: !!dbLead.hero_image_url,
-    },
-    secondaryStories: dbSecondary.map(s => ({
-      title: s.title,
-      desk: s.desk || "Intel",
-      timeAgo: formatTimeAgo(s.publish_date),
-      excerpt: s.excerpt,
-      slug: s.slug,
-      readTime: `${s.read_time || 4} min`,
-      aiGeneratedImageUrl: s.hero_image_url || null
-    }))
-  };
+  // Distribute articles across sections
+  const leadStory = allStories[0];
+  const sideStories = allStories.slice(1, 4);      // 3 side stories
+  const trendingStories = allStories.slice(4, 6);   // 2 trending stories
+  const gridStories = allStories.slice(6, 12);      // 6 headline grid stories
+  const inDepthStory = allStories[12];               // 1 in-depth feature
+  const reversedFeature = allStories[13];             // 1 reversed feature
+  const extraGridStories = allStories.slice(14, 20); // 6 more grid stories
 
-  let activeLayout = 'standard';
+  // Edition logic
   let currentEdition = "Morning Borg Edition";
-
-  // Simulate server time (mocking current time of day)
   const currentHour = new Date().getHours();
-  const isEveningEdition = currentHour >= 18 || currentHour < 6; // 6 PM to 6 AM
-
-  if (isEveningEdition) {
-    currentEdition = "Nightly Borg Edition";
-    activeLayout = 'hero_focus'; // Evening defaults to magazine style
-  } else {
-    currentEdition = "Morning Borg Edition";
-    activeLayout = 'standard'; // Morning defaults to dense grid
-  }
-
-  // Override logic based on Content payload
-  if (newsMatrix.leadStory.severity === 5) {
-    // Earth-shattering news forces the Hero Layout regardless of time
-    activeLayout = 'hero_focus';
-  } else if (!newsMatrix.leadStory.hasHighResHero && activeLayout === 'hero_focus') {
-    // If we wanted Hero Focus but don't have good art, fallback to standard
-    activeLayout = 'standard';
-  }
-
-  // To prove it works, we can simulate different scenarios by changing the mock object, 
-  // but the logic above securely handles the routing decision.
+  if (currentHour >= 5 && currentHour < 12) currentEdition = "Morning Borg Edition";
+  else if (currentHour >= 12 && currentHour < 17) currentEdition = "Afternoon Borg Edition";
+  else if (currentHour >= 17 && currentHour < 21) currentEdition = "Evening Borg Edition";
+  else currentEdition = "Nightly Borg Edition";
 
   return (
     <div className="flex flex-col min-h-screen relative">
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-6 py-8">
 
-        {/* Edition Indicator (Optional visual cue that algorithm is working) */}
+        {/* Edition Indicator */}
         <div className="mb-4 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-destructive animate-pulse"></span>
           <span className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
@@ -343,12 +435,65 @@ export default async function Home() {
           </span>
         </div>
 
-        {/* Dynamic Layout Switcher */}
-        {activeLayout === 'standard' ? (
-          <StandardNewspaperLayout data={newsMatrix} />
-        ) : (
-          <HeroFocusLayout data={newsMatrix} />
+        {/* === SECTION 1: Lead Hero + Sidebar === */}
+        <LeadHeroSection lead={leadStory} sideStories={sideStories} />
+
+        {/* === Borg Record + Newsletter (below fold on mobile, inline on desktop hidden in hero) === */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10 lg:hidden">
+          <BorgRecordSidebar />
+          <NewsletterSidebar />
+        </div>
+
+        {/* === SECTION 2: Trending Now (2-col split) === */}
+        {trendingStories.length >= 2 && (
+          <TrendingSplitSection stories={trendingStories} />
         )}
+
+        {/* === SECTION 3: Headlines Grid (3-col compact) === */}
+        {gridStories.length > 0 && (
+          <HeadlinesGridSection stories={gridStories} />
+        )}
+
+        {/* === SECTION 4: In-Depth Feature (full-width) === */}
+        {inDepthStory && (
+          <InDepthSection story={inDepthStory} />
+        )}
+
+        {/* === SECTION 5: Reversed Feature === */}
+        {reversedFeature && (
+          <ReversedFeatureSection story={reversedFeature} />
+        )}
+
+        {/* === SECTION 6: More Headlines Grid === */}
+        {extraGridStories.length > 0 && (
+          <section className="border-t-2 border-border pt-6 mt-10 mb-10">
+            <div className="flex items-center gap-2 mb-5">
+              <h2 className="font-sans uppercase font-bold text-xs tracking-widest">From the Desks</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {extraGridStories.map((story, idx) => (
+                <article key={idx} className="border-b border-border pb-4 flex flex-col gap-2">
+                  <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block">
+                    <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
+                      <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                    </div>
+                  </Link>
+                  <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)} mt-2`}>{story.desk}</span>
+                  <h3 className="font-serif font-bold text-lg leading-snug hover:opacity-70 transition-opacity cursor-pointer">
+                    <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
+                      {story.title}
+                    </Link>
+                  </h3>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{story.excerpt}</p>
+                  <span className="text-xs text-muted-foreground font-sans">{story.timeAgo}</span>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Borg Record sidebar (desktop: floating side panel after hero) */}
+        {/* This only shows on desktop via CSS, since mobile gets it above */}
 
       </main>
     </div>

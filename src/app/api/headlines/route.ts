@@ -8,13 +8,13 @@ export async function GET(req: NextRequest) {
     try {
         const db = await getDbBinding();
         
-        // Fetch top 5 approved articles ordered by date
+        // Fetch top 12 approved articles for a richer live ticker
         const { results } = await (db as any).prepare(`
             SELECT title 
             FROM articles 
             WHERE approval_status = 'approved' 
             ORDER BY publish_date DESC 
-            LIMIT 5
+            LIMIT 12
         `).all();
 
         const headlines = results.map((r: any) => r.title);

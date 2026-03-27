@@ -53,17 +53,17 @@ export function DynamicLiveStrip() {
         return () => clearInterval(interval);
     }, []);
 
-    // Create chunks of 2 updates per view
+    // Create chunks of 3 updates per view for denser ticker
     const liveUpdateSets = [];
-    for (let i = 0; i < liveUpdates.length; i += 2) {
-        liveUpdateSets.push(liveUpdates.slice(i, i + 2));
+    for (let i = 0; i < liveUpdates.length; i += 3) {
+        liveUpdateSets.push(liveUpdates.slice(i, i + 3));
     }
 
     useEffect(() => {
         if (liveUpdateSets.length <= 1) return;
         const timer = setInterval(() => {
             setLiveIndex((prev) => (prev + 1) % liveUpdateSets.length);
-        }, 8000); // Rotate every 8 seconds
+        }, 5000); // Rotate every 5 seconds for more dynamic feel
         return () => clearInterval(timer);
     }, [liveUpdateSets.length]);
 

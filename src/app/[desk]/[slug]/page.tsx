@@ -48,6 +48,13 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
+            {/* Full-Width Hero Image (breaks out of content container) */}
+            {article.hero_image_url && (
+                <div className="w-full bg-[#EFEBE6] dark:bg-muted aspect-[21/9] relative overflow-hidden">
+                    <img src={article.hero_image_url} alt={article.title} className="w-full h-full object-cover" />
+                </div>
+            )}
+
             <main className="flex-1 w-full mx-auto px-4 md:px-6 py-8 md:py-12 max-w-[1200px]">
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
@@ -55,16 +62,14 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
                     {/* Main Article Content (Left Column) */}
                     <article className="lg:col-span-8 flex flex-col gap-8">
 
-                        {/* Lead Image */}
-                        <figure className="w-full">
-                            <div className="bg-[#EFEBE6] dark:bg-muted aspect-[16/9] w-full relative overflow-hidden flex items-center justify-center font-[family-name:var(--font-source-sans)] uppercase tracking-widest text-[#9CA3AF] text-[10px] md:text-xs font-bold border border-border">
-                                {article.hero_image_url ? (
-                                    <img src={article.hero_image_url} alt={article.title} className="w-full h-full object-cover" />
-                                ) : (
-                                    `LEAD IMAGE: ${formattedDesk.toUpperCase()}`
-                                )}
-                            </div>
-                        </figure>
+                        {/* Lead Image (only show inline if no hero_image_url for the full-width version) */}
+                        {!article.hero_image_url && (
+                            <figure className="w-full">
+                                <div className="bg-[#EFEBE6] dark:bg-muted aspect-[16/9] w-full relative overflow-hidden flex items-center justify-center font-[family-name:var(--font-source-sans)] uppercase tracking-widest text-[#9CA3AF] text-[10px] md:text-xs font-bold border border-border">
+                                    {`LEAD IMAGE: ${formattedDesk.toUpperCase()}`}
+                                </div>
+                            </figure>
+                        )}
 
                         {/* Article Header Details */}
                         <header className="flex flex-col gap-6 mt-2">
@@ -79,7 +84,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
                                 )}
                             </div>
 
-                            <h1 className="font-[family-name:var(--font-playfair)] font-black text-5xl md:text-6xl text-foreground hover:text-[#DFA823] transition-colors tracking-tight leading-[1.05]">
+                            <h1 className="font-[family-name:var(--font-playfair)] font-black text-5xl md:text-6xl text-foreground tracking-tight leading-[1.05]">
                                 {article.title}
                             </h1>
 
@@ -150,7 +155,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
                                     href={`/${s.desk.toLowerCase().replace(' ', '-')}/${s.slug}`}
                                     className="flex flex-col gap-3 py-6 border-b border-border border-dashed lg:border-solid lg:border-b-2 lg:first:pt-0 group cursor-pointer"
                                 >
-                                    <div className="font-[family-name:var(--font-source-sans)] text-[10px] font-black uppercase tracking-widest text-[#DFA823]">
+                                    <div className="font-[family-name:var(--font-source-sans)] text-[10px] font-black uppercase tracking-widest text-desk-politics">
                                         {s.desk}
                                     </div>
                                     <h4 className="font-[family-name:var(--font-playfair)] text-xl font-bold leading-tight text-[#0f172a] dark:text-slate-100 group-hover:underline underline-offset-4 decoration-2">
