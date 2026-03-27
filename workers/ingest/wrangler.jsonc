@@ -1,6 +1,6 @@
 {
 	"$schema": "../../node_modules/wrangler/config-schema.json",
-	"name": "dailyborg-site-ingest",
+	"name": "dailyborg-ingest",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-03-05",
 	"queues": {

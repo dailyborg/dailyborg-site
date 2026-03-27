@@ -14,7 +14,7 @@
     "kv_namespaces": [
         {
             "binding": "SENTINEL_CACHE",
-            "id": "e45edeb9186641e7be17fccce90289ab" // Fallback ID; user should provision a real one
+            "id": "5a2f3f363bce4eceb61dd765686b2dc4"
         }
     ],
     "triggers": {

@@ -2,18 +2,20 @@
 
 import React, { useState, useEffect } from "react";
 import { Activity, Radio, Zap, Globe, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 
 interface LiveUpdate {
     icon: any;
     text: string;
     time: string;
+    href: string;
 }
 
 const FALLBACK_UPDATES: LiveUpdate[] = [
-    { icon: Activity, text: "Grid Status: Operational", time: "LIVE" },
-    { icon: Globe, text: "Public Record Sync: Complete", time: "NOW" },
-    { icon: ShieldAlert, text: "Borg Security: Green", time: "SECURE" },
-    { icon: Radio, text: "Autonomous Feeders: Scouting", time: "ACTIVE" }
+    { icon: Activity, text: "Grid Status: Operational", time: "LIVE", href: "" },
+    { icon: Globe, text: "Public Record Sync: Complete", time: "NOW", href: "" },
+    { icon: ShieldAlert, text: "Borg Security: Green", time: "SECURE", href: "" },
+    { icon: Radio, text: "Autonomous Feeders: Scouting", time: "ACTIVE", href: "" }
 ];
 
 export function DynamicLiveStrip() {
@@ -23,21 +25,16 @@ export function DynamicLiveStrip() {
     useEffect(() => {
         async function fetchLiveIntelligence() {
             try {
-                // We'll reuse the headlines API but format them as Live Updates
                 const res = await fetch("/api/headlines");
                 if (res.ok) {
-                    const data = await res.json() as string[];
-                    // Format the raw headlines into the LiveUpdate interface
-                    const updates = data.map((headline, i) => {
-                        // Alternate icons for visual interest
-                        const icons = [Activity, Zap, Globe, Radio];
-                        return {
-                            icon: icons[i % icons.length],
-                            // Truncate headline if it's too long to fit in the modular strip
-                            text: headline.length > 55 ? headline.substring(0, 55) + "..." : headline,
-                            time: i === 0 ? "JUST IN" : `${i + 1}m AGO`
-                        };
-                    });
+                    const data = await res.json() as { title: string; slug: string; desk: string }[];
+                    const icons = [Activity, Zap, Globe, Radio];
+                    const updates = data.map((item, i) => ({
+                        icon: icons[i % icons.length],
+                        text: item.title.length > 55 ? item.title.substring(0, 55) + "..." : item.title,
+                        time: i === 0 ? "JUST IN" : `${i + 1}m AGO`,
+                        href: item.slug ? `/${item.desk}/${item.slug}` : "",
+                    }));
                     
                     if (updates.length > 0) {
                         setLiveUpdates(updates);
@@ -49,7 +46,7 @@ export function DynamicLiveStrip() {
         }
 
         fetchLiveIntelligence();
-        const interval = setInterval(fetchLiveIntelligence, 60 * 1000); // Check every minute
+        const interval = setInterval(fetchLiveIntelligence, 60 * 1000);
         return () => clearInterval(interval);
     }, []);
 
@@ -63,7 +60,7 @@ export function DynamicLiveStrip() {
         if (liveUpdateSets.length <= 1) return;
         const timer = setInterval(() => {
             setLiveIndex((prev) => (prev + 1) % liveUpdateSets.length);
-        }, 5000); // Rotate every 5 seconds for more dynamic feel
+        }, 5000);
         return () => clearInterval(timer);
     }, [liveUpdateSets.length]);
 
@@ -87,13 +84,20 @@ export function DynamicLiveStrip() {
                             >
                                 {set.map((update, index) => {
                                     const Icon = update.icon;
+                                    const content = (
+                                        <div className={`flex items-center gap-2 flex-shrink-0 font-sans text-xs text-primary-foreground/80 ${update.href ? 'hover:text-primary-foreground cursor-pointer' : 'cursor-default'} transition-colors`}>
+                                            <Icon className="w-3.5 h-3.5 text-primary-foreground" />
+                                            <span className="truncate max-w-[200px] md:max-w-[400px]">{update.text}</span>
+                                            <span className="text-[10px] text-accent font-bold ml-1 tracking-wider">{update.time}</span>
+                                        </div>
+                                    );
                                     return (
                                         <React.Fragment key={index}>
-                                            <div className="flex items-center gap-2 flex-shrink-0 font-sans text-xs text-primary-foreground/80 hover:text-primary-foreground cursor-default transition-colors">
-                                                <Icon className="w-3.5 h-3.5 text-primary-foreground" />
-                                                <span className="truncate max-w-[200px] md:max-w-[400px]">{update.text}</span>
-                                                <span className="text-[10px] text-accent font-bold ml-1 tracking-wider">{update.time}</span>
-                                            </div>
+                                            {update.href ? (
+                                                <Link href={update.href}>{content}</Link>
+                                            ) : (
+                                                content
+                                            )}
                                             {index < set.length - 1 && (
                                                 <div className="w-px h-3 bg-primary-foreground/20 ml-2 md:ml-4 flex-shrink-0"></div>
                                             )}

@@ -2,12 +2,18 @@
 
 import React, { useState, useEffect } from "react";
 
+interface HeadlineItem {
+    title: string;
+    slug: string;
+    desk: string;
+}
+
 interface DynamicTickerProps {
-    children: (headlines: string[]) => React.ReactNode;
+    children: (headlines: HeadlineItem[]) => React.ReactNode;
 }
 
 export function DynamicTicker({ children }: DynamicTickerProps) {
-    const [headlines, setHeadlines] = useState<string[]>([]);
+    const [headlines, setHeadlines] = useState<HeadlineItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -15,7 +21,7 @@ export function DynamicTicker({ children }: DynamicTickerProps) {
             try {
                 const res = await fetch("/api/headlines");
                 if (res.ok) {
-                    const data = await res.json() as string[];
+                    const data = await res.json() as HeadlineItem[];
                     setHeadlines(data);
                 }
             } catch (err) {

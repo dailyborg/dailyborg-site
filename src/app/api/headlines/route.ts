@@ -8,23 +8,25 @@ export async function GET(req: NextRequest) {
     try {
         const db = await getDbBinding();
         
-        // Fetch top 12 approved articles for a richer live ticker
+        // Fetch top 12 approved articles with slug and desk for clickable links
         const { results } = await (db as any).prepare(`
-            SELECT title 
+            SELECT title, slug, desk 
             FROM articles 
             WHERE approval_status = 'approved' 
             ORDER BY publish_date DESC 
             LIMIT 12
         `).all();
 
-        const headlines = results.map((r: any) => r.title);
+        const headlines = results.map((r: any) => ({
+            title: r.title,
+            slug: r.slug,
+            desk: (r.desk || 'intel').toLowerCase(),
+        }));
 
         if (headlines.length === 0) {
-            // Fallbacks if no articles yet
             return NextResponse.json([
-                "DAILY BORG: Algorithmic news matrix active",
-                "STATUS: Establishing connection to the grid...",
-                "UPDATE: Autonomous feeders deployed and scouting"
+                { title: "DAILY BORG: Algorithmic news matrix active", slug: "", desk: "" },
+                { title: "STATUS: Establishing connection to the grid...", slug: "", desk: "" },
             ]);
         }
 
@@ -32,9 +34,7 @@ export async function GET(req: NextRequest) {
     } catch (error) {
         console.error("Headlines API Error:", error);
         return NextResponse.json([
-            "DAILY BORG: Connection Interrupted",
-            "STATUS: Retrying secure uplink...",
-            "ERROR: D1 Matrix Sync Failure"
-        ], { status: 200 }); // Return fallback instead of 500 to keep UI clean
+            { title: "DAILY BORG: Connection Interrupted", slug: "", desk: "" },
+        ], { status: 200 });
     }
 }

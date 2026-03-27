@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Clock, MapPin, TrendingUp, Zap, BookOpen } from 'lucide-react';
+import { ArrowRight, Clock, MapPin, TrendingUp, Zap, BookOpen, Activity } from 'lucide-react';
 
 import { getImageForContext } from '@/lib/image-utils';
 
@@ -91,11 +91,11 @@ function LeadHeroSection({ lead, sideStories }: { lead: ArticleData; sideStories
               <span className="text-sm text-muted-foreground font-sans">{lead.readTime}</span>
             </div>
 
-            <p className="text-lg text-foreground/80 leading-relaxed font-serif">
+            <p className="text-xl text-foreground mt-2 leading-relaxed font-serif line-clamp-6">
               {lead.excerpt}
             </p>
 
-            <Link href={`/${lead.desk.toLowerCase()}/${lead.slug}`} className="inline-flex items-center gap-1 text-sm font-sans font-bold uppercase tracking-wider hover:opacity-70 transition-opacity mt-1 text-foreground">
+            <Link href={`/${lead.desk.toLowerCase()}/${lead.slug}`} className="inline-flex items-center gap-1 text-sm font-sans font-bold uppercase tracking-wider hover:opacity-70 transition-opacity mt-4 text-foreground">
               Continue reading <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -371,7 +371,7 @@ export default async function Home() {
         SELECT * FROM articles 
         WHERE approval_status = 'approved' 
         ORDER BY publish_date DESC 
-        LIMIT 20
+        LIMIT 32
     `).bind().all();
 
     if (results) articles.push(...(results as any[]));
@@ -408,12 +408,13 @@ export default async function Home() {
 
   // Distribute articles across sections
   const leadStory = allStories[0];
-  const sideStories = allStories.slice(1, 4);      // 3 side stories
-  const trendingStories = allStories.slice(4, 6);   // 2 trending stories
-  const gridStories = allStories.slice(6, 12);      // 6 headline grid stories
-  const inDepthStory = allStories[12];               // 1 in-depth feature
-  const reversedFeature = allStories[13];             // 1 reversed feature
-  const extraGridStories = allStories.slice(14, 20); // 6 more grid stories
+  const sideStories = allStories.slice(1, 3);      // 2 side stories to avoid dead space
+  const trendingStories = allStories.slice(3, 5);   // 2 trending stories
+  const gridStories = allStories.slice(5, 11);      // 6 headline grid stories
+  const inDepthStory = allStories[11];               // 1 in-depth feature
+  const reversedFeature = allStories[12];             // 1 reversed feature
+  const extraGridStories = allStories.slice(13, 19); // 6 more grid stories
+  const finalListStories = allStories.slice(19, 31); // Up to 12 simple list stories
 
   // Edition logic
   let currentEdition = "Morning Borg Edition";
@@ -431,7 +432,7 @@ export default async function Home() {
         <div className="mb-4 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-destructive animate-pulse"></span>
           <span className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Algorithmic Matrix Active — {currentEdition}
+            {currentEdition}
           </span>
         </div>
 
@@ -466,7 +467,7 @@ export default async function Home() {
 
         {/* === SECTION 6: More Headlines Grid === */}
         {extraGridStories.length > 0 && (
-          <section className="border-t-2 border-border pt-6 mt-10 mb-10">
+          <section className="border-t-2 border-border pt-6 mt-10">
             <div className="flex items-center gap-2 mb-5">
               <h2 className="font-sans uppercase font-bold text-xs tracking-widest">From the Desks</h2>
             </div>
@@ -486,6 +487,36 @@ export default async function Home() {
                   </h3>
                   <p className="text-sm text-muted-foreground line-clamp-2">{story.excerpt}</p>
                   <span className="text-xs text-muted-foreground font-sans">{story.timeAgo}</span>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* === SECTION 7: The Wire (Compact List) === */}
+        {finalListStories.length > 0 && (
+          <section className="border-t-[6px] border-foreground pt-6 mt-10 mb-10 bg-muted/30 p-8 rounded-sm">
+            <div className="flex items-center gap-2 mb-8">
+              <Activity className="w-5 h-5 text-desk-sports animate-pulse" />
+              <h2 className="font-sans uppercase font-black text-xl tracking-widest">The Daily Wire</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+              {finalListStories.map((story, idx) => (
+                <article key={idx} className="flex gap-4 border-b border-border/50 pb-4 items-center group">
+                  <div className="text-2xl font-black text-muted-foreground/30 font-sans w-8">
+                    {(idx + 1).toString().padStart(2, '0')}
+                  </div>
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)}`}>{story.desk}</span>
+                      <span className="text-[10px] text-muted-foreground font-sans mt-0.5">{story.timeAgo}</span>
+                    </div>
+                    <h3 className="font-serif font-bold text-base leading-snug group-hover:opacity-70 transition-opacity cursor-pointer line-clamp-2">
+                       <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
+                         {story.title}
+                       </Link>
+                    </h3>
+                  </div>
                 </article>
               ))}
             </div>

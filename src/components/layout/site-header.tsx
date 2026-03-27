@@ -15,15 +15,15 @@ interface LiveUpdate {
 }
 
 interface SiteHeaderProps {
-    headlines?: string[];
+    headlines?: { title: string; slug: string; desk: string }[];
     liveUpdates?: LiveUpdate[];
 }
 
 export function SiteHeader({ 
     headlines = [
-        "DAILY BORG: Algorithmic news matrix active",
-        "STATUS: Establishing connection to the grid...",
-        "UPDATE: Autonomous feeders deployed and scouting"
+        { title: "DAILY BORG: Algorithmic news matrix active", slug: "", desk: "" },
+        { title: "STATUS: Establishing connection to the grid...", slug: "", desk: "" },
+        { title: "UPDATE: Autonomous feeders deployed and scouting", slug: "", desk: "" }
     ],
     liveUpdates = [
         { icon: Activity, text: "Grid Status: Operational", time: "LIVE" },
@@ -45,7 +45,7 @@ export function SiteHeader({
     }, []);
 
     // Helper for ticker
-    const getTickerHeadlines = (h: string[]) => {
+    const getTickerHeadlines = (h: any[]) => {
         const items = h.length > 0 ? h : headlines;
         return [...items, ...items];
     };
@@ -86,8 +86,14 @@ export function SiteHeader({
                     {(currentHeadlines) => (
                         <div className="overflow-hidden whitespace-nowrap px-4 py-1.5 flex-1 font-sans flex items-center relative">
                             <div className="ticker-animate flex gap-12 items-center min-w-max">
-                                {getTickerHeadlines(currentHeadlines).map((headline, idx) => (
-                                    <span key={idx} className="opacity-90">{headline}</span>
+                                {getTickerHeadlines(currentHeadlines).map((item, idx) => (
+                                    item.slug ? (
+                                        <Link key={idx} href={`/${item.desk}/${item.slug}`} className="opacity-90 hover:opacity-100 hover:underline transition-opacity">
+                                            {item.title}
+                                        </Link>
+                                    ) : (
+                                        <span key={idx} className="opacity-90">{item.title}</span>
+                                    )
                                 ))}
                             </div>
                         </div>
