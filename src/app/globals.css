@@ -184,7 +184,7 @@
   }
 
   .ticker-animate {
-    animation: ticker-scroll 30s linear infinite;
+    animation: ticker-scroll 50s linear infinite;
   }
 
   /* Custom scrollbar for the Live strip */
