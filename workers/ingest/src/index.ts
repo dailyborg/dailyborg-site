@@ -158,32 +158,26 @@ export default {
                             },
                             body: JSON.stringify({
                                 model: "google/nano-banana-2",
-                                prompt: articleObject.suggestedHeroImagePrompt
+                                prompt: articleObject.suggestedHeroImagePrompt,
+                                aspect_ratio: "16:9",
+                                resolution: "1K"
                             })
                         });
 
                         if (imageRes.ok) {
                             const imgData = await imageRes.json() as any;
-                            const srcUrl = imgData.data[0].url;
-
-                            const imgBuffer = await fetch(srcUrl);
-                            const buffer = await imgBuffer.arrayBuffer();
-                            const fileKey = `hero-${articleObject.canonical_event_slug}-${Date.now()}.jpg`;
-
-                            await env.IMAGE_BUCKET.put(fileKey, buffer, {
-                                httpMetadata: { contentType: "image/jpeg" }
-                            });
-
-                            heroImageUrl = `https://dailyborg.com/api/images/${fileKey}`;
-                            console.log(`Successfully generated and stored image at ${heroImageUrl}`);
+                            // Use the direct AIML CDN URL — publicly accessible, no R2 proxy needed
+                            heroImageUrl = imgData.data[0].url;
+                            console.log(`Successfully generated image: ${heroImageUrl}`);
                         } else {
-                            console.warn(`Image generation failed: ${imageRes.statusText}`);
+                            const errText = await imageRes.text();
+                            console.warn(`Image generation failed: ${imageRes.status} ${imageRes.statusText} - ${errText}`);
                         }
                     } else {
                         console.log("Skipping actual AI Image generation to save cost/time.");
                     }
                 } catch (imgErr) {
-                    console.error(`Failed to generate/store image: `, imgErr);
+                    console.error(`Failed to generate image: `, imgErr);
                 }
 
                 const finalArticleType = isDraft ? "draft" : (type || "standard");
