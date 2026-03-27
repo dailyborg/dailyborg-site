@@ -2,6 +2,7 @@ interface Env {
     DB: D1Database;
     IMAGE_BUCKET: R2Bucket;
     AIML_API_KEY: string;
+    UNSPLASH_ACCESS_KEY: string;
     RESEND_API_KEY: string;
     TWILIO_SID: string;
     TWILIO_TOKEN: string;
@@ -146,39 +147,87 @@ export default {
                 }
 
                 let heroImageUrl = "https://example.com/generated-hero.jpg";
+                let imageSource = "none";
 
+                // =======================================================
+                // TIER 1: Search Unsplash for a free public domain photo
+                // =======================================================
                 try {
-                    console.log(`Requesting hero image generation...`);
-                    if (env.AIML_API_KEY && env.AIML_API_KEY.length > 5 && env.AIML_API_KEY !== 'mock') {
-                        const imageRes = await fetch("https://api.aimlapi.com/v1/images/generations", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": `Bearer ${env.AIML_API_KEY}`
-                            },
-                            body: JSON.stringify({
-                                model: "google/nano-banana-2",
-                                prompt: articleObject.suggestedHeroImagePrompt,
-                                aspect_ratio: "16:9",
-                                resolution: "1K"
-                            })
-                        });
+                    if (env.UNSPLASH_ACCESS_KEY && env.UNSPLASH_ACCESS_KEY.length > 5) {
+                        // Extract meaningful keywords from the title (drop filler words)
+                        const stopWords = new Set(['the','a','an','of','in','on','for','to','and','is','are','as','at','by','its','how','why','what','with','from','has','have','that','this','into','over','after','new']);
+                        const keywords = articleObject.title
+                            .replace(/[^a-zA-Z0-9\s]/g, '')
+                            .split(/\s+/)
+                            .filter((w: string) => w.length > 2 && !stopWords.has(w.toLowerCase()))
+                            .slice(0, 5)
+                            .join(' ');
 
-                        if (imageRes.ok) {
-                            const imgData = await imageRes.json() as any;
-                            // Use the direct AIML CDN URL — publicly accessible, no R2 proxy needed
-                            heroImageUrl = imgData.data[0].url;
-                            console.log(`Successfully generated image: ${heroImageUrl}`);
+                        console.log(`[Tier 1] Searching Unsplash for: "${keywords}"`);
+                        const unsplashRes = await fetch(
+                            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(keywords)}&orientation=landscape&per_page=3`,
+                            { headers: { 'Authorization': `Client-ID ${env.UNSPLASH_ACCESS_KEY}` } }
+                        );
+
+                        if (unsplashRes.ok) {
+                            const unsplashData = await unsplashRes.json() as any;
+                            if (unsplashData.results && unsplashData.results.length > 0) {
+                                // Pick the top result's high-quality URL
+                                heroImageUrl = unsplashData.results[0].urls.regular;
+                                imageSource = "unsplash";
+                                console.log(`[Tier 1] ✅ Found Unsplash image: ${heroImageUrl.substring(0, 80)}...`);
+                            } else {
+                                console.log(`[Tier 1] No Unsplash results for "${keywords}"`);
+                            }
                         } else {
-                            const errText = await imageRes.text();
-                            console.warn(`Image generation failed: ${imageRes.status} ${imageRes.statusText} - ${errText}`);
+                            console.warn(`[Tier 1] Unsplash API error: ${unsplashRes.status}`);
                         }
                     } else {
-                        console.log("Skipping actual AI Image generation to save cost/time.");
+                        console.log(`[Tier 1] No UNSPLASH_ACCESS_KEY configured, skipping.`);
                     }
-                } catch (imgErr) {
-                    console.error(`Failed to generate image: `, imgErr);
+                } catch (unsplashErr) {
+                    console.warn(`[Tier 1] Unsplash search failed:`, unsplashErr);
                 }
+
+                // =======================================================
+                // TIER 2: Generate with Nano Banana 2 (paid fallback)
+                // =======================================================
+                if (imageSource === "none") {
+                    try {
+                        console.log(`[Tier 2] No free image found. Generating with Nano Banana 2...`);
+                        if (env.AIML_API_KEY && env.AIML_API_KEY.length > 5 && env.AIML_API_KEY !== 'mock') {
+                            const imageRes = await fetch("https://api.aimlapi.com/v1/images/generations", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "Authorization": `Bearer ${env.AIML_API_KEY}`
+                                },
+                                body: JSON.stringify({
+                                    model: "google/nano-banana-2",
+                                    prompt: articleObject.suggestedHeroImagePrompt,
+                                    aspect_ratio: "16:9",
+                                    resolution: "1K"
+                                })
+                            });
+
+                            if (imageRes.ok) {
+                                const imgData = await imageRes.json() as any;
+                                heroImageUrl = imgData.data[0].url;
+                                imageSource = "nano-banana-2";
+                                console.log(`[Tier 2] ✅ Generated AI image: ${heroImageUrl}`);
+                            } else {
+                                const errText = await imageRes.text();
+                                console.warn(`[Tier 2] Nano Banana 2 failed: ${imageRes.status} - ${errText}`);
+                            }
+                        } else {
+                            console.log("[Tier 2] No AIML_API_KEY configured, skipping AI generation.");
+                        }
+                    } catch (imgErr) {
+                        console.error(`[Tier 2] Failed to generate image:`, imgErr);
+                    }
+                }
+
+                console.log(`Image sourced via: ${imageSource} | URL: ${heroImageUrl.substring(0, 60)}...`);
 
                 const finalArticleType = isDraft ? "draft" : (type || "standard");
                 const approvalStatus = isDraft ? 'pending' : 'approved';

@@ -305,17 +305,17 @@ export default async function Home() {
   };
 
   let activeLayout = 'standard';
-  let currentEdition = "Morning Briefing";
+  let currentEdition = "Morning Borg Edition";
 
   // Simulate server time (mocking current time of day)
   const currentHour = new Date().getHours();
   const isEveningEdition = currentHour >= 18 || currentHour < 6; // 6 PM to 6 AM
 
   if (isEveningEdition) {
-    currentEdition = "Evening Edition";
+    currentEdition = "Nightly Borg Edition";
     activeLayout = 'hero_focus'; // Evening defaults to magazine style
   } else {
-    currentEdition = "Morning Briefing";
+    currentEdition = "Morning Borg Edition";
     activeLayout = 'standard'; // Morning defaults to dense grid
   }
 

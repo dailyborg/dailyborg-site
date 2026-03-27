@@ -34,14 +34,14 @@ export function SiteHeader({
     const isAdmin = searchParams.get("admin") === "true";
 
     const [liveIndex, setLiveIndex] = useState(0);
-    const [edition, setEdition] = useState("Grid Edition");
+    const [edition, setEdition] = useState("Borg Edition");
 
     useEffect(() => {
         const hour = new Date().getHours();
-        if (hour >= 5 && hour < 12) setEdition("Morning Grid Edition");
-        else if (hour >= 12 && hour < 17) setEdition("Afternoon Grid Edition");
-        else if (hour >= 17 && hour < 21) setEdition("Evening Grid Edition");
-        else setEdition("Night Grid Edition");
+        if (hour >= 5 && hour < 12) setEdition("Morning Borg Edition");
+        else if (hour >= 12 && hour < 17) setEdition("Afternoon Borg Edition");
+        else if (hour >= 17 && hour < 21) setEdition("Evening Borg Edition");
+        else setEdition("Nightly Borg Edition");
     }, []);
 
     // Helper for ticker
