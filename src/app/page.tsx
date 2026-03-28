@@ -10,6 +10,7 @@ import { getDbBinding } from '@/lib/db';
 import { 
   ArticleData, 
   formatTimeAgo, 
+  formatFullTimestamp,
   getDeskColor, 
   LeadHeroSection, 
   TrendingSplitSection, 
@@ -113,6 +114,7 @@ export default async function Home() {
     title: s.title,
     desk: s.desk || "Intel",
     timeAgo: formatTimeAgo(s.publish_date),
+    fullTimestamp: formatFullTimestamp(s.publish_date),
     excerpt: s.excerpt,
     slug: s.slug,
     readTime: `${s.read_time || 4} min`,

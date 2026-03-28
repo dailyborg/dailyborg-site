@@ -6,6 +6,7 @@ import { getDbBinding } from '@/lib/db';
 import { 
     ArticleData, 
     formatTimeAgo, 
+    formatFullTimestamp,
     LeadHeroSection, 
     TrendingSplitSection, 
     HeadlinesGridSection, 
@@ -65,6 +66,7 @@ export default async function DeskPage({ params }: { params: Promise<{ desk: str
         title: s.title,
         desk: s.desk || "Intel",
         timeAgo: formatTimeAgo(s.publish_date),
+        fullTimestamp: formatFullTimestamp(s.publish_date),
         excerpt: s.excerpt,
         slug: s.slug,
         readTime: `${s.read_time || 4} min`,

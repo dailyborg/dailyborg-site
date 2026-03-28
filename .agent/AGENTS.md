@@ -6,7 +6,7 @@ This profile adapts Superpowers workflows for Antigravity with strict single-flo
 
 ## Core Rules
 
-1. **Mandatory Context Loading**: Before executing any tool call (edit, search, or deploy), you MUST read the root `rules.md` to ensure compliance with naming conventions, project architecture, and deployment guardrails.
+1. **Mandatory Context Loading**: Before executing any tool call (edit, search, deploy, or anything else), you MUST read the root `rules.md` to ensure compliance with naming conventions, project architecture, and deployment guardrails.
 2. Prefer local skills in `.agent/skills/<skill-name>/SKILL.md`.
 3. Execute one core task at a time with `task_boundary`.
 4. Use `browser_subagent` only for browser automation tasks.

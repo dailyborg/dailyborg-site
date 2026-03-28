@@ -8,6 +8,7 @@ export type ArticleData = {
   title: string;
   desk: string;
   timeAgo: string;
+  fullTimestamp?: string;
   excerpt: string;
   slug: string;
   readTime?: string;
@@ -25,6 +26,22 @@ export function formatTimeAgo(dateString: string) {
   if (hours < 24) return `${hours} hours ago`;
   const days = Math.floor(hours / 24);
   return `${days} day${days > 1 ? 's' : ''} ago`;
+}
+
+export function formatFullTimestamp(dateString: string) {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "";
+  
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  };
+  
+  return date.toLocaleString('en-US', options).toUpperCase().replace(',', ' •');
 }
 
 export function getDeskColor(desk: string): string {
@@ -82,6 +99,8 @@ export function LeadHeroSection({ lead, sideStories }: { lead: ArticleData; side
             <div className="flex items-center gap-2 mt-1 mb-1">
               <div className="text-sm font-sans">By <span className="font-bold">The Borg Syndicate</span></div>
               <span className="text-muted-foreground mx-1">•</span>
+              <span className="text-sm text-muted-foreground font-sans">{lead.fullTimestamp || lead.timeAgo}</span>
+              <span className="text-muted-foreground mx-1">•</span>
               <span className="text-sm text-muted-foreground font-sans">{lead.readTime || '5 min'}</span>
             </div>
             <p className="text-xl text-foreground mt-2 leading-relaxed font-serif line-clamp-6">
@@ -113,7 +132,7 @@ export function LeadHeroSection({ lead, sideStories }: { lead: ArticleData; side
             </p>
             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground font-sans">
               <Clock className="w-3 h-3" />
-              <span>{story.timeAgo}</span>
+              <span>{story.fullTimestamp || story.timeAgo}</span>
               {story.readTime && (
                 <>
                   <span className="text-muted-foreground mx-1">•</span>
@@ -156,7 +175,7 @@ export function TrendingSplitSection({ stories, title = "Trending Now" }: { stor
           </p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground font-sans mt-1">
             <Clock className="w-3 h-3" />
-            <span>{leftStory.timeAgo}</span>
+            <span>{leftStory.fullTimestamp || leftStory.timeAgo}</span>
             {leftStory.readTime && <><span className="mx-1">•</span><span>{leftStory.readTime}</span></>}
           </div>
         </article>
@@ -208,7 +227,7 @@ export function HeadlinesGridSection({ stories, title = "More Headlines" }: { st
                   {story.title}
                 </Link>
               </h3>
-              <span className="text-xs text-muted-foreground font-sans mt-auto">{story.readTime || '4 min'}</span>
+              <span className="text-xs text-muted-foreground font-sans mt-auto">{story.fullTimestamp || story.timeAgo}</span>
             </div>
           </article>
         ))}
@@ -242,7 +261,7 @@ export function InDepthSection({ story, title = "In Depth" }: { story: ArticleDa
           </p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground font-sans mt-2">
             <Clock className="w-3 h-3" />
-            <span>{story.timeAgo}</span>
+            <span>{story.fullTimestamp || story.timeAgo}</span>
             {story.readTime && <><span className="mx-1">•</span><span>{story.readTime}</span></>}
           </div>
           <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="inline-flex items-center gap-1 text-sm font-sans font-bold uppercase tracking-wider hover:opacity-70 transition-opacity mt-2 text-foreground">
@@ -285,7 +304,7 @@ export function ReversedFeatureSection({ story }: { story: ArticleData }) {
           </p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground font-sans mt-1">
             <Clock className="w-3 h-3" />
-            <span>{story.timeAgo}</span>
+            <span>{story.fullTimestamp || story.timeAgo}</span>
           </div>
         </div>
       </div>

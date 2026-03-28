@@ -103,8 +103,9 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
                                 ) : (
                                     <span>BY {formattedDesk.toUpperCase()} DESK</span>
                                 )}
-                                <span>•</span>
                                 <span>{new Date(article.publish_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()}</span>
+                                <span>•</span>
+                                <span>{new Date(article.publish_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase()}</span>
                             </div>
                         </header>
 
