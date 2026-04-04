@@ -31,6 +31,20 @@
 			"bucket_name": "borg-images"
 		}
 	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "IngestCoordinator",
+				"class_name": "IngestCoordinator"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["IngestCoordinator"]
+		}
+	],
 	"triggers": {
 		"crons": [
 			"0 8 * * *",

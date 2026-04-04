@@ -6,7 +6,7 @@ export default async function BorgRecordDirectory() {
     let initialPoliticians = [];
     try {
         const db = await getDbBinding();
-        const res = await db.prepare("SELECT * FROM politicians WHERE country = 'US' ORDER BY name ASC").bind().all();
+        const res = await db.prepare("SELECT * FROM politicians ORDER BY name ASC").bind().all();
 
         // Handle varying return structures between local better-sqlite and cloud D1
         const raw = res?.results || res?.[0]?.results || [];
@@ -18,6 +18,8 @@ export default async function BorgRecordDirectory() {
             office_held: p.office_held || "Federal Official",
             party: p.party || "Independent",
             district_state: p.district_state || "--",
+            region_level: p.region_level || "Federal",
+            photo_url: p.photo_url || null,
             consistency_label: "Analyzing" // Dynamic scores deferred to profile view for index performance
         }));
     } catch (e) {

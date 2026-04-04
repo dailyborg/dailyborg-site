@@ -36,10 +36,13 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
             {/* Profile Header */}
             <div className="flex flex-col md:flex-row gap-8 mb-12 items-start">
                 <div className="w-full md:w-1/3 lg:w-1/4">
-                    <div className="aspect-[3/4] bg-muted/30 w-full border-2 border-foreground flex items-center justify-center relative overflow-hidden">
-                        {/* Placeholder for actual image */}
-                        <span className="text-muted-foreground font-serif italic text-sm absolute bottom-4 right-4 group-hover:text-accent transition-colors">No Photo</span>
-                        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background/80 to-transparent pointer-events-none"></div>
+                    <div className="aspect-[3/4] bg-muted/30 w-full border-[3px] border-foreground flex items-center justify-center relative overflow-hidden group">
+                        {politician.photo_url ? (
+                            <img src={politician.photo_url} alt={politician.name} className="absolute inset-0 w-full h-full object-cover grayscale opacity-90 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500" />
+                        ) : (
+                            <span className="text-muted-foreground font-serif italic text-sm absolute bottom-4 right-4 group-hover:text-accent transition-colors">No Photo</span>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background/90 to-transparent pointer-events-none z-10"></div>
                     </div>
                 </div>
                 <div className="w-full md:w-2/3 lg:w-3/4 space-y-6">

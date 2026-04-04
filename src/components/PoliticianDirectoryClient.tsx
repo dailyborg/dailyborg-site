@@ -12,6 +12,8 @@ type Politician = {
     office_held: string;
     party: string;
     district_state: string;
+    region_level?: string;
+    photo_url?: string;
     consistency_label: string;
 };
 
@@ -31,6 +33,29 @@ export function PoliticianDirectoryClient({ initialPoliticians }: { initialPolit
         p.name.toLowerCase().includes(query.toLowerCase()) ||
         p.district_state.toLowerCase().includes(query.toLowerCase()) ||
         p.office_held.toLowerCase().includes(query.toLowerCase())
+    );
+
+    const federalMatched = filtered.filter(p => p.region_level === 'Federal');
+    const stateMatched = filtered.filter(p => p.region_level === 'State');
+    const localMatched = filtered.filter(p => p.region_level === 'Local');
+
+    const renderPoliticianCard = (pol: Politician) => (
+        <Link key={pol.id} href={`/borg-record/politicians/${pol.slug}`} className="col-span-1 md:col-span-2 lg:col-span-3 border border-border group hover:border-accent transition-colors block">
+            <div className={`aspect-[3/4] relative ${!pol.photo_url ? 'bg-muted' : 'bg-black'}`}>
+                {pol.photo_url && (
+                    <img src={pol.photo_url} alt={pol.name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent flex flex-col justify-end p-4">
+                    <span className={`text-xs font-bold uppercase tracking-widest w-fit px-2 py-1 mb-2 ${pol.party === 'Democrat' ? 'bg-blue-500/10 text-blue-500' : pol.party === 'Republican' ? 'bg-red-500/10 text-red-500' : 'bg-accent/10 text-accent'}`}>{pol.party}</span>
+                    <h3 className="font-serif text-2xl font-bold leading-tight group-hover:text-accent transition-colors relative z-10">{pol.name}</h3>
+                    <p className="text-sm font-medium text-muted-foreground mt-1 uppercase tracking-wider relative z-10">{pol.office_held} • {pol.district_state}</p>
+                </div>
+            </div>
+            <div className="p-4 bg-background border-t border-border flex justify-between items-center text-xs font-bold uppercase tracking-wider">
+                <span className="text-muted-foreground">Detailed Record</span>
+                <span className="text-foreground group-hover:text-accent transition-colors flex items-center">View <ChevronRight className="w-4 h-4 ml-1" /></span>
+            </div>
+        </Link>
     );
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -79,23 +104,34 @@ export function PoliticianDirectoryClient({ initialPoliticians }: { initialPolit
             </div>
 
             {filtered.length > 0 ? (
-                <NewsGrid>
-                    {filtered.map((pol) => (
-                        <Link key={pol.id} href={`/borg-record/politicians/${pol.slug}`} className="col-span-1 md:col-span-2 lg:col-span-3 border border-border group hover:border-accent transition-colors block">
-                            <div className="aspect-[3/4] bg-muted relative">
-                                <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent flex flex-col justify-end p-4">
-                                    <span className={`text-xs font-bold uppercase tracking-widest w-fit px-2 py-1 mb-2 ${pol.party === 'Democrat' ? 'bg-blue-500/10 text-blue-500' : pol.party === 'Republican' ? 'bg-red-500/10 text-red-500' : 'bg-accent/10 text-accent'}`}>{pol.party}</span>
-                                    <h3 className="font-serif text-2xl font-bold leading-tight group-hover:text-accent transition-colors">{pol.name}</h3>
-                                    <p className="text-sm font-medium text-muted-foreground mt-1 uppercase tracking-wider">{pol.office_held} • {pol.district_state}</p>
-                                </div>
-                            </div>
-                            <div className="p-4 bg-background border-t border-border flex justify-between items-center text-xs font-bold uppercase tracking-wider">
-                                <span className="text-muted-foreground">Detailed Record</span>
-                                <span className="text-foreground group-hover:text-accent transition-colors flex items-center">View <ChevronRight className="w-4 h-4 ml-1" /></span>
-                            </div>
-                        </Link>
-                    ))}
-                </NewsGrid>
+                <div className="space-y-16">
+                    {federalMatched.length > 0 && (
+                        <section>
+                            <h3 className="font-serif text-2xl font-black uppercase tracking-widest border-b-[3px] border-border pb-2 mb-6">Federal</h3>
+                            <NewsGrid>
+                                {federalMatched.map(renderPoliticianCard)}
+                            </NewsGrid>
+                        </section>
+                    )}
+                    
+                    {stateMatched.length > 0 && (
+                        <section>
+                            <h3 className="font-serif text-2xl font-black uppercase tracking-widest border-b-[3px] border-border pb-2 mb-6">State</h3>
+                            <NewsGrid>
+                                {stateMatched.map(renderPoliticianCard)}
+                            </NewsGrid>
+                        </section>
+                    )}
+
+                    {localMatched.length > 0 && (
+                        <section>
+                            <h3 className="font-serif text-2xl font-black uppercase tracking-widest border-b-[3px] border-border pb-2 mb-6">Local</h3>
+                            <NewsGrid>
+                                {localMatched.map(renderPoliticianCard)}
+                            </NewsGrid>
+                        </section>
+                    )}
+                </div>
             ) : (
                 <div className="p-12 border-2 border-dashed border-border bg-muted/10 text-center flex flex-col items-center">
                     <AlertCircle className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />

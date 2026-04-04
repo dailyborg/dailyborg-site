@@ -12,13 +12,15 @@
     "worker:feeder": "cd feeder-worker && wrangler dev",
     "worker:scraper": "cd workers/scraper && wrangler dev",
     "worker:publisher": "cd workers/publisher && wrangler dev",
-    "boot": "concurrently \"npm run dev\" \"npm run worker:feeder\" \"npm run worker:scraper\" \"npm run worker:publisher\"",
+    "worker:discovery": "cd workers/discovery-engine && wrangler dev",
+    "boot": "concurrently \"npm run dev\" \"npm run worker:feeder\" \"npm run worker:scraper\" \"npm run worker:publisher\" \"npm run worker:discovery\"",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
     "@react-email/render": "^2.0.4",
     "@twilio/voice-sdk": "^2.18.0",
+    "agents": "^0.9.0",
     "better-sqlite3": "^12.6.2",
     "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",

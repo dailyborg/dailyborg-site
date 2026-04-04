@@ -1,0 +1,20 @@
+{
+	"name": "dailyborg-discovery",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-03-05",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "dailyborg-db",
+			"database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3"
+		}
+	],
+	"ai": {
+        "binding": "AI"
+    },
+	"triggers": {
+		"crons": [
+			"*/10 * * * *"
+		]
+	}
+}
