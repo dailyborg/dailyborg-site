@@ -74,6 +74,7 @@ function NewsletterSidebar() {
 // =============================================
 export const dynamic = 'force-dynamic';
 export const runtime = 'edge';
+export const revalidate = 0; // Force cache bypass for every request
 
 export default async function Home() {
 

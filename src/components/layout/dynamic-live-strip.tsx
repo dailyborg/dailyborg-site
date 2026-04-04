@@ -26,7 +26,7 @@ export function DynamicLiveStrip() {
     useEffect(() => {
         async function fetchLiveIntelligence() {
             try {
-                const res = await fetch("/api/headlines");
+                const res = await fetch(`/api/headlines?t=${Date.now()}`);
                 if (res.ok) {
                     const data = await res.json() as { title: string; slug: string; desk: string }[];
                     const icons = [Activity, Zap, Globe, Radio];
