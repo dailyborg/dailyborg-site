@@ -4,16 +4,6 @@ import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle, FileText, AlertTriangle, ShieldCheck, BarChart3, Users } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-// Dummy data for visual chart until we build historical edge endpoints
-const chartData = [
-  { name: 'Mon', visitors: 400 },
-  { name: 'Tue', visitors: 300 },
-  { name: 'Wed', visitors: 550 },
-  { name: 'Thu', visitors: 450 },
-  { name: 'Fri', visitors: 700 },
-  { name: 'Sat', visitors: 400 },
-  { name: 'Sun', visitors: 800 },
-];
 
 export default function AdminDashboard() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -28,7 +18,8 @@ export default function AdminDashboard() {
         successfulInsertsToday: 0,
         uniqueVisitorsToday: 0,
         totalSubscribers: 0,
-        payingSubscribers: 0
+        payingSubscribers: 0,
+        chartData: [] as {name: string, visitors: number}[]
     });
     const [articles, setArticles] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -208,7 +199,7 @@ export default function AdminDashboard() {
                             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-6">Traffic Overview (7 Days)</h3>
                             <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={chartData}>
+                                    <LineChart data={metrics.chartData}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748B'}} />
                                         <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748B'}} />

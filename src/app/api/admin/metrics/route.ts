@@ -37,13 +37,33 @@ export async function GET(request: Request) {
         const totalSubscribers = subscribersResult?.total_subscribers || 0;
         const payingSubscribers = subscribersResult?.paying_subscribers || 0;
 
+        // 5. Get 7-day historical chart data
+        const historicalResult = await db.prepare(`
+            SELECT 
+                strftime('%w', created_at) as day_of_week, 
+                COUNT(DISTINCT ip_hash) as visitors 
+            FROM site_visits 
+            WHERE created_at >= date('now', '-7 days') 
+            GROUP BY date(created_at)
+            ORDER BY date(created_at) ASC
+        `).all();
+
+        const rawChartData = historicalResult.results || [];
+        // Map SQLite weekday index (0=Sunday) to human names
+        const daysMap = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const chartData = rawChartData.map((row: any) => ({
+            name: daysMap[Number(row.day_of_week)],
+            visitors: row.visitors
+        }));
+
         return NextResponse.json({
             pendingCount,
             duplicatesCaughtToday: metricsResult?.duplicates_caught || 0,
             successfulInsertsToday: metricsResult?.successful_inserts || 0,
             uniqueVisitorsToday,
             totalSubscribers,
-            payingSubscribers
+            payingSubscribers,
+            chartData
         });
 
     } catch (error: any) {
