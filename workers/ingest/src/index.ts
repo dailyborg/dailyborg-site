@@ -81,10 +81,18 @@ export default {
                         })
                     });
 
-                    if (aiResponse.ok) {
-                        const aiData = await aiResponse.json() as any;
-                        articleObject = JSON.parse(aiData.choices[0].message.content);
+                    if (aiResponse.status === 401 || aiResponse.status === 403) {
+                        throw new Error("ERR_AUTH: AI Authentication failed. Check AIML_API_KEY.");
                     }
+                    if (aiResponse.status === 429) {
+                        throw new Error("ERR_QUOTA: AI API Quota exceeded or rate limited.");
+                    }
+                    if (!aiResponse.ok) {
+                        throw new Error(`ERR_HTTP: AI Provider returned ${aiResponse.status}`);
+                    }
+
+                    const aiData = await aiResponse.json() as any;
+                    articleObject = JSON.parse(aiData.choices[0].message.content);
                 }
 
                 // Fallback to Mock Content if AI fails or quality gate fails
@@ -139,8 +147,13 @@ export default {
             } catch (error: any) {
                 console.error("Queue processing error:", error);
                 try {
+                    let errorCode = 'failed';
+                    if (error.message.includes('ERR_AUTH')) errorCode = 'auth_error';
+                    else if (error.message.includes('ERR_QUOTA')) errorCode = 'quota_exceeded';
+                    else if (error.message.includes('ERR_HTTP')) errorCode = 'provider_error';
+                    
                     await env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
-                        .bind(crypto.randomUUID(), title.substring(0, 50), 'failed', `Error: ${error.message || 'Unknown processing error'}`).run();
+                        .bind(crypto.randomUUID(), title.substring(0, 50), errorCode, `Error: ${error.message || 'Unknown processing error'}`).run();
                 } catch (dbErr) {
                     console.error("Critical: Could not log failure to D1:", dbErr);
                 }

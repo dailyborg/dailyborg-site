@@ -8,7 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 export function formatTimeAgo(dateString: string) {
     if (!dateString) return "Just now";
     const date = new Date(dateString);
-    const diff = Date.now() - date.getTime();
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
     if (isNaN(diff)) return "Just now";
     
     const minutes = Math.floor(diff / (1000 * 60));
@@ -21,7 +22,8 @@ export function formatTimeAgo(dateString: string) {
     const days = Math.floor(hours / 24);
     if (days < 7) return `${days}d AGO`;
     
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+    // User local date formatting
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
 }
 
 export function formatFullTimestamp(dateString: string) {
@@ -37,5 +39,6 @@ export function formatFullTimestamp(dateString: string) {
         hour12: true
     };
     
-    return date.toLocaleString('en-US', options).toUpperCase().replace(',', ' •');
+    // Using undefined as the first argument uses the browser's default locale
+    return date.toLocaleString(undefined, options).toUpperCase().replace(',', ' •');
 }

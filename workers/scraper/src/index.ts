@@ -9,29 +9,32 @@ const RSS_FEEDS = [
     { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml', type: 'politics' },
     { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Science.xml', type: 'science' },
     { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Education.xml', type: 'education' },
-    { url: 'https://www.usnews.com/rss/education', type: 'education' }, // Backup
+    { url: 'https://www.usnews.com/rss/education', type: 'education' }, 
     { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml', type: 'entertainment' },
     { url: 'https://www.espn.com/espn/rss/news', type: 'sports' },
-    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Crime.xml', type: 'crime' }, // Note: NYT often rolls crime into NY Region or general news, but some feeds exist. Let's add a generic crime one just in case, or Fox News Crime.
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Crime.xml', type: 'crime' }, 
     { url: 'https://moxie.foxnews.com/google-publisher/us-crime.xml', type: 'crime' }
 ];
 
 export default {
     async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-        ctx.waitUntil(this.runScrapingCycle(env));
+        ctx.waitUntil(this.runScrapingCycle(env, false));
     },
 
-    // Allow manual HTTP trigger for E2E testing
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         if (request.method !== "POST") {
             return new Response("Method not allowed. POST to trigger scraper.", { status: 405 });
         }
-        ctx.waitUntil(this.runScrapingCycle(env));
-        return new Response("Sentinel scraping cycle initiated in background.", { status: 202 });
+        
+        const body = await request.json().catch(() => ({})) as any;
+        const isDeep = body.deep === true;
+        
+        ctx.waitUntil(this.runScrapingCycle(env, isDeep));
+        return new Response(`Sentinel scraping cycle (Deep: ${isDeep}) initiated in background.`, { status: 202 });
     },
 
-    async runScrapingCycle(env: Env) {
-        console.log(`[Sentinel] Waking up. Processing ${RSS_FEEDS.length} feeds...`);
+    async runScrapingCycle(env: Env, isDeep: boolean = false) {
+        console.log(`[Sentinel] Waking up (Deep Mode: ${isDeep}). Processing ${RSS_FEEDS.length} feeds...`);
         let queuedArticles = 0;
         let skippedArticles = 0;
 
@@ -51,13 +54,14 @@ export default {
                 // Simple regex parser to extract <item> blocks from RSS XML without relying on heavy external parsers
                 const items = xmlData.match(/<item>([\s\S]*?)<\/item>/g) || [];
 
-                // Only process the 4 most recent articles per feed per hour to prevent AI API rate limiting
-                const recentItems = items.slice(0, 4);
+                // In Deep Mode, we process up to 15 articles per feed to catch historical gaps
+                const itemsToProcess = isDeep ? items.slice(0, 15) : items.slice(0, 4);
 
-                for (const itemXml of recentItems) {
+                for (const itemXml of itemsToProcess) {
                     const titleMatch = itemXml.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || itemXml.match(/<title>(.*?)<\/title>/);
                     const linkMatch = itemXml.match(/<link>(.*?)<\/link>/);
                     const descMatch = itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) || itemXml.match(/<description>(.*?)<\/description>/);
+                    const dateMatch = itemXml.match(/<pubDate>(.*?)<\/pubDate>/);
 
                     if (!titleMatch || !linkMatch) continue;
 
@@ -72,9 +76,16 @@ export default {
                     const urlHash = await this.hashString(link);
                     const isCached = await env.SENTINEL_CACHE.get(`seen_${urlHash}`);
 
-                    if (isCached) {
+                    if (isCached && !isDeep) {
                         skippedArticles++;
                         continue;
+                    }
+
+                    // Date parsing for backfill accuracy
+                    let publishTimestamp = Date.now();
+                    if (dateMatch) {
+                        const parsedDate = Date.parse(dateMatch[1]);
+                        if (!isNaN(parsedDate)) publishTimestamp = parsedDate;
                     }
 
                     // Dispatch to the Daily Borg Ingest Queue
@@ -83,11 +94,13 @@ export default {
                         title: title,
                         rawContent: rawContent,
                         type: feed.type,
-                        timestamp: Date.now()
+                        timestamp: publishTimestamp
                     });
 
-                    // Mark as seen for 24 hours to prevent re-processing
-                    await env.SENTINEL_CACHE.put(`seen_${urlHash}`, '1', { expirationTtl: 86400 });
+                    // Mark as seen for 72 hours in Deep Mode to prevent re-processing during backfill
+                    const ttl = isDeep ? 259200 : 86400;
+                    await env.SENTINEL_CACHE.put(`seen_${urlHash}`, '1', { expirationTtl: ttl });
+                    
                     queuedArticles++;
                     console.log(`[Sentinel] Queued -> ${title}`);
                 }

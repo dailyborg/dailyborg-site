@@ -70,6 +70,14 @@ export async function GET(request: Request) {
             });
         }
 
+        // 6. Get last 50 ingestion logs for the System Health tab
+        const logsResult = await db.prepare(`
+            SELECT * FROM ingestion_logs 
+            ORDER BY created_at DESC 
+            LIMIT 50
+        `).all();
+        const logs = logsResult.results || [];
+
         return NextResponse.json({
             pendingCount,
             duplicatesCaughtToday: metricsResult?.duplicates_caught || 0,
@@ -77,7 +85,8 @@ export async function GET(request: Request) {
             uniqueVisitorsToday,
             totalSubscribers,
             payingSubscribers,
-            chartData
+            chartData,
+            logs
         });
 
     } catch (error: any) {

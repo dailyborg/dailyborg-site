@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckCircle2, XCircle, FileText, AlertTriangle, ShieldCheck, BarChart3, Users } from "lucide-react";
+import { CheckCircle2, XCircle, FileText, AlertTriangle, ShieldCheck, BarChart3, Users, Activity, Zap, RefreshCcw } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { formatTimeAgo } from "@/lib/utils";
 
 
 export default function AdminDashboard() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [passphrase, setPassphrase] = useState("");
     const [authError, setAuthError] = useState("");
-    const [activeTab, setActiveTab] = useState<'queue' | 'analytics' | 'audience'>('queue');
+    const [activeTab, setActiveTab] = useState<'queue' | 'analytics' | 'audience' | 'health'>('queue');
     const [dateRange, setDateRange] = useState<7 | 30>(7);
 
     // Dashboard Data
@@ -20,7 +21,8 @@ export default function AdminDashboard() {
         uniqueVisitorsToday: 0,
         totalSubscribers: 0,
         payingSubscribers: 0,
-        chartData: [] as {name: string, visitors: number}[]
+        chartData: [] as {name: string, visitors: number}[],
+        logs: [] as any[]
     });
     const [articles, setArticles] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -186,6 +188,12 @@ export default function AdminDashboard() {
                     >
                         <Users className="w-5 h-5" /> Audience CRM
                     </button>
+                    <button 
+                        onClick={() => setActiveTab('health')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'health' ? 'bg-blue-600 font-bold' : 'hover:bg-slate-800'}`}
+                    >
+                        <Activity className="w-5 h-5" /> System Health
+                    </button>
                 </nav>
 
                 <div className="p-4 border-t border-slate-800">
@@ -297,6 +305,95 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
+                {activeTab === 'health' && (
+                    <div className="flex flex-col gap-8 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-end">
+                            <h2 className="font-serif text-4xl font-black">System Health</h2>
+                            <button 
+                                onClick={() => login({ preventDefault: () => {} } as any)}
+                                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-600 transition-all"
+                            >
+                                <RefreshCcw className="w-4 h-4" /> Refresh Status
+                            </button>
+                        </div>
+
+                        {/* Status Matrix */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {[
+                                { name: 'Sentinel', status: 'Active', icon: ShieldCheck, color: 'emerald' },
+                                { name: 'Scraper', status: 'Ready', icon: Activity, color: 'blue' },
+                                { name: 'Ingest', status: metrics.logs.some(l => l.status.includes('error')) ? 'Degraded' : 'Active', icon: Zap, color: metrics.logs.some(l => l.status.includes('error')) ? 'orange' : 'emerald' },
+                                { name: 'Discovery', status: 'Ready', icon: Users, color: 'blue' },
+                            ].map((s) => (
+                                <div key={s.name} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                                    <div className={`p-3 rounded-xl bg-${s.color}-100 text-${s.color}-600`}>
+                                        <s.icon className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">{s.name}</div>
+                                        <div className={`text-sm font-black text-${s.color}-600 uppercase`}>{s.status}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Diagnostic Log */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                                <h3 className="font-bold text-slate-700">Autonomous Diagnostic Log</h3>
+                                <div className="flex gap-2">
+                                    <span className="flex items-center gap-1 text-[10px] font-black uppercase text-slate-400">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Healthy
+                                    </span>
+                                    <span className="flex items-center gap-1 text-[10px] font-black uppercase text-slate-400">
+                                        <div className="w-2 h-2 rounded-full bg-orange-500"></div> Warning
+                                    </span>
+                                    <span className="flex items-center gap-1 text-[10px] font-black uppercase text-slate-400">
+                                        <div className="w-2 h-2 rounded-full bg-red-500"></div> Critical
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-widest text-[10px] border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-6 py-4">Event Identity</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Message</th>
+                                            <th className="px-6 py-4">Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {metrics.logs.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-medium italic">
+                                                    No diagnostic records found in current orbit.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            metrics.logs.map((log: any) => (
+                                                <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-6 py-4 font-mono text-[10px] text-slate-500">{log.event_slug}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${
+                                                            log.status === 'inserted' || log.status === 'healthy' || log.status === 'healed' ? 'bg-emerald-100 text-emerald-700' :
+                                                            log.status === 'auth_error' || log.status === 'quota_exceeded' ? 'bg-red-100 text-red-700' :
+                                                            'bg-orange-100 text-orange-700'
+                                                        }`}>
+                                                            {log.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-slate-600 line-clamp-1 max-w-md">{log.message}</td>
+                                                    <td className="px-6 py-4 text-slate-400 text-xs whitespace-nowrap">{formatTimeAgo(log.created_at)}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {activeTab === 'queue' && (
                     <div className="flex flex-col gap-8 animate-in fade-in zoom-in-95 duration-300">
                         <div className="flex justify-between items-end">
