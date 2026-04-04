@@ -7,10 +7,9 @@ import { getImageForContext } from '@/lib/image-utils';
 
 import { getDbBinding } from '@/lib/db';
 
+import { formatTimeAgo, formatFullTimestamp } from '@/lib/utils';
 import { 
   ArticleData, 
-  formatTimeAgo, 
-  formatFullTimestamp,
   getDeskColor, 
   LeadHeroSection, 
   TrendingSplitSection, 

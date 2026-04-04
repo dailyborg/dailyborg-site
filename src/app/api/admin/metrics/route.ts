@@ -13,6 +13,9 @@ export async function GET(request: Request) {
     }
 
     try {
+        const url = new URL(request.url);
+        const days = parseInt(url.searchParams.get('days') || '7', 10);
+
         const db = await getDbBinding();
 
         // 1. Get total pending articles
@@ -37,24 +40,35 @@ export async function GET(request: Request) {
         const totalSubscribers = subscribersResult?.total_subscribers || 0;
         const payingSubscribers = subscribersResult?.paying_subscribers || 0;
 
-        // 5. Get 7-day historical chart data
+        // 5. Get historical chart data dynamically
         const historicalResult = await db.prepare(`
             SELECT 
-                strftime('%w', created_at) as day_of_week, 
+                date(created_at) as raw_date, 
                 COUNT(DISTINCT ip_hash) as visitors 
             FROM site_visits 
-            WHERE created_at >= date('now', '-7 days') 
+            WHERE created_at >= date('now', ?) 
             GROUP BY date(created_at)
             ORDER BY date(created_at) ASC
-        `).all();
+        `).bind(`-${days - 1} days`).all();
 
         const rawChartData = historicalResult.results || [];
-        // Map SQLite weekday index (0=Sunday) to human names
-        const daysMap = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        const chartData = rawChartData.map((row: any) => ({
-            name: daysMap[Number(row.day_of_week)],
-            visitors: row.visitors
-        }));
+        const dataMap = new Map(rawChartData.map((row: any) => [row.raw_date, row.visitors]));
+
+        const chartData = [];
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            
+            // Format labels. For 7 days, "Mon". For >7 days, "Apr 04".
+            const displayOpts: Intl.DateTimeFormatOptions = days <= 14 ? { weekday: 'short' } : { month: 'short', day: 'numeric' };
+            const labelName = d.toLocaleDateString('en-US', displayOpts);
+            
+            chartData.push({
+                name: labelName,
+                visitors: dataMap.get(dateStr) || 0
+            });
+        }
 
         return NextResponse.json({
             pendingCount,

@@ -10,6 +10,7 @@ export default function AdminDashboard() {
     const [passphrase, setPassphrase] = useState("");
     const [authError, setAuthError] = useState("");
     const [activeTab, setActiveTab] = useState<'queue' | 'analytics' | 'audience'>('queue');
+    const [dateRange, setDateRange] = useState<7 | 30>(7);
 
     // Dashboard Data
     const [metrics, setMetrics] = useState({ 
@@ -35,7 +36,7 @@ export default function AdminDashboard() {
         setIsLoading(true);
 
         try {
-            const res = await fetch('/api/admin/metrics', {
+            const res = await fetch(`/api/admin/metrics?days=${dateRange}`, {
                 headers: { 'Authorization': `Bearer ${passphrase}` }
             });
 
@@ -66,7 +67,7 @@ export default function AdminDashboard() {
         if (token) {
             setPassphrase(token);
             document.cookie = `borg_admin_token=${token}; path=/; max-age=86400`;
-            fetch('/api/admin/metrics', { headers: { 'Authorization': `Bearer ${token}` } })
+            fetch(`/api/admin/metrics?days=${dateRange}`, { headers: { 'Authorization': `Bearer ${token}` } })
                 .then(res => res.json() as any)
                 .then(data => {
                     if (data.error) throw new Error();
@@ -80,6 +81,16 @@ export default function AdminDashboard() {
                 });
         }
     }, []);
+
+    // Hook to allow refreshing metrics when the date segment changes
+    useEffect(() => {
+        if (!isAuthenticated || !passphrase) return;
+        fetch(`/api/admin/metrics?days=${dateRange}`, { headers: { 'Authorization': `Bearer ${passphrase}` } })
+            .then(res => res.json() as any)
+            .then(data => {
+                if (!data.error) setMetrics(data);
+            });
+    }, [dateRange]);
 
     const fetchArticles = async (token: string) => {
         const res = await fetch('/api/admin/articles', {
@@ -104,7 +115,7 @@ export default function AdminDashboard() {
         if (res.ok) {
             setSelectedArticle(null);
             fetchArticles(passphrase);
-            const metricsRes = await fetch('/api/admin/metrics', { headers: { 'Authorization': `Bearer ${passphrase}` } });
+            const metricsRes = await fetch(`/api/admin/metrics?days=${dateRange}`, { headers: { 'Authorization': `Bearer ${passphrase}` } });
             if (metricsRes.ok) setMetrics(await metricsRes.json() as any);
         } else {
             alert(`Failed to ${action} article.`);
@@ -192,11 +203,31 @@ export default function AdminDashboard() {
             <main className="flex-1 p-6 md:p-10 overflow-y-auto">
                 {activeTab === 'analytics' && (
                     <div className="flex flex-col gap-8 animate-in fade-in zoom-in-95 duration-300">
-                        <h2 className="font-serif text-4xl font-black">Web Analytics</h2>
+                        <div className="flex justify-between items-end">
+                            <h2 className="font-serif text-4xl font-black">Web Analytics</h2>
+                        </div>
                         
                         {/* Traffic Overview */}
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-6">Traffic Overview (7 Days)</h3>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Traffic Overview ({dateRange} Days)</h3>
+                                
+                                {/* Stitch-Style Segment Filter */}
+                                <div className="bg-slate-100 p-1 rounded-lg flex gap-1">
+                                    <button 
+                                        onClick={() => setDateRange(7)}
+                                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${dateRange === 7 ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        7 Days
+                                    </button>
+                                    <button 
+                                        onClick={() => setDateRange(30)}
+                                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${dateRange === 30 ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        30 Days
+                                    </button>
+                                </div>
+                            </div>
                             <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={metrics.chartData}>

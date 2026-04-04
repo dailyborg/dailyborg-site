@@ -3,10 +3,9 @@ export const runtime = 'edge';
 import Link from 'next/link';
 import { notFound } from "next/navigation";
 import { getDbBinding } from '@/lib/db';
+import { formatTimeAgo, formatFullTimestamp } from '@/lib/utils';
 import { 
     ArticleData, 
-    formatTimeAgo, 
-    formatFullTimestamp,
     LeadHeroSection, 
     TrendingSplitSection, 
     HeadlinesGridSection, 
