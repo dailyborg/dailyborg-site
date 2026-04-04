@@ -68,31 +68,33 @@ export default {
         `;
 
                 if (env.AIML_API_KEY && env.AIML_API_KEY.length > 5 && env.AIML_API_KEY !== 'mock') {
-                    const aiResponse = await fetch("https://api.aimlapi.com/v1/chat/completions", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": `Bearer ${env.AIML_API_KEY}`
-                        },
-                        body: JSON.stringify({
-                            model: "gemini-3-flash-preview",
-                            messages: [{ role: "user", content: enrichmentPrompt }],
-                            response_format: { type: "json_object" }
-                        })
-                    });
+                    try {
+                        const aiResponse = await fetch("https://api.aimlapi.com/v1/chat/completions", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer ${env.AIML_API_KEY}`
+                            },
+                            body: JSON.stringify({
+                                model: "gemini-3-flash-preview",
+                                messages: [{ role: "user", content: enrichmentPrompt }],
+                                response_format: { type: "json_object" }
+                            })
+                        });
 
-                    if (aiResponse.status === 401 || aiResponse.status === 403) {
-                        throw new Error("ERR_AUTH: AI Authentication failed. Check AIML_API_KEY.");
+                        if (aiResponse.status === 401 || aiResponse.status === 403) {
+                            console.error("ERR_AUTH: AI Authentication failed.");
+                        } else if (aiResponse.status === 429) {
+                            console.error("ERR_QUOTA: AI API Quota exceeded.");
+                        } else if (!aiResponse.ok) {
+                            console.error(`ERR_HTTP: AI Provider returned ${aiResponse.status}`);
+                        } else {
+                            const aiData = await aiResponse.json() as any;
+                            articleObject = JSON.parse(aiData.choices[0].message.content);
+                        }
+                    } catch (e: any) {
+                        console.error("AI Fetch Failure:", e.message);
                     }
-                    if (aiResponse.status === 429) {
-                        throw new Error("ERR_QUOTA: AI API Quota exceeded or rate limited.");
-                    }
-                    if (!aiResponse.ok) {
-                        throw new Error(`ERR_HTTP: AI Provider returned ${aiResponse.status}`);
-                    }
-
-                    const aiData = await aiResponse.json() as any;
-                    articleObject = JSON.parse(aiData.choices[0].message.content);
                 }
 
                 // Fallback to Mock Content if AI fails or quality gate fails
