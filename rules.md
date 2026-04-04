@@ -10,10 +10,16 @@ Ingest worker: dailyborg-ingest
 Feeder worker: dailyborg-site-feeder
 Domain: dailyborg.com (also dailyborg-site.pages.dev)
 
-🔴 AI/ML Specification (ULTRA-FAST GRID)
-- **Text Ingest & Analysis**: ALWAYS use **Gemini 3 Flash**. Never use 1.5 Pro unless explicitly asked for deep historical research that Flash cannot handle.
-- **Image Generation**: ALWAYS use **Nano Banana 2** (Gemini 3.1 Flash Image). Optimized for speed and high-volume grid visuals.
+🔴 AI/ML Specification (HYBRID INFRASTRUCTURE)
+We utilize a carefully balanced Hybrid system spanning external AIML APIs and Native Edge AI to manage costs and maximize speed.
+- **Text Ingest & Analysis (Heavy Lifting)**: ALWAYS use **Gemini 3 Flash (via AIML API)**. Never use 1.5 Pro unless explicitly asked for deep historical research.
+- **Image Generation (Main Articles)**: ALWAYS use **Nano Banana 2** (Gemini 3.1 Flash Image via AIML API). Optimized for speed and high-volume grid visuals.
+- **Autonomous Discovery & Edge Fallbacks (Native Free Tier)**: Use **Cloudflare Workers AI (Llama 3 8B Instruct & Stable Diffusion XL)** for autonomous, high-frequency tasks (like the Discovery Engine). Edge AI is strictly for operations needing $0 compute costs where AIML tokens would accumulate too quickly.
 - **Research Capability**: Integrated with **Perplexity AI** (Sonar Pro) for real-time internet scouting with citations.
+
+🔴 3rd Party Data Sourcing (THE INFINITE MATRIX)
+- **Image Verification**: ALWAYS attempt to source public, legally safe imagery first before relying on AI generation. For politicians, query the **Wikimedia Action API** (for guaranteed Public Domain / CC-BY-SA images) first.
+- **Proactive Registry Intake**: Automated discovery routines should rely on public, legally structured datasets (e.g., github/unitedstates/congress-legislators) before scraping.
 
 🔴 Cloudflare Pages — ALWAYS do this
 Every server-rendered file MUST have export const runtime = 'edge'; — This includes 
@@ -99,7 +105,7 @@ We have several core things set up in infrastructure:
 - We have a credibility and truth system.
 - We ensure that information is real and accurate.
 For everything else there's structure. Make sure that when you are implementing changes you're not taking away what we've already done; you're just adding on or fixing. If you're about to take away anything, you need to stop and let me know. Explain why and how you will make up for the issues or the ones that you are changing.
-Note that we're using specific language models through AIML so ensure that we're not changing or including additional models without checking up with me first. Gemini 3 Flash and Gemini 3.1 Flash and Perplexity or Claude workers are being used for different purposes so try to check with me if you need to update anything. 
+Note that we're using specific language models through AIML (Gemini 3 Flash, Gemini 3.1 Flash, Perplexity) AND Cloudflare Workers AI for edge-native autonomous discovery infrastructure. Ensure that we're not changing or including additional models without checking up with me first. For high-frequency workers querying the matrix, prioritize the free Cloudflare Native bindings out of the box. 
 
 ### 🔴 Directory Integrity & Naming Standards (ALWAYS CHECK)
 - **Exhaustive Verification**: BEFORE creating any new file, folder, worker, or database, you MUST run `list_dir` and `find_by_name` to ensure a similar component doesn't already exist.

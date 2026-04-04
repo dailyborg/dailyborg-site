@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 import "./globals.css";
 
 const sourceSans = Source_Sans_3({
@@ -41,6 +42,7 @@ export default function RootLayout({
             <Suspense fallback={<div className="h-40 w-full" />}>
               <SiteHeader />
             </Suspense>
+            <AnalyticsTracker />
             <main className="flex-1">{children}</main>
             <SiteFooter />
           </div>

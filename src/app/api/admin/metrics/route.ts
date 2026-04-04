@@ -28,10 +28,22 @@ export async function GET(request: Request) {
             WHERE created_at > date('now')
         `).first();
 
+        // 3. Get unique visitors today
+        const visitorsResult = await db.prepare("SELECT COUNT(DISTINCT ip_hash) as unique_visitors_today FROM site_visits WHERE created_at >= date('now')").first();
+        const uniqueVisitorsToday = visitorsResult?.unique_visitors_today || 0;
+
+        // 4. Get total subscribers
+        const subscribersResult = await db.prepare("SELECT COUNT(*) as total_subscribers, SUM(CASE WHEN plan_type = 'paid' THEN 1 ELSE 0 END) as paying_subscribers FROM subscribers").first();
+        const totalSubscribers = subscribersResult?.total_subscribers || 0;
+        const payingSubscribers = subscribersResult?.paying_subscribers || 0;
+
         return NextResponse.json({
             pendingCount,
             duplicatesCaughtToday: metricsResult?.duplicates_caught || 0,
-            successfulInsertsToday: metricsResult?.successful_inserts || 0
+            successfulInsertsToday: metricsResult?.successful_inserts || 0,
+            uniqueVisitorsToday,
+            totalSubscribers,
+            payingSubscribers
         });
 
     } catch (error: any) {

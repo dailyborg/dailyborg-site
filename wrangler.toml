@@ -10,11 +10,13 @@ directory = ".vercel/output/static"
 binding = "DB"
 database_name = "dailyborg-db"
 database_id = "c412efcd-54d8-47a6-9ca5-8522417992c3"
+migrations_dir = "src/migrations"
 
 [[d1_databases]]
 binding = "dailyborg-db"
 database_name = "dailyborg-db"
 database_id = "c412efcd-54d8-47a6-9ca5-8522417992c3"
+migrations_dir = "src/migrations"
 
 [[r2_buckets]]
 binding = "IMAGE_BUCKET"
