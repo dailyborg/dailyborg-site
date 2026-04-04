@@ -97,7 +97,7 @@ export default {
             const sample = legislators.slice(0, 5); 
 
             for (const leg of sample) {
-                const name = \`\${leg.name?.first} \${leg.name?.last}\`;
+                const name = `${leg.name?.first} ${leg.name?.last}`;
                 // Check if exists
                 const existing = await env.DB.prepare("SELECT id FROM politicians WHERE name = ?").bind(name).first();
                 if (existing) continue; // Skip if already verified
@@ -110,17 +110,17 @@ export default {
 
                 const officeHeld = latestTerm.type === "sen" ? "U.S. Senate" : "U.S. House";
                 const party = latestTerm.party || "Independent";
-                const districtState = latestTerm.state + (latestTerm.district ? \`-\${latestTerm.district}\` : "");
+                const districtState = latestTerm.state + (latestTerm.district ? `-${latestTerm.district}` : "");
                 
                 const photoUrl = await this.resolvePoliticianImage(env, name, officeHeld, party);
 
-                const polId = \`pol_\${Date.now()}_\${Math.floor(Math.random() * 1000)}\`;
+                const polId = `pol_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                 const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-                await env.DB.prepare(\`
+                await env.DB.prepare(`
                     INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, time_in_office, photo_url)
                     VALUES (?, ?, ?, ?, ?, ?, 'Federal', 'Active', ?)
-                \`).bind(polId, slug, name, officeHeld, party, districtState, photoUrl).run();
+                `).bind(polId, slug, name, officeHeld, party, districtState, photoUrl).run();
 
                 console.log(`[Discovery Engine] Background mapping complete for: ${name}`);
             }
@@ -135,7 +135,7 @@ export default {
     // ----------------------------------------------------
     async processRequests(env: Env) {
         const { results: pendingRequests } = await env.DB.prepare(
-            \`SELECT * FROM politician_requests WHERE status = 'Pending' LIMIT 5\`
+            `SELECT * FROM politician_requests WHERE status = 'Pending' LIMIT 5`
         ).all();
 
         if (!pendingRequests || pendingRequests.length === 0) return;
@@ -154,10 +154,10 @@ export default {
 
                 // AI Lookup
                 try {
-                    const aiPrompt = \`Extract basic details of US political figure "\${requestedName}". Return strict JSON: { "name": "...", "office_held": "...", "party": "...", "district_state": "...", "region_level": "...", "political_platform_summary": "..." }\`;
+                    const aiPrompt = `Extract basic details of US political figure "${requestedName}". Return strict JSON: { "name": "...", "office_held": "...", "party": "...", "district_state": "...", "region_level": "...", "political_platform_summary": "..." }`;
                     const aiRes = await env.AI.run('@cf/meta/llama-3-8b-instruct', { messages: [{ role: 'user', content: aiPrompt }] });
                     const rawText = aiRes.response || aiRes;
-                    const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/);
+                    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
                     if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
                 } catch (e) {
                     console.warn("[Discovery Engine] AI text parsing failed, using defaults.");
@@ -165,27 +165,27 @@ export default {
 
                 const photoUrl = await this.resolvePoliticianImage(env, parsed.name, parsed.office_held, parsed.party);
 
-                const polId = \`pol_\${Date.now()}_\${Math.floor(Math.random() * 1000)}\`;
+                const polId = `pol_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                 const slug = parsed.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-                const stmt1 = env.DB.prepare(\`
+                const stmt1 = env.DB.prepare(`
                     INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, time_in_office, photo_url)
                     VALUES (?, ?, ?, ?, ?, ?, ?, 'New Intake', ?)
-                \`).bind(polId, slug, parsed.name, parsed.office_held, parsed.party, parsed.district_state, parsed.region_level, photoUrl);
+                `).bind(polId, slug, parsed.name, parsed.office_held, parsed.party, parsed.district_state, parsed.region_level, photoUrl);
 
-                const claimId = \`clm_\${Date.now()}\`;
-                const stmt2 = env.DB.prepare(\`
+                const claimId = `clm_${Date.now()}`;
+                const stmt2 = env.DB.prepare(`
                     INSERT INTO claims (id, politician_id, type, content, date, context)
                     VALUES (?, ?, 'Fact', ?, DATE('now'), 'AI Initial Discovery')
-                \`).bind(claimId, polId, parsed.political_platform_summary);
+                `).bind(claimId, polId, parsed.political_platform_summary);
 
-                const stmt3 = env.DB.prepare(\`
+                const stmt3 = env.DB.prepare(`
                     UPDATE politician_requests SET status = 'Verified', updated_at = CURRENT_TIMESTAMP WHERE id = ?
-                \`).bind(req.id);
+                `).bind(req.id);
 
                 await env.DB.batch([stmt1, stmt2, stmt3]);
             } catch (err: any) {
-                await env.DB.prepare(\`UPDATE politician_requests SET status = 'Rejected', verification_notes = ? WHERE id = ?\`).bind(\`Discovery Error: \${err.message}\`, req.id).run();
+                await env.DB.prepare(`UPDATE politician_requests SET status = 'Rejected', verification_notes = ? WHERE id = ?`).bind(`Discovery Error: ${err.message}`, req.id).run();
             }
         }
     }
