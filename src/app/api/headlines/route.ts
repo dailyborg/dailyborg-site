@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
         
         // Fetch top 12 approved articles with slug and desk for clickable links
         const { results } = await (db as any).prepare(`
-            SELECT title, slug, desk 
+            SELECT title, slug, desk, publish_date
             FROM articles 
             WHERE approval_status = 'approved' 
             ORDER BY publish_date DESC 
@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
             title: r.title,
             slug: r.slug,
             desk: (r.desk || 'intel').toLowerCase(),
+            publish_date: r.publish_date
         }));
 
         if (headlines.length === 0) {

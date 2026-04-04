@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Clock, TrendingUp, Zap, BookOpen } from 'lucide-react';
 import { getImageForContext } from '@/lib/image-utils';
+import { cn, formatTimeAgo, formatFullTimestamp } from '@/lib/utils';
 
 export type ArticleData = {
   title: string;
@@ -17,32 +18,7 @@ export type ArticleData = {
   article_type?: string;
 };
 
-export function formatTimeAgo(dateString: string) {
-  const diff = Date.now() - new Date(dateString).getTime();
-  if (isNaN(diff)) return "Just now";
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  if (hours < 1) return 'Just now';
-  if (hours === 1) return '1 hour ago';
-  if (hours < 24) return `${hours} hours ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days > 1 ? 's' : ''} ago`;
-}
-
-export function formatFullTimestamp(dateString: string) {
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return "";
-  
-  const options: Intl.DateTimeFormatOptions = {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  };
-  
-  return date.toLocaleString('en-US', options).toUpperCase().replace(',', ' •');
-}
+// Time formatting functions moved to @/lib/utils
 
 export function getDeskColor(desk: string): string {
   const d = desk?.toLowerCase() || '';

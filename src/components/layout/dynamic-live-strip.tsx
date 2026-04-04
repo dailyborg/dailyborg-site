@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Activity, Radio, Zap, Globe, ShieldAlert } from "lucide-react";
 import Link from "next/link";
+import { formatTimeAgo } from "@/lib/utils";
 
 interface LiveUpdate {
     icon: any;
@@ -29,10 +30,10 @@ export function DynamicLiveStrip() {
                 if (res.ok) {
                     const data = await res.json() as { title: string; slug: string; desk: string }[];
                     const icons = [Activity, Zap, Globe, Radio];
-                    const updates = data.map((item, i) => ({
+                    const updates = data.map((item: any, i) => ({
                         icon: icons[i % icons.length],
                         text: item.title.length > 55 ? item.title.substring(0, 55) + "..." : item.title,
-                        time: i === 0 ? "JUST IN" : `${i + 1}m AGO`,
+                        time: formatTimeAgo(item.publish_date),
                         href: item.slug ? `/${item.desk}/${item.slug}` : "",
                     }));
                     

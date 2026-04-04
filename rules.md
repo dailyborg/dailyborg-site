@@ -58,11 +58,13 @@ Never use
  (no dot before bracket).
 Always stage AND commit before pushing. PowerShell does not support && chains — run git add, git commit, and git push as THREE SEPARATE commands.
 After any code change, verify there are no TypeScript/syntax errors before pushing. A failed Cloudflare build wastes a build minute and delays deployment.
-🔴 Deployment — NEVER skip these checks
-After pushing, always verify the push landed: git ls-remote origin main — compare the hash to git log -n 1 --oneline.
-Check git status after commit — if files still show as "modified," the commit didn't include them.
-Never assume a push triggered a build — always check the Cloudflare Deployments tab.
-PowerShell command chaining: Use ; instead of &&, or run commands separately. && fails silently in PowerShell.
+🔴 Deployment — ALWAYS do this
+- **Autonomous Push**: ALWAYS autonomously stage, commit, and push 
+changes to GitHub/Cloudflare after verification. Never ask for user permission or verification before pushing or deploying workers; only report after the deployment is successful.
+- **Verification**: After pushing, always verify the push landed: git ls-remote origin main — compare the hash to git log -n 1 --oneline.
+- Check git status after commit — if files still show as "modified," the commit didn't include them.
+- Never assume a push triggered a build — always check the Cloudflare Deployments tab.
+- PowerShell command chaining: Use ; instead of &&, or run commands separately. && fails silently in PowerShell.
 🟡 Architecture Awareness
 The site is Next.js 14 on Cloudflare Pages using @cloudflare/next-on-pages.
 Dynamic pages need BOTH: export const runtime = 'edge' AND export const dynamic = 'force-dynamic' (if you want no caching).
