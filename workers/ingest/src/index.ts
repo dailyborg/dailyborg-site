@@ -80,17 +80,25 @@ export class IngestCoordinator extends Agent<Env> {
                 if (aiResponse.status === 401 || aiResponse.status === 403) {
                     const errBody = await aiResponse.text().catch(() => 'no body');
                     console.error(`ERR_AUTH: AI Authentication failed. Status: ${aiResponse.status}. Body: ${errBody.substring(0, 200)}`);
+                    await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                        .bind(crypto.randomUUID(), title.substring(0, 50), 'auth_error', `AI Authentication Failed (401/403): ${errBody.substring(0, 100)}`).run();
                 } else if (aiResponse.status === 429) {
                     console.error("ERR_QUOTA: AI API Quota exceeded.");
+                    await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                        .bind(crypto.randomUUID(), title.substring(0, 50), 'quota_exceeded', 'AI API Quota exceeded (429)').run();
                 } else if (!aiResponse.ok) {
                     const errBody = await aiResponse.text().catch(() => 'no body');
                     console.error(`ERR_HTTP: AI Provider returned ${aiResponse.status}. Body: ${errBody.substring(0, 200)}`);
+                    await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                        .bind(crypto.randomUUID(), title.substring(0, 50), 'provider_error', `AI Provider Error (${aiResponse.status}): ${errBody.substring(0, 100)}`).run();
                 } else {
                     const aiData = await aiResponse.json() as any;
                     articleObject = JSON.parse(aiData.choices[0].message.content);
                 }
             } catch (e: any) {
                 console.error("AI Fetch Failure:", e.message);
+                await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                    .bind(crypto.randomUUID(), title.substring(0, 50), 'fetch_failure', `AI Network Error: ${e.message}`).run();
             }
         }
 

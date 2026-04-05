@@ -78,9 +78,10 @@ After any code change, verify there are no TypeScript/syntax errors before pushi
 - Exception: Trivial fixes (typos, one-liner bug fixes) do not require a plan.
 
 🔴 Deployment — ALWAYS do this
-- **Autonomous Push**: ALWAYS autonomously stage, commit, and push 
-changes to GitHub/Cloudflare after verification. Never ask for user permission or verification before pushing or deploying workers; only report after the deployment is successful.
-- **Verification**: After pushing, always verify the push landed: git ls-remote origin main — compare the hash to git log -n 1 --oneline.
+81: - **Autonomous Push (PROTOCOL)**: ALWAYS autonomously stage, commit, and push 
+82: changes to GitHub/Cloudflare after verification. Never ask for user permission or verification before pushing or deploying workers; only report after the deployment is successful. This is a mandatory standard.
+83: - **Verification**: After pushing, always verify the push landed: git ls-remote origin main — compare the hash to git log -n 1 --oneline.
+84: - **Worker Deployment**: Always run `npx wrangler deploy` from the worker directory after logic changes. Do not wait for CI if you can deploy directly.
 - Check git status after commit — if files still show as "modified," the commit didn't include them.
 - Never assume a push triggered a build — always check the Cloudflare Deployments tab.
 - PowerShell command chaining: Use ; instead of &&, or run commands separately. && fails silently in PowerShell.
@@ -125,6 +126,16 @@ We have several core things set up in infrastructure:
 - We ensure that information is real and accurate.
 For everything else there's structure. Make sure that when you are implementing changes you're not taking away what we've already done; you're just adding on or fixing. If you're about to take away anything, you need to stop and let me know. Explain why and how you will make up for the issues or the ones that you are changing.
 Note that we're using specific language models through AIML (Gemini 3 Flash, Gemini 3.1 Flash, Perplexity) AND Cloudflare Workers AI for edge-native autonomous discovery infrastructure. Ensure that we're not changing or including additional models without checking up with me first. For high-frequency workers querying the matrix, prioritize the free Cloudflare Native bindings out of the box. 
+
+### 🟢 System Health Diagnostics (Monitoring Registry)
+The following status codes are used in `ingestion_logs` for real-time monitoring:
+- `inserted`: Success.
+- `auth_error`: API Key invalid or expired (401/403). Needs urgent secret update.
+- `quota_exceeded`: API billing usage cap reached (429). Needs funding or throttle adjustment.
+- `provider_error`: Upstream AI provider returned non-200.
+- `fetch_failure`: Network timeout or DNS issue at the edge.
+- `healed`: Sentinel detected a gap and triggered a recovery process.
+- `healthy`: Sentinel check complete with no action needed.
 
 ### 🔴 Directory Integrity & Naming Standards (ALWAYS CHECK)
 - **Exhaustive Verification**: BEFORE creating any new file, folder, worker, or database, you MUST run `list_dir` and `find_by_name` to ensure a similar component doesn't already exist.

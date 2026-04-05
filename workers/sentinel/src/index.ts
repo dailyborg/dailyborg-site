@@ -45,28 +45,33 @@ export default {
 
             // 3. Check Politicians health
             const { polCount } = await env.DB.prepare("SELECT COUNT(*) as polCount FROM politicians").first() as { polCount: number };
+            const { officeVariety } = await env.DB.prepare("SELECT COUNT(DISTINCT office_held) as officeVariety FROM politicians").first() as { officeVariety: number };
 
-            console.log(`[Sentinel] Coverage Report: Missing Desks: ${missingDesks.join(', ') || 'None'} | Apr2: ${day2Count} | Apr3: ${day3Count} | Pols: ${polCount}`);
+            // 4. Check for Content Staleness (> 24 hours)
+            const { lastArticleAge } = await env.DB.prepare(
+                "SELECT (julianday('now') - julianday(MAX(publish_date))) * 24 as lastArticleAge FROM articles"
+            ).first() as { lastArticleAge: number };
+
+            console.log(`[Sentinel] Coverage Report: Missing Desks: ${missingDesks.join(', ') || 'None'} | Apr2: ${day2Count} | Apr3: ${day3Count} | Pols: ${polCount} | Variety: ${officeVariety} | Staleness: ${lastArticleAge?.toFixed(1)}h`);
 
             let actionsTaken = [];
 
-            // 4. Trigger Scraper if news is missing
-            if (missingDesks.length > 0 || day2Count === 0 || day3Count === 0) {
-                console.log("[Sentinel] Detected content gaps. Triggering Scraper Deep-Scout...");
+            // 5. Trigger Scraper if news is missing or stale
+            if (missingDesks.length > 0 || day2Count === 0 || day3Count === 0 || lastArticleAge > 24) {
+                console.log("[Sentinel] Detected content gaps or staleness. Triggering Scraper Deep-Scout...");
                 try {
-                    // Internal trigger to the scraper worker
-                    // In production, this would be a fetch to the scraper endpoint.
-                    // We'll use the worker name based on Rule #115
-                    await fetch("https://dailyborg-scraper.pressroom.workers.dev", { method: "POST" });
-                    actionsTaken.push("Scraper Triggered");
+                    // Trigger deep scout if staleness detected
+                    const scraperUrl = `https://dailyborg-scraper.pressroom.workers.dev${lastArticleAge > 24 ? '?deep=true' : ''}`;
+                    await fetch(scraperUrl, { method: "POST" });
+                    actionsTaken.push(lastArticleAge > 24 ? "Staleness Healed" : "Scraper Triggered");
                 } catch (e) {
                     console.error("[Sentinel] Failed to trigger Scraper:", e);
                 }
             }
 
-            // 5. Trigger Discovery if Matrix is low
-            if (polCount < 10) {
-                console.log("[Sentinel] Intelligence Matrix low. Triggering Discovery Engine...");
+            // 6. Trigger Discovery if Matrix is low or lacking variety
+            if (polCount < 20 || officeVariety < 2) {
+                console.log(`[Sentinel] Intelligence Matrix ${polCount < 20 ? 'low' : 'lacking variety'}. Triggering Discovery Engine...`);
                 try {
                     await fetch("https://dailyborg-discovery.pressroom.workers.dev", { method: "POST" });
                     actionsTaken.push("Discovery Triggered");
@@ -75,7 +80,7 @@ export default {
                 }
             }
 
-            // 6. Log the healing event
+            // 7. Log the healing event
             const status = actionsTaken.length > 0 ? 'healed' : 'healthy';
             const message = actionsTaken.length > 0 
                 ? `Sentinel detected gaps and took actions: ${actionsTaken.join(', ')}. Missing: ${missingDesks.join(', ')}` 
