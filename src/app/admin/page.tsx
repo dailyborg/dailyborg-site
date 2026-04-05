@@ -190,25 +190,25 @@ function AdminDashboardContent() {
                 
                 <nav className="flex-1 p-4 flex flex-col gap-2">
                     <button 
-                        onClick={() => setActiveTab('queue')}
+                        onClick={() => handleTabChange('queue')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'queue' ? 'bg-blue-600 font-bold' : 'hover:bg-slate-800'}`}
                     >
                         <FileText className="w-5 h-5" /> Editorial Queue
                     </button>
                     <button 
-                        onClick={() => setActiveTab('analytics')}
+                        onClick={() => handleTabChange('analytics')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'analytics' ? 'bg-blue-600 font-bold' : 'hover:bg-slate-800'}`}
                     >
                         <BarChart3 className="w-5 h-5" /> Web Analytics
                     </button>
                     <button 
-                        onClick={() => setActiveTab('audience')}
+                        onClick={() => handleTabChange('audience')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'audience' ? 'bg-blue-600 font-bold' : 'hover:bg-slate-800'}`}
                     >
                         <Users className="w-5 h-5" /> Audience CRM
                     </button>
                     <button 
-                        onClick={() => setActiveTab('health')}
+                        onClick={() => handleTabChange('health')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'health' ? 'bg-blue-600 font-bold' : 'hover:bg-slate-800'}`}
                     >
                         <Activity className="w-5 h-5" /> System Health
@@ -540,5 +540,13 @@ function AdminDashboardContent() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function AdminDashboard() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 min-w-full min-h-screen animate-pulse"><div className="w-16 h-16 border-4 border-t-slate-900 border-slate-200 rounded-full animate-spin"></div></div>}>
+            <AdminDashboardContent />
+        </Suspense>
     );
 }
