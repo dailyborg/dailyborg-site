@@ -66,7 +66,7 @@ function AdminDashboardContent() {
                 // The cookies API (which actually bypasses our tracking) could be hit here or set by server, 
                 // but setting in localStorage + manually checking on tracking works. 
                 // Wait, our tracker checks cookie. We should set cookie to bypass tracker!
-                document.cookie = `borg_admin_token=${passphrase}; path=/; max-age=86400`;
+                document.cookie = `borg_admin_token=${passphrase}; path=/; max-age=31536000`;
                 window.dispatchEvent(new Event('borg_admin_change'));
                 
                 fetchArticles(passphrase);
@@ -85,7 +85,7 @@ function AdminDashboardContent() {
         const token = localStorage.getItem("borg_admin_token");
         if (token) {
             setPassphrase(token);
-            document.cookie = `borg_admin_token=${token}; path=/; max-age=86400`;
+            document.cookie = `borg_admin_token=${token}; path=/; max-age=31536000`;
             fetch(`/api/admin/metrics?days=${dateRange}`, { headers: { 'Authorization': `Bearer ${token}` } })
                 .then(res => res.json() as any)
                 .then(data => {
