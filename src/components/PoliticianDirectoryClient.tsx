@@ -68,6 +68,7 @@ export function PoliticianDirectoryClient({ initialPoliticians }: { initialPolit
     const [levelFilter, setLevelFilter] = useState<string | null>(null);
     const [partyFilter, setPartyFilter] = useState<string | null>(null);
     const [stateFilter, setStateFilter] = useState<string | null>(null);
+    const [localTownFilter, setLocalTownFilter] = useState<string>("");
     const [sortBy, setSortBy] = useState<SortOption>('name-asc');
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [showStateDropdown, setShowStateDropdown] = useState(false);
@@ -80,7 +81,7 @@ export function PoliticianDirectoryClient({ initialPoliticians }: { initialPolit
     const [submitSuccess, setSubmitSuccess] = useState(false);
     const [submitError, setSubmitError] = useState("");
 
-    const activeFilterCount = [levelFilter, partyFilter, stateFilter].filter(Boolean).length;
+    const activeFilterCount = [levelFilter, partyFilter, stateFilter, localTownFilter].filter(Boolean).length;
 
     const filteredAndSorted = useMemo(() => {
         let result = initialPoliticians.filter(p => {
@@ -101,7 +102,10 @@ export function PoliticianDirectoryClient({ initialPoliticians }: { initialPolit
             // State filter
             const matchesState = !stateFilter || p.district_state.startsWith(stateFilter);
 
-            return matchesSearch && matchesLevel && matchesParty && matchesState;
+            // Local town filter
+            const matchesTown = !localTownFilter || p.district_state.toLowerCase().includes(localTownFilter.toLowerCase());
+
+            return matchesSearch && matchesLevel && matchesParty && matchesState && matchesTown;
         });
 
         // Sort
@@ -125,12 +129,13 @@ export function PoliticianDirectoryClient({ initialPoliticians }: { initialPolit
         });
 
         return result;
-    }, [initialPoliticians, query, levelFilter, partyFilter, stateFilter, sortBy]);
+    }, [initialPoliticians, query, levelFilter, partyFilter, stateFilter, localTownFilter, sortBy]);
 
     const clearAllFilters = () => {
         setLevelFilter(null);
         setPartyFilter(null);
         setStateFilter(null);
+        setLocalTownFilter("");
         setSortBy('name-asc');
     };
 
@@ -297,11 +302,23 @@ export function PoliticianDirectoryClient({ initialPoliticians }: { initialPolit
                             {/* Divider */}
                             <div className="w-px h-8 bg-border self-center hidden md:block" />
 
-                            {/* State Dropdown */}
+                            {/* State / Municipality Filter */}
                             <div className="relative flex items-center gap-2">
-                                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground mr-1">State</span>
-                                <button
-                                    onClick={() => setShowStateDropdown(!showStateDropdown)}
+                                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground mr-1">
+                                    {levelFilter === 'Local' ? 'Municipality' : 'State'}
+                                </span>
+                                {levelFilter === 'Local' ? (
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Chicago, Miami-Dade..."
+                                        value={localTownFilter}
+                                        onChange={(e) => setLocalTownFilter(e.target.value)}
+                                        className="px-3 py-1.5 text-xs font-medium border border-border bg-transparent outline-none focus:border-accent w-[200px]"
+                                    />
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => setShowStateDropdown(!showStateDropdown)}
                                     className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-all duration-200 flex items-center gap-1.5 ${stateFilter ? 'bg-foreground text-background border-foreground' : 'bg-transparent text-foreground/70 border-border hover:border-foreground/50'}`}
                                 >
                                     {stateFilter ? STATE_NAMES[stateFilter] || stateFilter : 'All States'}
@@ -326,6 +343,8 @@ export function PoliticianDirectoryClient({ initialPoliticians }: { initialPolit
                                             </button>
                                         ))}
                                     </div>
+                                )}
+                                    </>
                                 )}
                             </div>
                         </div>

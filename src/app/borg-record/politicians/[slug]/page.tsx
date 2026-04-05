@@ -19,7 +19,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
         return notFound();
     }
 
-    const { politician, promises, methodology, derivedScores, claims, evidenceMap, aiStanceChanges, trustHistory } = profile;
+    const { politician, promises, methodology, derivedScores, claims, evidenceMap, aiStanceChanges, trustHistory, recentVotes } = profile;
 
     // Helper to get right icon and color for promise status
     const getPromiseStyles = (status: string) => {
@@ -119,7 +119,32 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                         />
                     </section>
 
-                    {/* Consistency Tracker */}
+                    {/* Recent Legislative Votes */}
+                    <section>
+                        <h2 className="font-serif text-3xl md:text-4xl font-black uppercase tracking-tighter border-b-[3px] border-foreground pb-3 mb-8">Recent Legislative Votes</h2>
+                        {(!recentVotes || recentVotes.length === 0) ? (
+                            <div className="p-8 border border-border bg-muted/10 text-center">
+                                <p className="text-muted-foreground font-serif italic text-lg opacity-80">No recent legislative votes recorded for this official.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {recentVotes.map((vote: any, i: number) => (
+                                    <div key={i} className="p-5 border border-border bg-background flex flex-col md:flex-row gap-4 justify-between items-start md:items-center hover:border-foreground/30 transition-colors">
+                                        <div className="space-y-1 flex-1">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">{new Date(vote.vote_date).toLocaleDateString()}</p>
+                                            <h3 className="font-serif font-bold text-xl">{vote.title}</h3>
+                                            {vote.rationale && (
+                                                <p className="text-sm text-foreground/80 font-serif italic pt-1">{vote.rationale}</p>
+                                            )}
+                                        </div>
+                                        <div className={`px-4 py-2 border font-black uppercase tracking-[0.15em] text-sm shrink-0 ${vote.position === 'Yea' ? 'bg-success/10 text-success border-success/30' : vote.position === 'Nay' ? 'bg-destructive/10 text-destructive border-destructive/30' : 'bg-muted text-muted-foreground border-border'}`}>
+                                            {vote.position}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
                     <section>
                         {/* New Stance Timeline Component injected here */}
                         <div className="mb-16">

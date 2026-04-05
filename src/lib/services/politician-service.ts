@@ -170,6 +170,11 @@ export class PoliticianService {
                     { scored_at: '2025-09-01', score: 70, promises_kept: 1, promises_broken: 0 },
                     { scored_at: '2026-01-01', score: 72, promises_kept: 1, promises_broken: 1 },
                 ],
+                recentVotes: [
+                    { id: 'v_1', title: 'H.R. 842 - Protecting the Right to Organize Act', vote_date: '2023-03-09', position: 'Yea', rationale: 'Strong support for union organizing rights.' },
+                    { id: 'v_2', title: 'S. 1 - For the People Act', vote_date: '2023-06-22', position: 'Nay', rationale: 'Concerns about federal overreach in state election laws.' },
+                    { id: 'v_3', title: 'H.R. 3684 - Infrastructure Investment and Jobs Act', vote_date: '2023-11-05', position: 'Yea', rationale: 'Critical funding for state broadband and roads.' },
+                ],
                 methodology: { version_name: 'v1.4 - Baseline', description: 'Standard algorithmic ingestion weightings for positional contradiction detection.', formula: 'Score = MAX(0, 100 - ((Contradictions * 15) / Eligible Topics))' },
                 derivedScores: {
                     promiseKeepsRate: 33,
@@ -257,6 +262,22 @@ export class PoliticianService {
             // Table may not exist yet in local dev
         }
 
+        // Fetch recent legislative votes
+        let recentVotes: any[] = [];
+        try {
+            const votesRes = await db.prepare(
+                `SELECT v.id, v.title, v.vote_date, pv.position, pv.rationale 
+                 FROM votes v 
+                 JOIN politician_votes pv ON v.id = pv.vote_id 
+                 WHERE pv.politician_id = ? 
+                 ORDER BY v.vote_date DESC LIMIT 10`
+            ).bind(politician.id);
+            recentVotes = votesRes?.results || votesRes?.[0]?.results || [];
+        } catch (e) {
+            // Fallback if table doesn't exist locally
+            recentVotes = [];
+        }
+
         return {
             politician,
             promises,
@@ -265,6 +286,7 @@ export class PoliticianService {
             evidenceMap,
             aiStanceChanges: stanceChangesFormatted,
             trustHistory,
+            recentVotes,
             methodology: activeMethodology,
             derivedScores: {
                 promiseKeepsRate: promiseMetrics.rate,

@@ -32,20 +32,24 @@ CREATE TABLE IF NOT EXISTS trustworthiness_history (
 CREATE INDEX IF NOT EXISTS idx_trust_history_politician ON trustworthiness_history(politician_id);
 CREATE INDEX IF NOT EXISTS idx_trust_history_date ON trustworthiness_history(scored_at);
 
--- Legislative Voting Records (Cross-referenced against promises)
-CREATE TABLE IF NOT EXISTS politician_votes (
+CREATE TABLE IF NOT EXISTS votes (
     id TEXT PRIMARY KEY,
-    politician_id TEXT NOT NULL,
-    bill_id TEXT NOT NULL,
-    bill_title TEXT NOT NULL,
-    vote_position TEXT NOT NULL, -- e.g., 'Yea', 'Nay', 'Present'
-    vote_date TIMESTAMP NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (politician_id) REFERENCES politicians(id)
+    bill_id TEXT,
+    vote_date TEXT,
+    title TEXT,
+    result TEXT,
+    url TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_politician_votes_pol ON politician_votes(politician_id);
-CREATE INDEX IF NOT EXISTS idx_politician_votes_date ON politician_votes(vote_date);
+
+CREATE TABLE IF NOT EXISTS politician_votes (
+    politician_id TEXT,
+    vote_id TEXT,
+    position TEXT,
+    rationale TEXT,
+    PRIMARY KEY (politician_id, vote_id),
+    FOREIGN KEY (politician_id) REFERENCES politicians(id),
+    FOREIGN KEY (vote_id) REFERENCES votes(id)
+);
 
 CREATE TABLE IF NOT EXISTS committees (
     id TEXT PRIMARY KEY,
