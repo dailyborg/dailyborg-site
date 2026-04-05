@@ -5,9 +5,20 @@ GitHub repository: dailyborg/dailyborg-site
 D1 Database ID: c412efcd-54d8-47a6-9ca5-8522417992c3 — This is the ONE production database. Never create a new one.
 D1 Database Name: dailyborg-db
 D1 Binding Name in Dashboard: DB
-Worker Names:
-Ingest worker: dailyborg-ingest
-Feeder worker: dailyborg-site-feeder
+Worker & Pages Registry (COMPLETE — Verified from Cloudflare Dashboard):
+| Name | Type | Dashboard Name | Config File | Purpose |
+|------|------|---------------|-------------|--------|
+| dailyborg-site | Pages | dailyborg-site | `wrangler.toml` (root) | Main Next.js frontend |
+| dailyborg-ingest | Worker | dailyborg-ingest | `workers/ingest/wrangler.jsonc` | Article AI processing pipeline |
+| dailyborg-scraper | Worker | dailyborg-scraper | `workers/scraper/wrangler.jsonc` | RSS feed sentinel scraper |
+| dailyborg-discovery | Worker | dailyborg-discovery | `workers/discovery-engine/wrangler.jsonc` | Politician auto-discovery & accountability scoring |
+| sentinel-engine | Worker | sentinel-engine | `workers/sentinel/wrangler.jsonc` | Active monitoring pipeline |
+| dailyborg-feeder | Worker | dailyborg-feeder | `feeder-worker/wrangler.json` | Content enrichment & queue processing |
+
+- **NEVER** create a new worker or Pages project without adding it to this table first.
+- **NEVER** deploy a worker whose name doesn't appear in this registry. If a new worker is needed, update this table, then deploy.
+- If a task can be accomplished by extending an EXISTING worker in this table, do that instead of creating a new one.
+
 Domain: dailyborg.com (also dailyborg-site.pages.dev)
 
 🔴 AI/ML Specification (HYBRID INFRASTRUCTURE)
@@ -58,6 +69,14 @@ Never use
  (no dot before bracket).
 Always stage AND commit before pushing. PowerShell does not support && chains — run git add, git commit, and git push as THREE SEPARATE commands.
 After any code change, verify there are no TypeScript/syntax errors before pushing. A failed Cloudflare build wastes a build minute and delays deployment.
+🔴 Plan-First Workflow — ALWAYS do this
+- **Before executing any non-trivial task**, present a written implementation plan FIRST and wait for user approval.
+- The plan MUST reference and comply with every relevant section of this `rules.md` file.
+- Plans must list which existing workers, files, and DB tables will be affected.
+- Plans must confirm no duplicate workers/files will be created.
+- Only after the user says "go ahead" or equivalent may you begin code changes.
+- Exception: Trivial fixes (typos, one-liner bug fixes) do not require a plan.
+
 🔴 Deployment — ALWAYS do this
 - **Autonomous Push**: ALWAYS autonomously stage, commit, and push 
 changes to GitHub/Cloudflare after verification. Never ask for user permission or verification before pushing or deploying workers; only report after the deployment is successful.
@@ -73,16 +92,14 @@ The
 
 wrangler.toml
  in the root is for Pages — it needs pages_build_output_dir to be recognized by Cloudflare's build system. If it doesn't have it, Cloudflare logs a warning but continues.
-Three config files exist for three workers: 
-
-wrangler.toml
- (main site), 
-
-wrangler-feeder.json
- (feeder), 
-
-workers/ingest/wrangler.jsonc
- (ingest). ALL must have the same D1 database ID.
+Six config files exist for the full infrastructure (see Worker Registry above):
+- `wrangler.toml` (root — Pages site)
+- `workers/ingest/wrangler.jsonc` (ingest)
+- `workers/scraper/wrangler.jsonc` (scraper)
+- `workers/discovery-engine/wrangler.jsonc` (discovery)
+- `workers/sentinel/wrangler.jsonc` (sentinel)
+- `feeder-worker/wrangler.json` (feeder)
+ALL must reference the same D1 database ID: `c412efcd-54d8-47a6-9ca5-8522417992c3`.
 🟡 Content & Feed
 Articles must have approval_status = 'approved' to appear on the site.
 The homepage query filters by approval_status = 'approved' — pending articles won't show.
@@ -114,7 +131,7 @@ Note that we're using specific language models through AIML (Gemini 3 Flash, Gem
 - **Strict Case Sensitivity**: Names of files, folders, and variables MUST follow existing patterns.
   - **Project Name**: `dailyborg-site` (lowercase).
   - **D1 Binding**: `DB` (uppercase).
-  - **Worker Names**: `dailyborg-ingest`, `dailyborg-scraper`, `dailyborg-site-feeder`.
+  - **Worker Names**: `dailyborg-ingest`, `dailyborg-scraper`, `dailyborg-site-feeder`, `dailyborg-discovery`, `sentinel-engine`, `dailyborg-feeder`.
 - **Targeted Editing**: Never create a "duplicate" file (e.g., `SiteHeaderV2.tsx`) if `site-header.tsx` exists. ALWAYS edit the existing file to adapt it to new requirements.
 - **No Ghost Infrastructure**: Ensure your local config (`wrangler.toml`, `wrangler.jsonc`) EXACTLY matches the Cloudflare Dashboard names to prevent creating duplicate "clones" during deployment.
 - **Code Location Enforcement**: 

@@ -51,6 +51,7 @@ export default function AdminDashboard() {
                 // but setting in localStorage + manually checking on tracking works. 
                 // Wait, our tracker checks cookie. We should set cookie to bypass tracker!
                 document.cookie = `borg_admin_token=${passphrase}; path=/; max-age=86400`;
+                window.dispatchEvent(new Event('borg_admin_change'));
                 
                 fetchArticles(passphrase);
             } else {
@@ -75,11 +76,13 @@ export default function AdminDashboard() {
                     if (data.error) throw new Error();
                     setMetrics(data);
                     setIsAuthenticated(true);
+                    window.dispatchEvent(new Event('borg_admin_change'));
                     fetchArticles(token);
                 })
                 .catch(() => {
                     localStorage.removeItem("borg_admin_token");
                     document.cookie = "borg_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+                    window.dispatchEvent(new Event('borg_admin_change'));
                 });
         }
     }, []);
@@ -200,6 +203,7 @@ export default function AdminDashboard() {
                     <button onClick={() => { 
                         localStorage.removeItem("borg_admin_token"); 
                         document.cookie = "borg_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+                        window.dispatchEvent(new Event('borg_admin_change'));
                         setIsAuthenticated(false); 
                     }} className="w-full text-sm uppercase tracking-wider text-slate-400 hover:text-white font-bold text-left px-4">
                         Lock Terminal

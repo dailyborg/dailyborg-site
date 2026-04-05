@@ -10,8 +10,27 @@ CREATE TABLE IF NOT EXISTS politicians (
     time_in_office TEXT,
     country TEXT DEFAULT 'US',
     region_level TEXT DEFAULT 'Federal',
+    trustworthiness_score INTEGER DEFAULT NULL,
+    promises_kept INTEGER DEFAULT 0,
+    promises_broken INTEGER DEFAULT 0,
+    promises_total INTEGER DEFAULT 0,
+    popularity_score INTEGER DEFAULT 0,
+    last_scored_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Trustworthiness Score History (for time-series charts)
+CREATE TABLE IF NOT EXISTS trustworthiness_history (
+    id TEXT PRIMARY KEY,
+    politician_id TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    promises_kept INTEGER DEFAULT 0,
+    promises_broken INTEGER DEFAULT 0,
+    scored_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (politician_id) REFERENCES politicians(id)
+);
+CREATE INDEX IF NOT EXISTS idx_trust_history_politician ON trustworthiness_history(politician_id);
+CREATE INDEX IF NOT EXISTS idx_trust_history_date ON trustworthiness_history(scored_at);
 
 CREATE TABLE IF NOT EXISTS committees (
     id TEXT PRIMARY KEY,
