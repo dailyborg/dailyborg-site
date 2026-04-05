@@ -6,7 +6,7 @@ export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {
-    const { email, phone_number, plan_type, delivery_channel, frequency, topics, tracked_politician } = await request.json() as any;
+    const { email, phone_number, plan_type, delivery_channel, frequency, topics, tracked_politician, tracked_politicians } = await request.json() as any;
 
     if (!email && !phone_number) {
       return NextResponse.json({ error: "Email or Phone Number is required" }, { status: 400 });
@@ -90,8 +90,17 @@ export async function POST(request: Request) {
       } catch (e) { }
     }
 
+    // Maintain legacy tracked_politician string widget payload
     if (tracked_politician && !currentTracked.includes(tracked_politician)) {
       currentTracked.push(tracked_politician);
+    }
+    // Handle new wizard tracked_politicians array payload
+    if (tracked_politicians && Array.isArray(tracked_politicians)) {
+      for (const pol of tracked_politicians) {
+        if (!currentTracked.includes(pol)) {
+          currentTracked.push(pol);
+        }
+      }
     }
     const trackedJson = JSON.stringify(currentTracked);
 
@@ -149,6 +158,7 @@ export async function POST(request: Request) {
             <p><strong>Plan:</strong> ${plan === 'paid' ? 'Premium ($0.99/mo)' : 'Free'}</p>
             <p><strong>Frequency:</strong> ${freq}</p>
             ${tracked_politician ? `<p><strong>Borg Alert Active:</strong> You will now be notified of priority stance shifts or broken promises regarding ${tracked_politician.toUpperCase().replace('-', ' ')}.</p>` : ''}
+            ${(tracked_politicians && tracked_politicians.length > 0) ? `<p><strong>Entities Tracked:</strong> ${tracked_politicians.map((p: string) => p.toUpperCase().replace('-', ' ')).join(', ')}</p>` : ''}
             ${topics?.length ? `<p><strong>Topics Tracked:</strong> ${topics.join(', ')}</p>` : ''}
             <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;" />
             <p style="color: #666; font-size: 12px; font-family: sans-serif; text-transform: uppercase;">The Daily Borg - Broadcast Operations & Reporting Grid</p>

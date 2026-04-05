@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, ChevronRight, Mail, MessageSquare, Loader2, ArrowRight, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CheckCircle2, ChevronRight, Mail, MessageSquare, Loader2, ArrowRight, AlertCircle, Search } from "lucide-react";
+
+const MACRO_TOPICS = [
+    "The Daily Borg (Newsletter)",
+    "The Borg Record (Updates)"
+];
 
 const TOPICS = [
     "U.S. Politics",
@@ -29,11 +34,35 @@ export default function SubscribePage() {
     const [isLoading, setIsLoading] = useState(false);
     const [result, setResult] = useState<{ success?: boolean; message?: string } | null>(null);
 
+    // Politician State
+    const [availablePoliticians, setAvailablePoliticians] = useState<any[]>([]);
+    const [selectedPoliticians, setSelectedPoliticians] = useState<string[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    useEffect(() => {
+        fetch("/api/politicians")
+            .then(res => res.json())
+            .then((data: any) => {
+                if (data.politicians && Array.isArray(data.politicians)) {
+                    setAvailablePoliticians(data.politicians);
+                }
+            })
+            .catch(() => {});
+    }, []);
+
     const toggleTopic = (topic: string) => {
         if (topics.includes(topic)) {
             setTopics(topics.filter(t => t !== topic));
         } else {
             setTopics([...topics, topic]);
+        }
+    };
+
+    const togglePolitician = (slug: string) => {
+        if (selectedPoliticians.includes(slug)) {
+            setSelectedPoliticians(selectedPoliticians.filter(p => p !== slug));
+        } else {
+            setSelectedPoliticians([...selectedPoliticians, slug]);
         }
     };
 
@@ -45,6 +74,7 @@ export default function SubscribePage() {
         try {
             const payload = {
                 topics,
+                tracked_politicians: selectedPoliticians,
                 delivery_channel: channel,
                 frequency,
                 plan_type: plan,
@@ -130,7 +160,24 @@ export default function SubscribePage() {
                             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background font-bold font-mono text-sm leading-none">1</span>
                             <h2 className="font-serif text-2xl font-bold tracking-tight">Select Intelligence Desks</h2>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+
+                        {/* Macro Systems */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                            {MACRO_TOPICS.map(topic => (
+                                <button
+                                    key={topic}
+                                    type="button"
+                                    onClick={() => toggleTopic(topic)}
+                                    className={`p-5 border text-left flex justify-between items-center transition-all duration-200 ${topics.includes(topic) ? 'border-accent bg-accent text-accent-foreground shadow-md transform -translate-y-1' : 'border-border bg-muted/10 hover:border-foreground/50 hover:bg-muted/30'}`}
+                                >
+                                    <span className="font-bold text-lg leading-tight w-full">{topic}</span>
+                                    {topics.includes(topic) && <CheckCircle2 className="w-5 h-5 ml-2" />}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Topic Desks */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 border-t border-border/50 pt-6">
                             {TOPICS.map(topic => (
                                 <button
                                     key={topic}
@@ -145,10 +192,63 @@ export default function SubscribePage() {
                         </div>
                     </div>
 
-                    {/* Step 2: Delivery Config */}
+                    {/* Step 2: Track Specific Entities */}
                     <div className="space-y-6">
                         <div className="flex items-center gap-4 border-b-2 border-border pb-4">
                             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background font-bold font-mono text-sm leading-none">2</span>
+                            <h2 className="font-serif text-2xl font-bold tracking-tight">Track Specific Entities</h2>
+                        </div>
+                        <p className="text-sm text-muted-foreground font-medium">Receive direct alerts whenever an official changes their stance, breaks a promise, or alters their public record.</p>
+
+                        <div className="relative mb-4">
+                            <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                            <input 
+                                type="text"
+                                placeholder="Search by name or office..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-background border border-border p-2 pl-9 font-medium outline-none focus:border-foreground transition-colors"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                            {availablePoliticians
+                                .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.office_held.toLowerCase().includes(searchQuery.toLowerCase()))
+                                .map(pol => (
+                                <button
+                                    key={pol.slug}
+                                    type="button"
+                                    onClick={() => togglePolitician(pol.slug)}
+                                    className={`p-3 border text-left flex items-center justify-between transition-all duration-200 ${selectedPoliticians.includes(pol.slug) ? 'border-foreground bg-foreground text-background shadow-sm' : 'border-border hover:border-foreground/50 hover:bg-muted/10'}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded bg-muted overflow-hidden flex-shrink-0">
+                                            {pol.photo_url ? (
+                                                <img src={pol.photo_url} alt={pol.name} className="w-full h-full object-cover grayscale" />
+                                            ) : (
+                                                <div className="w-full h-full bg-slate-300"></div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-sm leading-tight">{pol.name}</div>
+                                            <div className="text-[10px] opacity-70 uppercase tracking-wider font-bold">{pol.office_held}</div>
+                                        </div>
+                                    </div>
+                                    {selectedPoliticians.includes(pol.slug) && <CheckCircle2 className="w-4 h-4" />}
+                                </button>
+                            ))}
+                            {availablePoliticians.length === 0 && (
+                                <div className="col-span-2 text-center p-4 text-sm text-muted-foreground border border-dashed border-border">
+                                    Loading entity matrix...
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Step 3: Delivery Config */}
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-4 border-b-2 border-border pb-4">
+                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background font-bold font-mono text-sm leading-none">3</span>
                             <h2 className="font-serif text-2xl font-bold tracking-tight">Delivery Vectors</h2>
                         </div>
 
@@ -195,10 +295,10 @@ export default function SubscribePage() {
                         </div>
                     </div>
 
-                    {/* Step 3: Tier */}
+                    {/* Step 4: Tier */}
                     <div className="space-y-6">
                         <div className="flex items-center gap-4 border-b-2 border-border pb-4">
-                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background font-bold font-mono text-sm leading-none">3</span>
+                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background font-bold font-mono text-sm leading-none">4</span>
                             <h2 className="font-serif text-2xl font-bold tracking-tight">Select Access Tier</h2>
                         </div>
 
