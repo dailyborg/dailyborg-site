@@ -23,7 +23,12 @@ export default async function BorgRecordDirectory() {
             district_state: p.district_state || "--",
             region_level: p.region_level || "Federal",
             photo_url: p.photo_url || null,
-            consistency_label: "Analyzing" // Dynamic scores deferred to profile view for index performance
+            trustworthiness_score: p.trustworthiness_score ?? null,
+            promises_kept: p.promises_kept ?? 0,
+            promises_broken: p.promises_broken ?? 0,
+            promises_total: p.promises_total ?? 0,
+            popularity_score: p.popularity_score ?? 0,
+            consistency_label: "Analyzing"
         }));
     } catch (e) {
         console.warn("Failed to load initial politicians", e);

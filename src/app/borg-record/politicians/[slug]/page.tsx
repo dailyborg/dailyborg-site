@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, AlertCircle, ArrowRightLeft, ArrowUpRight } from
 import Link from "next/link";
 import CredibilityChart from "@/components/CredibilityChart";
 import StanceTimeline from "@/components/StanceTimeline";
+import TrustworthinessChart from "@/components/TrustworthinessChart";
 import { BorgAlertSubscribe } from "@/components/BorgAlertSubscribe";
 
 import { notFound } from "next/navigation";
@@ -18,7 +19,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
         return notFound();
     }
 
-    const { politician, promises, methodology, derivedScores, claims, evidenceMap, aiStanceChanges } = profile;
+    const { politician, promises, methodology, derivedScores, claims, evidenceMap, aiStanceChanges, trustHistory } = profile;
 
     // Helper to get right icon and color for promise status
     const getPromiseStyles = (status: string) => {
@@ -105,6 +106,18 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
             <NewsGrid>
                 {/* Main Column */}
                 <div className="col-span-1 md:col-span-4 lg:col-span-8 space-y-16">
+
+                    {/* Trustworthiness Index Charts */}
+                    <section>
+                        <TrustworthinessChart
+                            politicianName={politician.name}
+                            trustworthinessScore={politician.trustworthiness_score ?? null}
+                            promisesKept={politician.promises_kept ?? 0}
+                            promisesBroken={politician.promises_broken ?? 0}
+                            promisesTotal={politician.promises_total ?? 0}
+                            history={trustHistory || []}
+                        />
+                    </section>
 
                     {/* Consistency Tracker */}
                     <section>

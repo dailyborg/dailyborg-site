@@ -156,7 +156,8 @@ export class PoliticianService {
         if (slug === 'sample-slug') {
             return {
                 politician: {
-                    id: 'pol_mock', slug: 'sample-slug', name: 'Eleanor Vance', office_held: 'U.S. Senate', party: 'Democrat', district_state: 'OH', time_in_office: '4 Years, 2 Months', country: 'US', region_level: 'Federal'
+                    id: 'pol_mock', slug: 'sample-slug', name: 'Eleanor Vance', office_held: 'U.S. Senate', party: 'Democrat', district_state: 'OH', time_in_office: '4 Years, 2 Months', country: 'US', region_level: 'Federal',
+                    trustworthiness_score: 72, promises_kept: 1, promises_broken: 1, promises_total: 3, popularity_score: 45
                 },
                 promises: [
                     { promise_text: 'Codify metadata guidelines into federal law', date_said: '2022-10-14', issue_area: 'Tech Policy', status: 'In Progress' },
@@ -164,6 +165,11 @@ export class PoliticianService {
                     { promise_text: 'Increase funding for national algorithmic deployments', date_said: '2023-04-05', issue_area: 'Infrastructure', status: 'Fulfilled' }
                 ],
                 positions: [],
+                trustHistory: [
+                    { scored_at: '2025-06-01', score: 65, promises_kept: 0, promises_broken: 0 },
+                    { scored_at: '2025-09-01', score: 70, promises_kept: 1, promises_broken: 0 },
+                    { scored_at: '2026-01-01', score: 72, promises_kept: 1, promises_broken: 1 },
+                ],
                 methodology: { version_name: 'v1.4 - Baseline', description: 'Standard algorithmic ingestion weightings for positional contradiction detection.', formula: 'Score = MAX(0, 100 - ((Contradictions * 15) / Eligible Topics))' },
                 derivedScores: {
                     promiseKeepsRate: 33,
@@ -240,6 +246,17 @@ export class PoliticianService {
         const promiseMetrics = this.calculatePromises(promises);
         const consistencyMetrics = this.calculateConsistency(positions);
 
+        // Fetch trustworthiness history for time-series chart
+        let trustHistory: any[] = [];
+        try {
+            const trustHistRes = await db.prepare(
+                `SELECT score, promises_kept, promises_broken, scored_at FROM trustworthiness_history WHERE politician_id = ? ORDER BY scored_at ASC LIMIT 30`
+            ).bind(politician.id);
+            trustHistory = trustHistRes?.results || trustHistRes?.[0]?.results || [];
+        } catch (e) {
+            // Table may not exist yet in local dev
+        }
+
         return {
             politician,
             promises,
@@ -247,6 +264,7 @@ export class PoliticianService {
             claims: rawClaims,
             evidenceMap,
             aiStanceChanges: stanceChangesFormatted,
+            trustHistory,
             methodology: activeMethodology,
             derivedScores: {
                 promiseKeepsRate: promiseMetrics.rate,

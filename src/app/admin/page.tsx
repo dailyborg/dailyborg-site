@@ -1,17 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { CheckCircle2, XCircle, FileText, AlertTriangle, ShieldCheck, BarChart3, Users, Activity, Zap, RefreshCcw } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { formatTimeAgo } from "@/lib/utils";
 
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [passphrase, setPassphrase] = useState("");
     const [authError, setAuthError] = useState("");
     const [activeTab, setActiveTab] = useState<'queue' | 'analytics' | 'audience' | 'health'>('queue');
     const [dateRange, setDateRange] = useState<7 | 30>(7);
+
+    // Sync active tab with URL
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && ['queue', 'analytics', 'audience', 'health'].includes(tab)) {
+            setActiveTab(tab as any);
+        }
+    }, [searchParams]);
+
+    const handleTabChange = (tab: 'queue' | 'analytics' | 'audience' | 'health') => {
+        setActiveTab(tab);
+        router.push(`/admin?tab=${tab}`);
+    };
 
     // Dashboard Data
     const [metrics, setMetrics] = useState({ 
