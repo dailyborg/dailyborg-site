@@ -175,6 +175,9 @@ export class PoliticianService {
                     { id: 'v_2', title: 'S. 1 - For the People Act', vote_date: '2023-06-22', position: 'Nay', rationale: 'Concerns about federal overreach in state election laws.' },
                     { id: 'v_3', title: 'H.R. 3684 - Infrastructure Investment and Jobs Act', vote_date: '2023-11-05', position: 'Yea', rationale: 'Critical funding for state broadband and roads.' },
                 ],
+                factChecks: [
+                    { id: 'fc_mock1', statement: 'I never voted for the tax cuts.', rating: 'pants_on_fire', analysis_text: 'Voting record shows yea on H.R. 1', date: '2024-01-01' }
+                ],
                 methodology: { version_name: 'v1.4 - Baseline', description: 'Standard algorithmic ingestion weightings for positional contradiction detection.', formula: 'Score = MAX(0, 100 - ((Contradictions * 15) / Eligible Topics))' },
                 derivedScores: {
                     promiseKeepsRate: 33,
@@ -278,6 +281,17 @@ export class PoliticianService {
             recentVotes = [];
         }
 
+        // Fetch Fact Checks
+        let factChecks: any[] = [];
+        try {
+            const fcRes = await db.prepare(
+                `SELECT * FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 5`
+            ).bind(slug);
+            factChecks = fcRes?.results || fcRes?.[0]?.results || [];
+        } catch (e) {
+            factChecks = [];
+        }
+
         return {
             politician,
             promises,
@@ -287,6 +301,7 @@ export class PoliticianService {
             aiStanceChanges: stanceChangesFormatted,
             trustHistory,
             recentVotes,
+            factChecks,
             methodology: activeMethodology,
             derivedScores: {
                 promiseKeepsRate: promiseMetrics.rate,

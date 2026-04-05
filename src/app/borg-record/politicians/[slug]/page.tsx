@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NewsGrid } from "@/components/ui/grid";
-import { CheckCircle2, XCircle, AlertCircle, ArrowRightLeft, ArrowUpRight } from "lucide-react";
+import { CheckCircle2, XCircle, AlertCircle, ArrowRightLeft, ArrowUpRight, Flame } from "lucide-react";
 import Link from "next/link";
 import CredibilityChart from "@/components/CredibilityChart";
 import StanceTimeline from "@/components/StanceTimeline";
@@ -19,7 +19,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
         return notFound();
     }
 
-    const { politician, promises, methodology, derivedScores, claims, evidenceMap, aiStanceChanges, trustHistory, recentVotes } = profile;
+    const { politician, promises, methodology, derivedScores, claims, evidenceMap, aiStanceChanges, trustHistory, recentVotes, factChecks } = profile;
 
     // Helper to get right icon and color for promise status
     const getPromiseStyles = (status: string) => {
@@ -289,6 +289,38 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                             </div>
                         </div>
                     </div>
+
+                    {/* Fact Checks / Lies */}
+                    <div className="p-6 bg-[#111318] border border-[#ff4d00]/30 rounded-xl relative overflow-hidden group shadow-lg mt-8">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#ff4d00]/10 blur-2xl group-hover:bg-[#ff4d00]/20 transition-all"></div>
+                        <h3 className="font-serif text-xl font-bold uppercase tracking-tight border-b border-[#fe8f00]/30 pb-3 mb-6 text-white flex items-center">
+                            <Flame className="w-5 h-5 mr-2 text-[#ff4d00]" /> 
+                            Forensic Truth Log
+                        </h3>
+                        {factChecks && factChecks.length > 0 ? (
+                            <div className="space-y-4">
+                                {factChecks.map((fc: any) => (
+                                    <div key={fc.id} className="border-l-2 pl-3 border-[#fe8f00]">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${fc.rating === 'pants_on_fire' ? 'bg-[#ff0000]/20 text-[#ff716c]' : 'bg-[#fe8f00]/20 text-[#ffc697]'}`}>
+                                                {fc.rating === 'pants_on_fire' ? 'PANTS ON FIRE' : 'FALSEHOOD'}
+                                            </span>
+                                            <span className="text-[10px] text-[#74757a]">{fc.date}</span>
+                                        </div>
+                                        <p className="font-medium text-sm text-[#f9f9ff] italic leading-snug">"{fc.statement}"</p>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-[#aaabb0] italic text-sm">No false statements currently tracked for this official.</p>
+                        )}
+                        <div className="mt-6 pt-4 border-t border-[#46484d]/50">
+                            <Link href="/borg-record/liar-liar" className="text-xs uppercase font-bold text-[#ff906d] tracking-widest flex items-center hover:text-[#ffc697] transition-colors">
+                                View Full Index <ArrowUpRight className="ml-1 w-3 h-3" />
+                            </Link>
+                        </div>
+                    </div>
+
                 </div>
             </NewsGrid>
         </div>
