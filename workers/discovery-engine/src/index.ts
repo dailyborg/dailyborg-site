@@ -26,10 +26,17 @@ export default {
             await this.scorePopularity(env);
         }
 
-        // Fact checking runs at minute 50-59
-        if (minute >= 50) {
-            console.log(`[Discovery Engine] Running autonomous fact-checking sweep...`);
-            await this.factCheckSweep(env);
+
+        // Cross-Worker Trigger: The Truth Engine sweeps every 6 hours (modulo 6)
+        // This overcomes the Cloudflare free-tier 5 cron limit by delegating the schedule.
+        if (now.getHours() % 6 === 0 && minute >= 55) {
+            console.log(`[Discovery Engine] Orchestrating external Truth Engine sweep...`);
+            try {
+                // Fire and forget so we don't block discovery's own execution limit
+                ctx.waitUntil(fetch("https://dailyborg-truth.pressroom.workers.dev?action=all"));
+            } catch (e) {
+                console.warn("[Discovery Engine] Failed to trigger Truth Engine.");
+            }
         }
 
         // User request processing runs every cycle
@@ -44,13 +51,12 @@ export default {
         if (action === 'intake') await this.intakeCongress(env);
         else if (action === 'score') await this.scoreAccountability(env);
         else if (action === 'popularity') await this.scorePopularity(env);
-        else if (action === 'factcheck') await this.factCheckSweep(env);
         else {
             await this.processRequests(env);
             await this.intakeCongress(env);
             await this.scoreAccountability(env);
             await this.scorePopularity(env);
-            await this.factCheckSweep(env);
+
         }
 
         return new Response("Discovery Pipeline Completed", { status: 200 });
@@ -413,95 +419,6 @@ export default {
         }
     },
 
-    // ====================================================================
-    // ZERO-COST AUTONOMOUS FACT-CHECKER (Llama-3-8B Edge AI)
-    // ====================================================================
-    async factCheckSweep(env: Env) {
-        console.log(`[Fact Checker] Beginning Matrix Sweep...`);
 
-        // Fetch recent un-checked articles (last 24 hours) from the DB
-        const { results: recentArticles } = await env.DB.prepare(`
-            SELECT id, title, content_html FROM articles 
-            WHERE publish_date > datetime('now', '-24 hours')
-            ORDER BY RANDOM() LIMIT 5
-        `).all();
-
-        if (!recentArticles || recentArticles.length === 0) {
-            console.log(`[Fact Checker] No recent articles to check.`);
-            return;
-        }
-
-        // Since we are running in an autonomous worker, we must parse out politician mentions
-        // and evaluate their statements objectively using Cloudflare's Native Llama 3 8B.
-        const { results: activePoliticians } = await env.DB.prepare(`SELECT slug, name FROM politicians`).all();
-        if (!activePoliticians || activePoliticians.length === 0) return;
-
-        for (const article of recentArticles as any[]) {
-            const articleText = article.content_html.replace(/<[^>]*>?/gm, ''); // strip HTML
-            
-            // Check if any politician is actively mentioned in the text
-            const mentioned = activePoliticians.filter((p: any) => articleText.includes(p.name) || articleText.includes(p.name.split(' ').pop()));
-            
-            if (mentioned.length > 0) {
-                for (const pol of mentioned as any[]) {
-                    try {
-                        const prompt = `
-Analyze the following news excerpt for any direct claims, promises, or statements made by ${pol.name}.
-If they made a statement that is verifiably false or considered a "lie" based on general public consensus, report it.
-If there are no false statements, reply with exactly: NONE
-
-Article Excerpt: ${articleText.substring(0, 1000)}
-
-Respond strictly in JSON format:
-{
-  "statement": "The exact lie they told",
-  "rating": "pants_on_fire" | "mostly_false",
-  "analysis_text": "Why it is false"
-}
-`;
-
-                        let aiResponse;
-                        if (env.AI) {
-                            // Using Native Cloudflare Workers AI for zero-cost operation
-                            aiResponse = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-                                messages: [{ role: 'user', content: prompt }]
-                            });
-                        } else {
-                            // Simulated response for local mock testing
-                            aiResponse = { response: 'NONE' };
-                        }
-
-                        const textResponse = typeof aiResponse === 'string' ? aiResponse : (aiResponse as any).response || aiResponse;
-
-                        if (textResponse && !textResponse.includes('NONE') && textResponse.includes('{')) {
-                            // Parse JSON from text
-                            const jsonMatch = textResponse.match(/\{.*?\}/s);
-                            if (jsonMatch) {
-                                const parsed = JSON.parse(jsonMatch[0]);
-                                if (parsed.statement && parsed.rating) {
-                                    console.log(`[Fact Checker] Lie detected for ${pol.name}: ${parsed.rating}`);
-                                    await env.DB.prepare(`
-                                        INSERT INTO fact_checks (id, politician_slug, statement, rating, analysis_text, source_url, date)
-                                        VALUES (?, ?, ?, ?, ?, ?, date('now'))
-                                    `).bind(
-                                        crypto.randomUUID(),
-                                        pol.slug,
-                                        parsed.statement,
-                                        parsed.rating,
-                                        parsed.analysis_text,
-                                        `https://dailyborg.com/articles/${article.id}`
-                                    ).run();
-                                }
-                            }
-                        }
-
-                    } catch (e: any) {
-                        console.error(`[Fact Checker] Error analyzing ${pol.name}: `, e);
-                    }
-                }
-            }
-        }
-        console.log(`[Fact Checker] Sweep completed.`);
-    }
 }
 

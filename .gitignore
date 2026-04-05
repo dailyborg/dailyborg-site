@@ -43,5 +43,5 @@ next-env.d.ts
 
 # Cloudflare / OpenNext
 /.open-next/
-/.wrangler/
+.wrangler/
 /dist/

@@ -14,6 +14,7 @@ Worker & Pages Registry (COMPLETE — Verified from Cloudflare Dashboard):
 | dailyborg-discovery | Worker | dailyborg-discovery | `workers/discovery-engine/wrangler.jsonc` | Politician auto-discovery & accountability scoring |
 | sentinel-engine | Worker | sentinel-engine | `workers/sentinel/wrangler.jsonc` | Active monitoring pipeline |
 | dailyborg-feeder | Worker | dailyborg-feeder | `feeder-worker/wrangler.json` | Content enrichment & queue processing |
+| dailyborg-truth | Worker | dailyborg-truth | `workers/truth-engine/wrangler.jsonc` | Autonomous external fact-checker & verification matrix |
 
 - **NEVER** create a new worker or Pages project without adding it to this table first.
 - **NEVER** deploy a worker whose name doesn't appear in this registry. If a new worker is needed, update this table, then deploy.
@@ -99,6 +100,7 @@ Six config files exist for the full infrastructure (see Worker Registry above):
 - `workers/scraper/wrangler.jsonc` (scraper)
 - `workers/discovery-engine/wrangler.jsonc` (discovery)
 - `workers/sentinel/wrangler.jsonc` (sentinel)
+- `workers/truth-engine/wrangler.jsonc` (truth engine)
 - `feeder-worker/wrangler.json` (feeder)
 ALL must reference the same D1 database ID: `c412efcd-54d8-47a6-9ca5-8522417992c3`.
 🟡 Content & Feed
@@ -142,7 +144,7 @@ The following status codes are used in `ingestion_logs` for real-time monitoring
 - **Strict Case Sensitivity**: Names of files, folders, and variables MUST follow existing patterns.
   - **Project Name**: `dailyborg-site` (lowercase).
   - **D1 Binding**: `DB` (uppercase).
-  - **Worker Names**: `dailyborg-ingest`, `dailyborg-scraper`, `dailyborg-site-feeder`, `dailyborg-discovery`, `sentinel-engine`, `dailyborg-feeder`.
+  - **Worker Names**: `dailyborg-ingest`, `dailyborg-scraper`, `dailyborg-site-feeder`, `dailyborg-discovery`, `sentinel-engine`, `dailyborg-feeder`, `dailyborg-truth`.
 - **Targeted Editing**: Never create a "duplicate" file (e.g., `SiteHeaderV2.tsx`) if `site-header.tsx` exists. ALWAYS edit the existing file to adapt it to new requirements.
 - **No Ghost Infrastructure**: Ensure your local config (`wrangler.toml`, `wrangler.jsonc`) EXACTLY matches the Cloudflare Dashboard names to prevent creating duplicate "clones" during deployment.
 - **Code Location Enforcement**: 
