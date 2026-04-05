@@ -22,8 +22,16 @@ export async function POST(request: Request) {
         // 2. Parse basic generic tracking payload
         const userAgent = reqData.userAgent || request.headers.get("user-agent") || "unknown";
 
-        // 3. Hash IP to ensure privacy but allow "Unique Visitor" counts
+        // 3. Extract IP
         const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "127.0.0.1";
+        
+        // 4. IP-based Administrator Exclusion (Check if IP is in ADMIN_IPS env var)
+        const adminIps = (process.env.ADMIN_IPS || "").split(",").map(i => i.trim()).filter(i => i.length > 0);
+        if (adminIps.includes(ip)) {
+            return NextResponse.json({ success: true, ignored: true });
+        }
+
+        // 5. Hash IP to ensure privacy but allow "Unique Visitor" counts
         
         // Use standard Web Crypto API (available in Edge runtime)
         const encoder = new TextEncoder();
