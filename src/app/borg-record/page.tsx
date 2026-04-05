@@ -1,6 +1,9 @@
 import { getDbBinding } from "@/lib/db";
 import { PoliticianDirectoryClient } from "@/components/PoliticianDirectoryClient";
 
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
 export default async function BorgRecordDirectory() {
     // Prevent the build from failing if DB is missing on Vercel/Edge build step
     let initialPoliticians = [];

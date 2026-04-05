@@ -76,18 +76,20 @@ export default {
                                 "Authorization": `Bearer ${env.AIML_API_KEY}`
                             },
                             body: JSON.stringify({
-                                model: "gemini-3-flash-preview",
+                                model: "google/gemini-3-flash-preview",
                                 messages: [{ role: "user", content: enrichmentPrompt }],
                                 response_format: { type: "json_object" }
                             })
                         });
 
                         if (aiResponse.status === 401 || aiResponse.status === 403) {
-                            console.error("ERR_AUTH: AI Authentication failed.");
+                            const errBody = await aiResponse.text().catch(() => 'no body');
+                            console.error(`ERR_AUTH: AI Authentication failed. Status: ${aiResponse.status}. Body: ${errBody.substring(0, 200)}`);
                         } else if (aiResponse.status === 429) {
                             console.error("ERR_QUOTA: AI API Quota exceeded.");
                         } else if (!aiResponse.ok) {
-                            console.error(`ERR_HTTP: AI Provider returned ${aiResponse.status}`);
+                            const errBody = await aiResponse.text().catch(() => 'no body');
+                            console.error(`ERR_HTTP: AI Provider returned ${aiResponse.status}. Body: ${errBody.substring(0, 200)}`);
                         } else {
                             const aiData = await aiResponse.json() as any;
                             articleObject = JSON.parse(aiData.choices[0].message.content);
