@@ -7,13 +7,19 @@ export async function POST(request: Request) {
     try {
         // 1. Check for Admin token to exclude tracking
         const cookies = request.headers.get("cookie") || "";
-        if (cookies.includes("borg_admin_token=")) {
+        const adminMatch = cookies.match(/borg_admin_token=([^;]+)/);
+        if (adminMatch && adminMatch[1].length > 0) {
+            return NextResponse.json({ success: true, ignored: true });
+        }
+
+        // Also skip tracking for admin paths
+        const reqData = await request.json() as any;
+        const path = reqData.path || "/";
+        if (path.startsWith("/admin")) {
             return NextResponse.json({ success: true, ignored: true });
         }
 
         // 2. Parse basic generic tracking payload
-        const reqData = await request.json() as any;
-        const path = reqData.path || "/";
         const userAgent = reqData.userAgent || request.headers.get("user-agent") || "unknown";
 
         // 3. Hash IP to ensure privacy but allow "Unique Visitor" counts
