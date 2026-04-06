@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { Search, ChevronRight, X, AlertCircle, CheckCircle2, ChevronDown, Shield, TrendingUp, Award } from "lucide-react";
+import { Search, ChevronRight, X, AlertCircle, CheckCircle2, ChevronDown, Award } from "lucide-react";
 import { NewsGrid } from "./ui/grid";
 
 type Politician = {
@@ -59,6 +59,84 @@ function getTrustBadge(score: number | null | undefined) {
     return { label: 'Low Trust', color: 'text-red-500 bg-red-500/10 border-red-500/30', icon: '◉' };
 }
 
+function PoliticianCard({ pol }: { pol: Politician }) {
+    const trust = getTrustBadge(pol.trustworthiness_score);
+    const [imgSrc, setImgSrc] = useState(pol.photo_url || null);
+    const [imgFailed, setImgFailed] = useState(false);
+
+    // Self-healing Wikipedia Photo Fetcher
+    useEffect(() => {
+        if (!imgSrc || imgFailed) {
+            const fetchWikiImage = async () => {
+                try {
+                    const wikiTitle = encodeURIComponent(pol.name.trim().replace(/ /g, '_'));
+                    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${wikiTitle}`);
+                    if (res.ok) {
+                        const data = await res.json() as any;
+                        if (data && data.thumbnail && data.thumbnail.source) {
+                            setImgSrc(data.thumbnail.source);
+                            setImgFailed(false);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Wikipedia Image Fetch Error:", e);
+                }
+                setImgFailed(true);
+            };
+            fetchWikiImage();
+        }
+    }, [pol.name, imgSrc, imgFailed]);
+
+    // Premium Fallback Initials
+    const initials = pol.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+    return (
+        <Link key={pol.id} href={`/borg-record/politicians/${pol.slug}`} className="col-span-1 md:col-span-2 lg:col-span-3 bg-background border border-border group hover:border-accent hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] duration-500 transition-all block relative overflow-hidden rounded-sm">
+            <div className="aspect-[4/5] relative bg-muted/20 overflow-hidden">
+                {imgSrc && !imgFailed ? (
+                    <img 
+                        src={imgSrc} 
+                        alt={pol.name} 
+                        onError={() => setImgFailed(true)}
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                    />
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-foreground/5 dark:bg-foreground/10 group-hover:bg-foreground/10 transition-colors">
+                        <span className="font-serif text-6xl text-foreground/20 font-black tracking-tighter">
+                            {initials}
+                        </span>
+                    </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent flex flex-col justify-end p-6">
+                    <div className={`text-[9px] font-black uppercase tracking-[0.2em] w-fit px-2.5 py-1 mb-3 border backdrop-blur-sm shadow-sm ${trust.color}`}>
+                        {trust.icon} {trust.label}
+                    </div>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest w-fit px-2.5 py-1 mb-2 shadow-sm rounded-sm backdrop-blur-md ${pol.party === 'Democrat' ? 'bg-blue-500/80 text-white' : pol.party === 'Republican' ? 'bg-red-500/80 text-white' : 'bg-accent/80 text-white'}`}>
+                        {pol.party}
+                    </span>
+                    <h3 className="font-serif text-3xl font-bold leading-none mt-2 group-hover:text-accent transition-colors drop-shadow-sm">{pol.name}</h3>
+                    <p className="text-xs font-semibold text-muted-foreground mt-2 uppercase tracking-widest drop-shadow-sm">{pol.office_held} <span className="opacity-50 mx-1">•</span> {pol.district_state}</p>
+                </div>
+            </div>
+            
+            <div className="px-6 py-4 bg-background flex justify-between items-center text-xs font-bold uppercase tracking-wider relative z-20">
+                <div className="flex items-center gap-3">
+                    {pol.promises_total && pol.promises_total > 0 ? (
+                        <span className="text-foreground/70 flex items-center gap-1.5">
+                            <Award className="w-3.5 h-3.5 text-accent" />
+                            {pol.promises_kept}/{pol.promises_total} Promises Kept
+                        </span>
+                    ) : (
+                        <span className="text-foreground/50">Detailed Record</span>
+                    )}
+                </div>
+                <span className="text-muted-foreground group-hover:text-accent transition-colors flex items-center text-[10px] tracking-[0.2em]">View File <ChevronRight className="w-3.5 h-3.5 ml-1" /></span>
+            </div>
+        </Link>
+    );
+}
+
 export function PoliticianDirectoryClient({ initialPoliticians, initialState }: { initialPoliticians: Politician[], initialState?: string | null }) {
     const validInitialState = initialState && US_STATES.includes(initialState) ? initialState : null;
     
@@ -76,7 +154,6 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
     const [localTownFilter, setLocalTownFilter] = useState<string>("");
     const [sortBy, setSortBy] = useState<SortOption>('name-asc');
 
-
     // Form state
     const [formName, setFormName] = useState("");
     const [formLink, setFormLink] = useState("");
@@ -89,7 +166,6 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
 
     const filteredAndSorted = useMemo(() => {
         let result = initialPoliticians.filter(p => {
-            // Text search
             const q = query.toLowerCase();
             const matchesSearch = !q || 
                 p.name.toLowerCase().includes(q) ||
@@ -97,38 +173,23 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
                 p.office_held.toLowerCase().includes(q) ||
                 (STATE_NAMES[p.district_state.split('-')[0]]?.toLowerCase().includes(q));
 
-            // Level filter
             const matchesLevel = !levelFilter || p.region_level === levelFilter;
-
-            // Party filter
             const matchesParty = !partyFilter || p.party === partyFilter;
-
-            // State filter
             const matchesState = !stateFilter || p.district_state.startsWith(stateFilter);
-
-            // Local town filter
             const matchesTown = !localTownFilter || p.district_state.toLowerCase().includes(localTownFilter.toLowerCase());
 
             return matchesSearch && matchesLevel && matchesParty && matchesState && matchesTown;
         });
 
-        // Sort
         result.sort((a, b) => {
             switch (sortBy) {
-                case 'name-asc':
-                    return a.name.localeCompare(b.name);
-                case 'name-desc':
-                    return b.name.localeCompare(a.name);
-                case 'trustworthy':
-                    return (b.trustworthiness_score ?? -1) - (a.trustworthiness_score ?? -1);
-                case 'promises':
-                    return (b.promises_kept ?? 0) - (a.promises_kept ?? 0);
-                case 'popular':
-                    return (b.popularity_score ?? 0) - (a.popularity_score ?? 0);
-                case 'newest':
-                    return b.id.localeCompare(a.id);
-                default:
-                    return 0;
+                case 'name-asc': return a.name.localeCompare(b.name);
+                case 'name-desc': return b.name.localeCompare(a.name);
+                case 'trustworthy': return (b.trustworthiness_score ?? -1) - (a.trustworthiness_score ?? -1);
+                case 'promises': return (b.promises_kept ?? 0) - (a.promises_kept ?? 0);
+                case 'popular': return (b.popularity_score ?? 0) - (a.popularity_score ?? 0);
+                case 'newest': return b.id.localeCompare(a.id);
+                default: return 0;
             }
         });
 
@@ -143,57 +204,17 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
         setSortBy('name-asc');
     };
 
-    const renderPoliticianCard = (pol: Politician) => {
-        const trust = getTrustBadge(pol.trustworthiness_score);
-        return (
-            <Link key={pol.id} href={`/borg-record/politicians/${pol.slug}`} className="col-span-1 md:col-span-2 lg:col-span-3 border border-border group hover:border-accent transition-all duration-300 block relative overflow-hidden">
-                <div className={`aspect-[3/4] relative ${!pol.photo_url ? 'bg-muted' : 'bg-black'}`}>
-                    {pol.photo_url && (
-                        <img src={pol.photo_url} alt={pol.name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/40 to-transparent flex flex-col justify-end p-4">
-                        {/* Trust Badge */}
-                        <div className={`text-[9px] font-black uppercase tracking-[0.2em] w-fit px-2 py-1 mb-2 border ${trust.color}`}>
-                            {trust.icon} {trust.label}
-                        </div>
-                        {/* Party Badge */}
-                        <span className={`text-[10px] font-bold uppercase tracking-widest w-fit px-2 py-1 mb-2 ${pol.party === 'Democrat' ? 'bg-blue-500/10 text-blue-500' : pol.party === 'Republican' ? 'bg-red-500/10 text-red-500' : 'bg-accent/10 text-accent'}`}>{pol.party}</span>
-                        <h3 className="font-serif text-2xl font-bold leading-tight group-hover:text-accent transition-colors relative z-10">{pol.name}</h3>
-                        <p className="text-sm font-medium text-muted-foreground mt-1 uppercase tracking-wider relative z-10">{pol.office_held} • {pol.district_state}</p>
-                    </div>
-                </div>
-                {/* Bottom bar with promise stats */}
-                <div className="p-4 bg-background border-t border-border flex justify-between items-center text-xs font-bold uppercase tracking-wider">
-                    <div className="flex items-center gap-3">
-                        {pol.promises_total && pol.promises_total > 0 ? (
-                            <span className="text-muted-foreground flex items-center gap-1">
-                                <Award className="w-3 h-3" />
-                                {pol.promises_kept}/{pol.promises_total} kept
-                            </span>
-                        ) : (
-                            <span className="text-muted-foreground">Detailed Record</span>
-                        )}
-                    </div>
-                    <span className="text-foreground group-hover:text-accent transition-colors flex items-center">View <ChevronRight className="w-4 h-4 ml-1" /></span>
-                </div>
-            </Link>
-        );
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
         setSubmitError("");
-
         try {
             const res = await fetch('/api/requests/politician', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: formName, email: formEmail, link: formLink })
             });
-
             if (!res.ok) throw new Error("Failed to submit request.");
-
             setSubmitSuccess(true);
         } catch (err: any) {
             setSubmitError(err.message || "An error occurred");
@@ -203,135 +224,145 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
     };
 
     return (
-        <>
-            <div className="max-w-3xl mb-8">
-                <h1 className="font-serif text-5xl md:text-6xl font-extrabold tracking-tight mb-6">The Borg Record</h1>
-                <p className="text-xl text-muted-foreground font-serif leading-relaxed">
-                    The public record, standardized and documented. Search, filter, and sort officials at every level of government — federal, state, and local.
+        <div className="pb-24">
+            {/* Header & Search Block */}
+            <div className="max-w-3xl mb-12">
+                <h1 className="font-serif text-5xl md:text-6xl font-black tracking-tight mb-6 leading-none">The Borg Record</h1>
+                <p className="text-xl text-muted-foreground font-serif leading-relaxed mb-10 max-w-2xl">
+                    The public record, rigorously standardized and documented. Explore intelligence files across precise levels of governance.
                 </p>
-                <div className="mt-8 flex max-w-md items-center border-b-2 border-foreground group focus-within:border-accent transition-colors">
-                    <Search className="h-5 w-5 text-muted-foreground group-focus-within:text-accent" />
+                <div className="relative group max-w-lg">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-accent transition-colors" />
                     <input
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search by name, state, or office..."
-                        className="w-full bg-transparent border-none outline-none p-3 text-lg font-medium placeholder:font-normal placeholder:text-muted-foreground"
+                        placeholder="Search specific officials or jurisdictions..."
+                        className="w-full bg-background border border-border outline-none pl-12 pr-4 py-4 text-base font-medium rounded-full shadow-sm hover:shadow-md focus:border-accent focus:shadow-md focus:ring-4 focus:ring-accent/10 transition-all placeholder:text-muted-foreground/60"
                     />
                 </div>
             </div>
 
-            {/* ═══════════════════ STITCH SEGMENTED TABS ═══════════════════ */}
-            <div className="flex flex-col md:flex-row w-full mt-12 border-4 border-foreground mb-4 overflow-hidden shadow-sm">
-                {['Federal', 'State', 'Local'].map(level => (
-                    <button
-                        key={level}
-                        onClick={() => {
-                            // If toggling off, clear state
-                            if (levelFilter === level) {
-                                setLevelFilter(null);
-                            } else {
-                                setLevelFilter(level);
-                                // Reset logic based on transitions
-                                if (level === 'Federal') {
-                                   setStateFilter(null);
-                                   setLocalTownFilter("");
-                                }
-                            }
-                        }}
-                        className={`flex-1 text-center py-5 md:py-6 font-black uppercase tracking-[0.2em] text-sm md:text-xl transition-all duration-300 md:border-r-4 last:border-r-0 border-b-4 md:border-b-0 border-foreground ${levelFilter === level ? 'bg-foreground text-background shadow-inner z-10' : 'bg-transparent text-foreground hover:bg-foreground/5'}`}
-                    >
-                        {level}
-                    </button>
-                ))}
-            </div>
-
-            {/* Prominent State & Municipality Extenders */}
-            {(levelFilter === 'State' || levelFilter === 'Local') && (
-                <div className="mb-12 p-6 md:p-8 bg-muted/10 border-b-4 border-foreground animate-in slide-in-from-top-2 flex flex-col lg:flex-row items-center gap-6">
-                    <h3 className="font-serif text-3xl font-bold uppercase tracking-tight w-full lg:w-auto text-muted-foreground whitespace-nowrap">
-                        {levelFilter === 'Local' ? 'Select Region' : 'Select State'}
-                    </h3>
-                    
-                    <div className="relative w-full">
-                        <select
-                            value={stateFilter || ""}
-                            onChange={(e) => setStateFilter(e.target.value || null)}
-                            className="w-full appearance-none bg-background border-4 border-foreground py-4 px-6 text-lg font-black uppercase tracking-[0.1em] cursor-pointer hover:border-accent transition-colors outline-none focus:border-accent focus:ring-0"
-                        >
-                            <option value="">-- ALL STATES --</option>
-                            {US_STATES.map(s => <option key={s} value={s}>{STATE_NAMES[s]} ({s})</option>)}
-                        </select>
-                        <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-6 h-6 pointer-events-none text-foreground" />
-                    </div>
-
-                    {levelFilter === 'Local' && (
-                        <div className="relative w-full">
-                            <input 
-                                type="text" 
-                                placeholder="e.g. Chicago..." 
-                                value={localTownFilter} 
-                                onChange={(e) => setLocalTownFilter(e.target.value)}
-                                className="w-full bg-background border-4 border-foreground py-4 px-6 text-lg font-black uppercase tracking-[0.1em] placeholder:text-muted-foreground/50 hover:border-accent transition-colors outline-none focus:border-accent" 
-                            />
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ═══════════════════ SECONDARY FILTERS & SORT ROW ═══════════════════ */}
-            <div className="border-t-2 border-foreground/20 pt-6 mb-8 mt-4 flex flex-wrap justify-between items-center gap-4">
-                <div className="flex flex-col gap-4 w-full md:w-auto">
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* Party Filter as Chips */}
-                        <div className="flex items-center gap-2 bg-muted/30 p-1.5 border border-border">
-                            {['Democrat', 'Republican', 'Independent'].map(party => (
-                                <button
-                                    key={party}
-                                    onClick={() => setPartyFilter(partyFilter === party ? null : party)}
-                                    className={`px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-200 ${partyFilter === party
-                                        ? party === 'Democrat' ? 'bg-blue-600 text-white border-blue-600' : party === 'Republican' ? 'bg-red-600 text-white border-red-600' : 'bg-foreground text-background border-foreground'
-                                        : 'bg-transparent text-foreground border-transparent hover:bg-foreground/5'}`}
-                                >
-                                    {party}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Active Filter Clearer */}
-                        {activeFilterCount > 0 && (
-                            <button onClick={clearAllFilters} className="text-[10px] font-black uppercase tracking-widest text-destructive hover:underline md:ml-4">
-                                Clear All ({activeFilterCount})
+            {/* ═══════════════════ REFINED PREMIUM TABS (Stitch Aesthetic) ═══════════════════ */}
+            <div className="mb-10 w-full animate-in fade-in slide-in-from-bottom-2 duration-700">
+                {/* Outer Glass Container */}
+                <div className="inline-flex p-1.5 bg-muted/40 backdrop-blur-md rounded-full mb-6 border border-border/50 shadow-sm max-w-full overflow-x-auto scroolbar-hide">
+                    {['Federal', 'State', 'Local'].map(level => {
+                        const isActive = levelFilter === level;
+                        return (
+                            <button
+                                key={level}
+                                onClick={() => {
+                                    if (isActive) {
+                                        setLevelFilter(null);
+                                    } else {
+                                        setLevelFilter(level);
+                                        if (level === 'Federal') {
+                                           setStateFilter(null);
+                                           setLocalTownFilter("");
+                                        }
+                                    }
+                                }}
+                                className={`px-8 py-3 rounded-full text-xs md:text-sm font-bold uppercase tracking-[0.15em] transition-all duration-300 relative ${isActive ? 'text-background shadow-md' : 'text-foreground/70 hover:text-foreground hover:bg-foreground/5'}`}
+                            >
+                                {isActive && (
+                                    <span className="absolute inset-0 bg-foreground rounded-full -z-10 animate-in zoom-in-95 duration-200"></span>
+                                )}
+                                {level}
                             </button>
+                        );
+                    })}
+                </div>
+
+                {/* Smooth Expansion Dropdown Area */}
+                <div className={`transition-all duration-500 origin-top overflow-hidden ${levelFilter === 'State' || levelFilter === 'Local' ? 'max-h-[200px] opacity-100 mb-8' : 'max-h-0 opacity-0 mb-0'}`}>
+                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-muted/20 border border-border rounded-2xl p-6 backdrop-blur-sm">
+                        <label className="font-serif text-lg font-bold text-muted-foreground whitespace-nowrap hidden md:block">
+                            {levelFilter === 'Local' ? 'Focus Region :' : 'Focus State :'}
+                        </label>
+                        
+                        <div className="relative w-full max-w-sm">
+                            <select
+                                value={stateFilter || ""}
+                                onChange={(e) => setStateFilter(e.target.value || null)}
+                                className="w-full appearance-none bg-background border border-border rounded-xl py-3 px-5 text-sm font-bold uppercase tracking-widest cursor-pointer shadow-sm hover:border-accent hover:shadow-md transition-all outline-none focus:border-accent focus:ring-4 focus:ring-accent/10"
+                            >
+                                <option value="">National Analysis (All States)</option>
+                                {US_STATES.map(s => <option key={s} value={s}>{STATE_NAMES[s]} [{s}]</option>)}
+                            </select>
+                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                        </div>
+
+                        {levelFilter === 'Local' && (
+                            <div className="relative w-full max-w-sm">
+                                <input 
+                                    type="text" 
+                                    placeholder="e.g. Cook County, Chicago..." 
+                                    value={localTownFilter} 
+                                    onChange={(e) => setLocalTownFilter(e.target.value)}
+                                    className="w-full bg-background border border-border rounded-xl py-3 px-5 text-sm font-bold uppercase tracking-widest placeholder:text-muted-foreground/40 shadow-sm hover:border-accent hover:shadow-md transition-all outline-none focus:border-accent focus:ring-4 focus:ring-accent/10" 
+                                />
+                            </div>
                         )}
                     </div>
                 </div>
+            </div>
+
+            {/* ═══════════════════ SECONDARY FILTERS & METADATA ═══════════════════ */}
+            <div className="border-t border-border/50 pt-8 mb-8 flex flex-wrap justify-between items-center gap-6">
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    {/* Party Filter Pills */}
+                    <div className="flex items-center gap-2">
+                        {['Democrat', 'Republican', 'Independent'].map(party => {
+                            const isSelected = partyFilter === party;
+                            return (
+                                <button
+                                    key={party}
+                                    onClick={() => setPartyFilter(isSelected ? null : party)}
+                                    className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border ${isSelected 
+                                        ? party === 'Democrat' ? 'bg-blue-600/10 text-blue-600 border-blue-600/30' 
+                                            : party === 'Republican' ? 'bg-red-600/10 text-red-600 border-red-600/30' 
+                                            : 'bg-foreground/10 text-foreground border-foreground/30'
+                                        : 'bg-transparent text-muted-foreground border-border hover:bg-muted'}`}
+                                >
+                                    {party}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Active Filter Clearer */}
+                    {activeFilterCount > 0 && (
+                        <button onClick={clearAllFilters} className="text-[10px] font-bold uppercase tracking-widest text-destructive hover:bg-destructive/10 px-3 py-2 rounded-full transition-colors hidden sm:block">
+                            Clear Filters ({activeFilterCount})
+                        </button>
+                    )}
+                </div>
 
                 <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                    {/* Results count */}
-                    <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground pr-4">
-                        {filteredAndSorted.length} official{filteredAndSorted.length !== 1 ? 's' : ''} found
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                        {filteredAndSorted.length} Record{filteredAndSorted.length !== 1 ? 's' : ''} Indexed
                     </p>
 
                     {/* Sort Dropdown */}
-                    <div className="relative z-20">
+                    <div className="relative z-30">
                         <button
                             onClick={() => setShowSortDropdown(!showSortDropdown)}
-                            className="flex items-center gap-2 px-5 py-3 text-[11px] font-black uppercase tracking-[0.15em] border-2 border-foreground hover:bg-foreground hover:text-background transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest border border-border hover:border-foreground transition-colors bg-background"
                         >
                             Sort: {SORT_LABELS[sortBy]}
                             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} />
                         </button>
                         {showSortDropdown && (
-                            <div className="absolute right-0 top-full mt-1 bg-background border-2 border-foreground shadow-2xl min-w-[240px]">
+                            <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl min-w-[220px] overflow-hidden">
                                 {(Object.keys(SORT_LABELS) as SortOption[]).map(key => (
                                     <button
                                         key={key}
                                         onClick={() => { setSortBy(key); setShowSortDropdown(false); }}
-                                        className={`w-full text-left px-5 py-4 text-xs font-bold uppercase tracking-widest hover:bg-muted/50 transition-colors flex items-center justify-between ${sortBy === key ? 'text-accent bg-accent/5' : 'text-foreground'}`}
+                                        className={`w-full text-left px-5 py-3 text-xs font-bold uppercase tracking-widest hover:bg-muted/50 transition-colors flex items-center justify-between ${sortBy === key ? 'text-accent bg-accent/5' : 'text-foreground/80'}`}
                                     >
                                         {SORT_LABELS[key]}
-                                        {sortBy === key && <span className="text-accent">●</span>}
+                                        {sortBy === key && <CheckCircle2 className="w-4 h-4 text-accent" />}
                                     </button>
                                 ))}
                             </div>
@@ -343,113 +374,91 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
             {/* ═══════════════════ RESULTS GRID ═══════════════════ */}
             {filteredAndSorted.length > 0 ? (
                 <NewsGrid>
-                    {filteredAndSorted.map(renderPoliticianCard)}
+                    {filteredAndSorted.map(pol => <PoliticianCard key={pol.id} pol={pol} />)}
                 </NewsGrid>
             ) : (
-                <div className="p-12 border-4 border-dashed border-border bg-muted/10 text-center flex flex-col items-center">
-                    <AlertCircle className="w-16 h-16 text-muted-foreground mb-6 opacity-30" />
-                    <h3 className="font-serif text-4xl font-bold mb-4 uppercase tracking-tight">No Officials Found</h3>
-                    <p className="text-lg text-muted-foreground max-w-xl mb-6">
-                        {query ? `No results for "${query}"` : 'No officials match the selected filters.'}
+                <div className="py-24 border border-border rounded-3xl bg-muted/5 text-center flex flex-col items-center">
+                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-6">
+                        <AlertCircle className="w-8 h-8 text-muted-foreground opacity-50" />
+                    </div>
+                    <h3 className="font-serif text-3xl font-bold mb-3 tracking-tight">No Records Found</h3>
+                    <p className="text-base text-muted-foreground max-w-md mb-8">
+                        {query ? `We couldn't locate any intelligence records matching "${query}".` : 'No officials match the exact parameters of your filters.'}
                     </p>
+                    
                     {activeFilterCount > 0 && (
                         <button
                             onClick={clearAllFilters}
-                            className="mb-8 border-2 border-foreground px-8 py-3 text-sm font-black uppercase tracking-[0.2em] hover:bg-foreground hover:text-background transition-colors"
+                            className="mb-8 border border-border px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-muted transition-colors"
                         >
-                            Reset All Filters
+                            Reset Parameters
                         </button>
                     )}
+                    
+                    <div className="w-full max-w-sm h-px bg-border my-6"></div>
+                    
                     <button
                         onClick={() => {
                             setFormName(query);
                             setIsModalOpen(true);
                         }}
-                        className="bg-accent text-accent-foreground font-black uppercase tracking-[0.2em] text-sm px-10 py-5 hover:opacity-90 transition-opacity">
-                        Submit For Database Indexing
+                        className="bg-foreground text-background font-bold uppercase tracking-widest text-xs px-8 py-4 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">
+                        Request System Indexing
                     </button>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-[0.2em] mt-6">Automated Verification pipeline runs every 2 hours.</p>
                 </div>
             )}
 
-            {/* AI Review Submission Modal */}
+            {/* Modal remains mostly unchanged structurally but visually refined */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-background border-4 border-foreground w-full max-w-xl shadow-[20px_20px_0px_0px_rgba(0,0,0,0.1)] relative">
+                <div className="fixed inset-0 z-50 bg-background/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-background border border-border rounded-3xl w-full max-w-xl shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
                         <button
                             onClick={() => setIsModalOpen(false)}
-                            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors p-2 bg-muted/20 hover:bg-muted/50 rounded-full">
-                            <X className="w-6 h-6" />
+                            className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors p-2 bg-muted/40 hover:bg-muted rounded-full">
+                            <X className="w-5 h-5" />
                         </button>
-
-                        <div className="p-10">
-                            <h2 className="font-serif text-4xl font-black mb-4 leading-tight uppercase tracking-tight">System Request</h2>
-                            <p className="text-sm text-muted-foreground mb-10 font-medium">Submit an official for indexing. The autonomous verification framework will securely compile their public record and construct a zero-cost Trust Matrix.</p>
+                        <div className="p-10 md:p-12">
+                            <h2 className="font-serif text-3xl font-bold mb-3 tracking-tight">Request System Indexing</h2>
+                            <p className="text-sm text-muted-foreground mb-10 leading-relaxed max-w-md">Submit an official for automated intelligence indexing. Our verification nodes will autonomously compile their entire public footprint into our verified Trust Matrix.</p>
 
                             {submitSuccess ? (
-                                <div className="p-8 bg-success/10 border-2 border-success text-success flex flex-col items-center text-center">
-                                    <CheckCircle2 className="w-16 h-16 mb-6" />
-                                    <h3 className="font-bold text-2xl uppercase tracking-wider mb-2">Request Queued</h3>
-                                    <p className="text-sm opacity-80 max-w-xs">We've added this to the ingestion pipeline. You will be pinged via Edge-email once their profile synchronizes.</p>
+                                <div className="p-8 bg-success/10 rounded-2xl border border-success/20 text-success flex flex-col items-center justify-center text-center">
+                                    <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mb-4">
+                                        <CheckCircle2 className="w-8 h-8" />
+                                    </div>
+                                    <h3 className="font-bold text-xl mb-2">Request Verified</h3>
+                                    <p className="text-sm opacity-90 max-w-xs mb-8">This official has been placed securely into the indexing queue. You will be notified the moment their profile executes.</p>
                                     <button
                                         onClick={() => setIsModalOpen(false)}
-                                        className="mt-8 border-2 border-success px-8 py-3 text-xs font-black uppercase tracking-[0.2em] hover:bg-success hover:text-success-foreground transition-colors">
-                                        Return to Directory
+                                        className="bg-success text-success-foreground px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest hover:brightness-110 transition-all">
+                                        Close Window
                                     </button>
                                 </div>
                             ) : (
-                                <form onSubmit={handleSubmit} className="space-y-8">
+                                <form onSubmit={handleSubmit} className="space-y-6">
                                     {submitError && (
-                                        <div className="p-4 text-sm font-bold bg-destructive/10 text-destructive border-2 border-destructive uppercase tracking-widest text-center">
-                                            ERROR: {submitError}
+                                        <div className="p-4 text-xs font-bold bg-destructive/10 text-destructive rounded-xl text-center">
+                                            {submitError}
                                         </div>
                                     )}
-
-                                    <div>
-                                        <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-foreground mb-3">Official's Exact Name</label>
-                                        <input
-                                            type="text"
-                                            value={formName}
-                                            onChange={(e) => setFormName(e.target.value)}
-                                            required
-                                            className="w-full border-b-2 border-border p-3 focus:border-accent focus:outline-none bg-transparent font-serif text-2xl placeholder:text-muted-foreground/30 transition-colors"
-                                            placeholder="e.g. Bernie Sanders"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-foreground mb-3">Your Secure Email</label>
-                                        <input
-                                            type="email"
-                                            value={formEmail}
-                                            onChange={(e) => setFormEmail(e.target.value)}
-                                            required
-                                            className="w-full border-b-2 border-border p-3 focus:border-accent focus:outline-none bg-transparent font-serif text-2xl placeholder:text-muted-foreground/30 transition-colors"
-                                            placeholder="you@example.com"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-black uppercase tracking-[0.2em] text-foreground mb-3">Reference Origin (Optional)</label>
-                                        <input
-                                            type="url"
-                                            value={formLink}
-                                            onChange={(e) => setFormLink(e.target.value)}
-                                            className="w-full border-b-2 border-border p-3 focus:border-accent focus:outline-none bg-transparent font-serif text-2xl placeholder:text-muted-foreground/30 transition-colors"
-                                            placeholder="Wikipedia or Campaign Site"
-                                        />
+                                    <div className="space-y-5">
+                                        <div>
+                                            <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} required className="w-full bg-muted/30 border border-border rounded-xl p-4 text-sm font-medium focus:border-accent focus:bg-background focus:ring-4 focus:ring-accent/10 outline-none transition-all" placeholder="Official's Exact Name *" />
+                                        </div>
+                                        <div>
+                                            <input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} required className="w-full bg-muted/30 border border-border rounded-xl p-4 text-sm font-medium focus:border-accent focus:bg-background focus:ring-4 focus:ring-accent/10 outline-none transition-all" placeholder="Your Secure Email Address *" />
+                                        </div>
+                                        <div>
+                                            <input type="url" value={formLink} onChange={(e) => setFormLink(e.target.value)} className="w-full bg-muted/30 border border-border rounded-xl p-4 text-sm font-medium focus:border-accent focus:bg-background focus:ring-4 focus:ring-accent/10 outline-none transition-all" placeholder="Reference URL (Optional)" />
+                                        </div>
                                     </div>
 
                                     <div className="pt-6">
-                                        <p className="text-xs text-muted-foreground italic border-l-4 border-accent pl-4 mb-8 leading-relaxed">
-                                            By submitting, you authorize the Daily Borg to issue automated updates the moment verification processing completes.
-                                        </p>
-
                                         <button
                                             type="submit"
                                             disabled={isSubmitting}
-                                            className="w-full bg-foreground text-background font-black text-sm uppercase tracking-[0.2em] py-5 hover:bg-accent transition-colors disabled:opacity-50">
-                                            {isSubmitting ? "Queueing Protocol..." : "Initialize Verification Engine"}
+                                            className="w-full bg-foreground text-background font-bold text-xs uppercase tracking-widest py-4 rounded-full shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0">
+                                            {isSubmitting ? "Queueing Protocol..." : "Initialize Engine"}
                                         </button>
                                     </div>
                                 </form>
@@ -458,11 +467,9 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
                     </div>
                 </div>
             )}
-
-            {/* Click-away handler for dropdowns */}
             {(showSortDropdown) && (
-                <div className="fixed inset-0 z-10" onClick={() => setShowSortDropdown(false)} />
+                <div className="fixed inset-0 z-20" onClick={() => setShowSortDropdown(false)} />
             )}
-        </>
+        </div>
     );
 }
