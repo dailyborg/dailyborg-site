@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { CheckCircle2, XCircle, FileText, AlertTriangle, ShieldCheck, BarChart3, Users, Activity, Zap, RefreshCcw } from "lucide-react";
+import { CheckCircle2, XCircle, FileText, AlertTriangle, ShieldCheck, BarChart3, Users, Activity, Zap, RefreshCcw, MessageSquare, Trash2, Eye, EyeOff, Pencil } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { formatTimeAgo } from "@/lib/utils";
 
@@ -13,18 +13,18 @@ function AdminDashboardContent() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [passphrase, setPassphrase] = useState("");
     const [authError, setAuthError] = useState("");
-    const [activeTab, setActiveTab] = useState<'queue' | 'analytics' | 'audience' | 'health'>('queue');
+    const [activeTab, setActiveTab] = useState<'queue' | 'analytics' | 'audience' | 'health' | 'comments'>('queue');
     const [dateRange, setDateRange] = useState<7 | 30>(7);
 
     // Sync active tab with URL
     useEffect(() => {
         const tab = searchParams.get('tab');
-        if (tab && ['queue', 'analytics', 'audience', 'health'].includes(tab)) {
+        if (tab && ['queue', 'analytics', 'audience', 'health', 'comments'].includes(tab)) {
             setActiveTab(tab as any);
         }
     }, [searchParams]);
 
-    const handleTabChange = (tab: 'queue' | 'analytics' | 'audience' | 'health') => {
+    const handleTabChange = (tab: 'queue' | 'analytics' | 'audience' | 'health' | 'comments') => {
         setActiveTab(tab);
         router.push(`/admin?tab=${tab}`);
     };
@@ -46,6 +46,11 @@ function AdminDashboardContent() {
     // Global System Settings
     const [settings, setSettings] = useState({ ai_provider: 'aiml', cloudflare_daily_operations_cap: '30' });
     const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+    // Comments Moderation State
+    const [adminComments, setAdminComments] = useState<any[]>([]);
+    const [editingComment, setEditingComment] = useState<string | null>(null);
+    const [editCommentContent, setEditCommentContent] = useState('');
 
     // Editor State
     const [selectedArticle, setSelectedArticle] = useState<any>(null);
@@ -140,6 +145,64 @@ function AdminDashboardContent() {
             }
         } catch (e) {
             console.error("Failed to fetch settings", e);
+        }
+    };
+
+    const fetchComments = async (token: string) => {
+        try {
+            const res = await fetch('/api/admin/comments', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data: any = await res.json();
+                setAdminComments(data.comments || []);
+            }
+        } catch (e) {
+            console.error('Failed to fetch comments', e);
+        }
+    };
+
+    const handleCommentAction = async (id: string, action: 'hide' | 'show' | 'delete', newContent?: string) => {
+        try {
+            if (action === 'delete') {
+                await fetch('/api/admin/comments', {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${passphrase}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                setAdminComments(prev => prev.filter(c => c.id !== id));
+            } else if (action === 'hide') {
+                await fetch('/api/admin/comments', {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${passphrase}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, status: 'removed' })
+                });
+                setAdminComments(prev => prev.map(c => c.id === id ? { ...c, status: 'removed' } : c));
+            } else if (action === 'show') {
+                await fetch('/api/admin/comments', {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${passphrase}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, status: 'visible' })
+                });
+                setAdminComments(prev => prev.map(c => c.id === id ? { ...c, status: 'visible' } : c));
+            }
+        } catch (e) {
+            console.error('Comment action failed', e);
+        }
+    };
+
+    const handleCommentEdit = async (id: string) => {
+        try {
+            await fetch('/api/admin/comments', {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${passphrase}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, content: editCommentContent })
+            });
+            setAdminComments(prev => prev.map(c => c.id === id ? { ...c, content: editCommentContent } : c));
+            setEditingComment(null);
+            setEditCommentContent('');
+        } catch (e) {
+            console.error('Comment edit failed', e);
         }
     };
 
@@ -258,6 +321,12 @@ function AdminDashboardContent() {
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'health' ? 'bg-blue-600 font-bold' : 'hover:bg-slate-800'}`}
                     >
                         <Activity className="w-5 h-5" /> System Health
+                    </button>
+                    <button 
+                        onClick={() => { handleTabChange('comments'); fetchComments(passphrase); }}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'comments' ? 'bg-blue-600 font-bold' : 'hover:bg-slate-800'}`}
+                    >
+                        <MessageSquare className="w-5 h-5" /> Comments
                     </button>
                 </nav>
 
@@ -543,6 +612,126 @@ function AdminDashboardContent() {
                         </div>
                     </div>
                 )}
+
+                {activeTab === 'comments' && (
+                    <div className="flex flex-col gap-8 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-end">
+                            <h2 className="font-serif text-4xl font-black">Comment Moderation</h2>
+                            <button 
+                                onClick={() => fetchComments(passphrase)}
+                                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-600 transition-all"
+                            >
+                                <RefreshCcw className="w-4 h-4" /> Refresh
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                                <div className="text-slate-400 uppercase text-[10px] font-bold tracking-wider mb-1">Total Comments</div>
+                                <div className="text-3xl font-black">{adminComments.length}</div>
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                                <div className="text-emerald-500 uppercase text-[10px] font-bold tracking-wider mb-1">Visible</div>
+                                <div className="text-3xl font-black text-emerald-600">{adminComments.filter(c => c.status === 'visible').length}</div>
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                                <div className="text-red-400 uppercase text-[10px] font-bold tracking-wider mb-1">Removed</div>
+                                <div className="text-3xl font-black text-red-500">{adminComments.filter(c => c.status === 'removed').length}</div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-4 bg-slate-50 border-b border-slate-200">
+                                <h3 className="font-bold text-slate-700">All Comments (Last 100)</h3>
+                            </div>
+                            {adminComments.length === 0 ? (
+                                <div className="p-12 text-center text-slate-400">
+                                    <MessageSquare className="w-10 h-10 mx-auto text-slate-200 mb-3" />
+                                    <p className="font-bold">No comments yet</p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-slate-100">
+                                    {adminComments.map((comment: any) => (
+                                        <div key={comment.id} className={`p-5 flex gap-4 ${comment.status === 'removed' ? 'bg-red-50/50 opacity-60' : ''}`}>
+                                            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-500 shrink-0">
+                                                {comment.display_name?.charAt(0)?.toUpperCase() || '?'}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-sm font-bold text-slate-800">{comment.display_name}</span>
+                                                    <span className="text-[10px] text-slate-400 font-mono">{comment.subscriber_email}</span>
+                                                    <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${comment.status === 'visible' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                        {comment.status}
+                                                    </span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 mb-2 font-mono">
+                                                    {comment.page_type}/{comment.page_slug} • {formatTimeAgo(comment.created_at)}
+                                                </div>
+                                                
+                                                {editingComment === comment.id ? (
+                                                    <div className="flex gap-2 mt-1">
+                                                        <textarea 
+                                                            value={editCommentContent}
+                                                            onChange={(e) => setEditCommentContent(e.target.value)}
+                                                            className="flex-1 border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            rows={2}
+                                                        />
+                                                        <div className="flex flex-col gap-1">
+                                                            <button 
+                                                                onClick={() => handleCommentEdit(comment.id)}
+                                                                className="bg-blue-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg hover:bg-blue-700"
+                                                            >Save</button>
+                                                            <button 
+                                                                onClick={() => { setEditingComment(null); setEditCommentContent(''); }}
+                                                                className="text-slate-400 text-[10px] font-bold px-3 py-1.5 hover:text-slate-600"
+                                                            >Cancel</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-slate-700 leading-relaxed">{comment.content}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex items-start gap-1 shrink-0">
+                                                <button
+                                                    onClick={() => { setEditingComment(comment.id); setEditCommentContent(comment.content); }}
+                                                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"
+                                                    title="Edit"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                                {comment.status === 'visible' ? (
+                                                    <button
+                                                        onClick={() => handleCommentAction(comment.id, 'hide')}
+                                                        className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-orange-600 transition-colors"
+                                                        title="Hide comment"
+                                                    >
+                                                        <EyeOff className="w-4 h-4" />
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleCommentAction(comment.id, 'show')}
+                                                        className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-600 transition-colors"
+                                                        title="Restore comment"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => { if (confirm('Permanently delete this comment?')) handleCommentAction(comment.id, 'delete'); }}
+                                                    className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                                                    title="Delete permanently"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'queue' && (
                     <div className="flex flex-col gap-8 animate-in fade-in zoom-in-95 duration-300">
                         <div className="flex justify-between items-end">

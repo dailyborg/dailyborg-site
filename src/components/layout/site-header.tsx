@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { AlertTriangle, Search, User, Menu, Activity, Landmark, Building, Trophy, ShieldAlert, ShieldCheck, BarChart3, Users, FileText, Zap } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { DynamicTicker } from "./dynamic-ticker";
@@ -199,10 +200,20 @@ export function SiteHeader({
                         {/* Left Space to balance layout */}
                         <div className="hidden md:flex flex-1"></div>
 
-                        {/* Logo area - Center Aligned */}
+                        {/* Logo area - Center Aligned (Option B: Vertical Stack) */}
                         <div className="flex flex-col items-center text-center shrink-0 w-full md:w-auto">
-                            <Link href="/" className="font-[family-name:var(--font-playfair)] text-4xl md:text-6xl font-black text-foreground tracking-tight leading-none hover:opacity-90 transition-opacity">
-                                The Daily Borg
+                            <Link href="/" className="flex flex-col items-center group">
+                                <Image
+                                    src="/dailyborg-logo2.png"
+                                    alt="Daily Borg Mascot"
+                                    width={64}
+                                    height={64}
+                                    className="mb-2 group-hover:scale-105 transition-transform duration-200"
+                                    priority
+                                />
+                                <span className="font-[family-name:var(--font-playfair)] text-4xl md:text-6xl font-black text-foreground tracking-tight leading-none group-hover:opacity-90 transition-opacity">
+                                    The Daily Borg
+                                </span>
                             </Link>
                             <span className="font-[family-name:var(--font-source-sans)] text-[9px] sm:text-[10px] md:text-xs text-muted-foreground uppercase tracking-[0.25em] md:tracking-[0.3em] mt-2 delay-150">
                                 Broadcast Operations & Reporting Grid

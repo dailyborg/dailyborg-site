@@ -1,5 +1,6 @@
 import { getDbBinding } from "@/lib/db";
 import { PoliticianDirectoryClient } from "@/components/PoliticianDirectoryClient";
+import CommentSection from "@/components/CommentSection";
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -53,5 +54,12 @@ export default async function BorgRecordDirectory() {
         // Fallback or dev mode
     }
 
-    return <PoliticianDirectoryClient initialPoliticians={initialPoliticians} initialState={clientState} />;
+    return (
+        <>
+            <PoliticianDirectoryClient initialPoliticians={initialPoliticians} initialState={clientState} />
+            <div className="container mx-auto px-4 md:px-8 pb-16">
+                <CommentSection pageType="borg-record" pageSlug="directory" />
+            </div>
+        </>
+    );
 }

@@ -7,6 +7,7 @@ import CredibilityChart from "@/components/CredibilityChart";
 import StanceTimeline from "@/components/StanceTimeline";
 import TrustworthinessChart from "@/components/TrustworthinessChart";
 import { BorgAlertSubscribe } from "@/components/BorgAlertSubscribe";
+import CommentSection from "@/components/CommentSection";
 
 import { notFound } from "next/navigation";
 import { PoliticianService, ShiftEvent } from "@/lib/services/politician-service";
@@ -361,6 +362,9 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                             </Link>
                         </div>
                     </div>
+
+                    {/* Comments Section */}
+                    <CommentSection pageType="politician" pageSlug={slug} />
 
                 </div>
             </NewsGrid>

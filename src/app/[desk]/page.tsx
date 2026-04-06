@@ -12,6 +12,7 @@ import {
     InDepthSection, 
     ReversedFeatureSection 
 } from '@/components/layout/news-sections';
+import CommentSection from '@/components/CommentSection';
 
 const VALID_DESKS = ["politics", "crime", "business", "entertainment", "sports", "science", "education"];
 
@@ -150,6 +151,9 @@ export default async function DeskPage({ params }: { params: Promise<{ desk: str
                     })}
                 </div>
             )}
+
+            {/* Comments Section */}
+            <CommentSection pageType="article" pageSlug={desk} />
             
         </div>
     );

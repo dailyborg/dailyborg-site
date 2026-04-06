@@ -3,6 +3,9 @@ export const runtime = 'edge';
 import Link from 'next/link';
 import { ArticleService } from '@/lib/services/article-service';
 import { notFound } from 'next/navigation';
+import { getImageForContext } from '@/lib/image-utils';
+import { formatTimeAgo, formatFullTimestamp } from '@/lib/utils';
+import { ArticleData, HeadlinesGridSection } from '@/components/layout/news-sections';
 
 export default async function ArticlePage({ params }: { params: Promise<{ desk: string, slug: string }> }) {
     const resolvedParams = await params;
@@ -14,8 +17,24 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
 
     const formattedDesk = article.desk || resolvedParams.desk.charAt(0).toUpperCase() + resolvedParams.desk.slice(1);
     
-    // Fetch some recent articles for the sidebar
-    const sidebarArticles = await ArticleService.getRecentArticles(5);
+    // Fetch 6 articles for the bottom Headlines Grid
+    const sidebarArticles = await ArticleService.getRecentArticles(6);
+    
+    const moreArticles: ArticleData[] = sidebarArticles.map(s => ({
+        title: s.title,
+        desk: s.desk || "Intel",
+        timeAgo: formatTimeAgo(s.publish_date),
+        fullTimestamp: formatFullTimestamp(s.publish_date),
+        excerpt: s.excerpt,
+        slug: s.slug,
+        readTime: `${s.read_time || 4} min`,
+        aiGeneratedImageUrl: s.hero_image_url || null,
+        hero_image_url: s.hero_image_url || null,
+        article_type: s.article_type || 'standard',
+    }));
+
+    // Generate fallback or Unsplash image perfectly
+    const finalHeroImage = getImageForContext(article);
 
     // Prepare JSON-LD NewsArticle schema
     const jsonLd = {
@@ -23,7 +42,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
         "@type": "NewsArticle",
         "headline": article.title,
         "description": article.excerpt,
-        "image": [article.hero_image_url || "https://dailyborg.com/images/default-news.jpg"],
+        "image": [finalHeroImage || "https://dailyborg.com/images/default-news.jpg"],
         "datePublished": article.publish_date,
         "dateModified": article.publish_date,
         "author": [{
@@ -49,9 +68,9 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
             {/* Full-Width Hero Image (breaks out of content container) */}
-            {article.hero_image_url && (
+            {finalHeroImage && (
                 <div className="w-full bg-[#EFEBE6] dark:bg-muted aspect-[21/9] relative overflow-hidden">
-                    <img src={article.hero_image_url} alt={article.title} className="w-full h-full object-cover" />
+                    <img src={finalHeroImage} alt={article.title} className="w-full h-full object-cover" />
                 </div>
             )}
 
@@ -63,7 +82,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
                     <article className="lg:col-span-8 flex flex-col gap-8">
 
                         {/* Lead Image (only show inline if no hero_image_url for the full-width version) */}
-                        {!article.hero_image_url && (
+                        {!finalHeroImage && (
                             <figure className="w-full">
                                 <div className="bg-[#EFEBE6] dark:bg-muted aspect-[16/9] w-full relative overflow-hidden flex items-center justify-center font-[family-name:var(--font-source-sans)] uppercase tracking-widest text-[#9CA3AF] text-[10px] md:text-xs font-bold border border-border">
                                     {`LEAD IMAGE: ${formattedDesk.toUpperCase()}`}
@@ -144,33 +163,23 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
 
                     </article>
 
-                    {/* Sidebar Content (Right Column) */}
-                    <aside className="lg:col-span-4 flex flex-col">
-                        <div className="flex flex-col gap-0 border-t border-border lg:border-t-0">
-                            <h3 className="font-[family-name:var(--font-source-sans)] font-black text-xs uppercase tracking-[0.2em] text-muted-foreground mb-6">
-                                Latest Reports
-                            </h3>
-                            {sidebarArticles.map((s, idx) => (
-                                <Link 
-                                    key={s.id} 
-                                    href={`/${s.desk.toLowerCase().replace(' ', '-')}/${s.slug}`}
-                                    className="flex flex-col gap-3 py-6 border-b border-border border-dashed lg:border-solid lg:border-b-2 lg:first:pt-0 group cursor-pointer"
-                                >
-                                    <div className="font-[family-name:var(--font-source-sans)] text-[10px] font-black uppercase tracking-widest text-desk-politics">
-                                        {s.desk}
-                                    </div>
-                                    <h4 className="font-[family-name:var(--font-playfair)] text-xl font-bold leading-tight text-[#0f172a] dark:text-slate-100 group-hover:underline underline-offset-4 decoration-2">
-                                        {s.title}
-                                    </h4>
-                                    <p className="font-[family-name:var(--font-source-sans)] text-sm text-[#64748B] dark:text-slate-400 line-clamp-2">
-                                        {s.excerpt}
-                                    </p>
-                                </Link>
-                            ))}
-                        </div>
-                    </aside>
-
+                    {/* Sidebar Content is removed in favor of bottom grid */}
                 </div>
+
+                {/* BOTTOM DYNAMIC GRID: More from the Borg */}
+                {moreArticles.length > 0 && (
+                    <div className="mt-16 pt-12 border-t border-border w-full">
+                        <div className="mb-8">
+                            <h2 className="font-sans font-black uppercase text-xl md:text-2xl tracking-widest text-foreground">
+                                Continue Briefing
+                            </h2>
+                            <p className="font-serif text-muted-foreground mt-1 text-sm md:text-base">
+                                Additional intelligence reports from the network
+                            </p>
+                        </div>
+                        <HeadlinesGridSection stories={moreArticles} />
+                    </div>
+                )}
             </main>
         </div>
     );

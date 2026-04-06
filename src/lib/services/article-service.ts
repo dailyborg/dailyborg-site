@@ -13,6 +13,7 @@ export interface Article {
     hero_image_url: string;
     author_id: string;
     publish_date: string;
+    read_time?: number;
     author?: Author;
 }
 
