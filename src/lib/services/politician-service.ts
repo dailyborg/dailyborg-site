@@ -200,10 +200,10 @@ export class PoliticianService {
         const db = await getDbBinding();
 
         // Execute queries sequentially for local SQLite compatibility under OpenNext
-        const politicianRes = await db.prepare(`SELECT * FROM politicians WHERE slug = ? AND country = 'US'`).bind(slug);
-        const promisesRes = await db.prepare(`SELECT * FROM promises WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY date_said DESC`).bind(slug);
-        const positionsRes = await db.prepare(`SELECT * FROM positions WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY topic ASC, statement_date DESC`).bind(slug);
-        const methodologyRes = await db.prepare(`SELECT * FROM methodology_versions WHERE is_active = 1 LIMIT 1`);
+        const politicianRes = await db.prepare(`SELECT * FROM politicians WHERE slug = ? AND country = 'US'`).bind(slug).all();
+        const promisesRes = await db.prepare(`SELECT * FROM promises WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY date_said DESC`).bind(slug).all();
+        const positionsRes = await db.prepare(`SELECT * FROM positions WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY topic ASC, statement_date DESC`).bind(slug).all();
+        const methodologyRes = await db.prepare(`SELECT * FROM methodology_versions WHERE is_active = 1 LIMIT 1`).all();
 
         const politician = politicianRes?.results?.[0] || politicianRes?.[0]?.results?.[0]; // Handle varying return shapes between D1 / BetterSQLite
         if (!politician) return null;
@@ -213,7 +213,7 @@ export class PoliticianService {
         const activeMethodology = methodologyRes?.results?.[0] || methodologyRes?.[0]?.results?.[0] || null;
 
         // Fetch new Verification Engine items
-        const rawClaimsRes = await db.prepare(`SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20`).bind(politician.id);
+        const rawClaimsRes = await db.prepare(`SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20`).bind(politician.id).all();
         const rawClaims = rawClaimsRes?.results || rawClaimsRes?.[0]?.results || [];
 
         let evidenceMap: Record<string, any[]> = {};
@@ -238,7 +238,7 @@ export class PoliticianService {
            JOIN claims nc ON sc.new_claim_id = nc.id
            WHERE sc.politician_id = ? 
            ORDER BY sc.created_at DESC LIMIT 10
-        `).bind(politician.id);
+        `).bind(politician.id).all();
 
         const rawStanceChanges = stanceChangesRes?.results || stanceChangesRes?.[0]?.results || [];
 
@@ -259,7 +259,7 @@ export class PoliticianService {
         try {
             const trustHistRes = await db.prepare(
                 `SELECT score, promises_kept, promises_broken, scored_at FROM trustworthiness_history WHERE politician_id = ? ORDER BY scored_at ASC LIMIT 30`
-            ).bind(politician.id);
+            ).bind(politician.id).all();
             trustHistory = trustHistRes?.results || trustHistRes?.[0]?.results || [];
         } catch (e) {
             // Table may not exist yet in local dev
@@ -274,7 +274,7 @@ export class PoliticianService {
                  JOIN politician_votes pv ON v.id = pv.vote_id 
                  WHERE pv.politician_id = ? 
                  ORDER BY v.vote_date DESC LIMIT 10`
-            ).bind(politician.id);
+            ).bind(politician.id).all();
             recentVotes = votesRes?.results || votesRes?.[0]?.results || [];
         } catch (e) {
             // Fallback if table doesn't exist locally
@@ -286,7 +286,7 @@ export class PoliticianService {
         try {
             const fcRes = await db.prepare(
                 `SELECT * FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 5`
-            ).bind(slug);
+            ).bind(slug).all();
             factChecks = fcRes?.results || fcRes?.[0]?.results || [];
         } catch (e) {
             factChecks = [];
