@@ -4,16 +4,35 @@ export interface Env {
 }
 
 const RSS_FEEDS = [
-    { url: 'http://feeds.bbci.co.uk/news/world/rss.xml', type: 'standard' },
-    { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?profile=120000000&id=10000115', type: 'business' },
+    // === POLITICS (2 feeds) ===
     { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml', type: 'politics' },
-    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Science.xml', type: 'science' },
-    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Education.xml', type: 'education' },
-    { url: 'https://www.usnews.com/rss/education', type: 'education' }, 
+    { url: 'https://feeds.npr.org/1014/rss.xml', type: 'politics' },
+
+    // === CRIME (2 feeds — VERIFIED LIVE) ===
+    { url: 'https://www.cbsnews.com/latest/rss/crime', type: 'crime' },
+    { url: 'https://feeds.nbcnews.com/nbcnews/public/news', type: 'crime' },
+
+    // === BUSINESS (2 feeds) ===
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml', type: 'business' },
+    { url: 'https://feeds.npr.org/1006/rss.xml', type: 'business' },
+
+    // === ENTERTAINMENT (2 feeds) ===
     { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml', type: 'entertainment' },
+    { url: 'https://www.cbsnews.com/latest/rss/entertainment', type: 'entertainment' },
+
+    // === SPORTS (1 feed) ===
     { url: 'https://www.espn.com/espn/rss/news', type: 'sports' },
-    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Crime.xml', type: 'crime' }, 
-    { url: 'https://moxie.foxnews.com/google-publisher/us-crime.xml', type: 'crime' }
+
+    // === SCIENCE (2 feeds) ===
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Science.xml', type: 'science' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml', type: 'science' },
+
+    // === EDUCATION (2 feeds) ===
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Education.xml', type: 'education' },
+    { url: 'https://www.usnews.com/rss/education', type: 'education' },
+
+    // === GENERAL / WORLD ===
+    { url: 'http://feeds.bbci.co.uk/news/world/rss.xml', type: 'standard' }
 ];
 
 export default {

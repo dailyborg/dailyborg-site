@@ -55,7 +55,7 @@ export class IngestCoordinator extends Agent<Env> {
           - keyTakeaways (array)
           - confidenceScore (1-100)
           - suggestedHeroImagePrompt
-          - desk (Politics, Business, etc.)
+          - desk (MUST be exactly one of: Politics, Crime, Business, Entertainment, Sports, Science, Education. The source feed category is: ${type || 'standard'}. Use this as your primary guide.)
           - sources (array of {source_name, source_url, source_type})
         `;
 
@@ -94,6 +94,18 @@ export class IngestCoordinator extends Agent<Env> {
                 } else {
                     const aiData = await aiResponse.json() as any;
                     articleObject = JSON.parse(aiData.choices[0].message.content);
+
+                    // Normalize AI desk to valid categories only
+                    const validDesks = ['Politics','Crime','Business','Entertainment','Sports','Science','Education'];
+                    if (articleObject.desk && !validDesks.includes(articleObject.desk)) {
+                        const deskMap: Record<string, string> = {
+                            politics: 'Politics', crime: 'Crime', business: 'Business',
+                            entertainment: 'Entertainment', sports: 'Sports',
+                            science: 'Science', education: 'Education', standard: 'Politics'
+                        };
+                        articleObject.desk = deskMap[(type || '').toLowerCase()] || 'Politics';
+                        console.log(`[Ingest] AI returned invalid desk, normalized to: ${articleObject.desk}`);
+                    }
                 }
             } catch (e: any) {
                 console.error("AI Fetch Failure:", e.message);
@@ -107,6 +119,16 @@ export class IngestCoordinator extends Agent<Env> {
         // =======================================================
         if (!articleObject) {
             console.log("Using High-Quality Mock Fallback...");
+
+            // Map the scraper's feed type to a proper desk name
+            // This is CRITICAL — without it, all fallback articles default to Politics
+            const deskMap: Record<string, string> = {
+                politics: 'Politics', crime: 'Crime', business: 'Business',
+                entertainment: 'Entertainment', sports: 'Sports',
+                science: 'Science', education: 'Education', standard: 'Politics'
+            };
+            const resolvedDesk = deskMap[(type || '').toLowerCase()] || 'Politics';
+
             articleObject = {
                 canonical_event_slug: slug,
                 title: `Report: ${title}`,
@@ -115,7 +137,7 @@ export class IngestCoordinator extends Agent<Env> {
                 keyTakeaways: ["High-integrity data stream detected", "Strategic alignment shifting locally", "Autonomous verification completed"],
                 confidenceScore: 85,
                 suggestedHeroImagePrompt: "A sleek, cinematic blue digital matrix networking across a cityscape",
-                desk: "Politics",
+                desk: resolvedDesk,
                 sources: [{ source_name: "Feeder Network", source_url: sourceUrl, source_type: "primary" }]
             };
         }
