@@ -258,40 +258,8 @@ export default {
                             }
                         } catch (e) {}
 
-                        // Tier 2: Unsplash & Native AI Generation Fallbacks
-                        if (!sourceResolved && aiProvider === 'aiml') {
-                            try {
-                                console.log(`[AUTONOMOUS FEEDER] Tier 2 Generating Nano Banana 2 image for category: ${category}`);
-                                const imagePrompt = `High quality editorial news illustration about: ${title}. Style: professional, objective news media, no text.`;
-
-                                const imageResponse = await fetch("https://api.aimlapi.com/images/generations", {
-                                    method: "POST",
-                                    headers: {
-                                        "Authorization": `Bearer ${env.AIML_API_KEY}`,
-                                        "Content-Type": "application/json"
-                                    },
-                                    body: JSON.stringify({
-                                        model: "google/nano-banana-2", // Gemini 3 Flash Image
-                                        prompt: imagePrompt,
-                                        n: 1,
-                                        size: "1024x1024"
-                                    })
-                                });
-
-                                if (imageResponse.ok) {
-                                    const imageData = (await imageResponse.json()) as any;
-                                    generatedImageUrl = imageData.data?.[0]?.url;
-                                } else {
-                                    console.warn(`[AUTONOMOUS FEEDER] Image Gen Failed: ${imageResponse.status}`);
-                                }
-                            } catch (imgError) {
-                                console.error(`[AUTONOMOUS FEEDER] Image generation network error:`, imgError);
-                            }
-                        } else if (!sourceResolved && aiProvider === 'cloudflare') {
-                            console.log(`[AUTONOMOUS FEEDER] Tier 3 Native Unsplash Route (Bypassing AI Gen due to cost protocols)`);
-                            // We intentionally skip Stable Diffusion pixel generation here as it bloats D1 payload via base64, 
-                            // and prefer falling back to standardized semantic UI tag loading on frontend if wikimedia fails.
-                        }
+                        // Tier 2: Image generation removed to prevent double-billing.
+                        // The IngestCoordinator or the Frontend's hash-based image-utils handles all fallbacks.
                     }
 
                     // 4. Database Persistence

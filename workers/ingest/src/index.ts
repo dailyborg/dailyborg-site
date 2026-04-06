@@ -191,7 +191,8 @@ export class IngestCoordinator extends Agent<Env> {
         // IMAGE PIPELINE (3-Tier Matrix)
         // Tier 1: Wikimedia → Tier 2: Unsplash → Tier 3: AIML (if active)
         // =======================================================
-        let heroImageUrl = `https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?q=80&w=2070&auto=format&fit=crop`;
+        // Set baseline to empty string so frontend hash-fallback triggers if everything fails
+        let heroImageUrl = ``;
         let imageSource = "default";
 
         // --- TIER 1: Wikimedia Action API ---
