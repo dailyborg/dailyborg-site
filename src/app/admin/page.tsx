@@ -46,6 +46,7 @@ function AdminDashboardContent() {
     // Global System Settings
     const [settings, setSettings] = useState({ ai_provider: 'aiml', cloudflare_daily_operations_cap: '30' });
     const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [previewLogoPlacement, setPreviewLogoPlacement] = useState<'left' | 'center' | 'bar'>('center');
 
     // Comments Moderation State
     const [adminComments, setAdminComments] = useState<any[]>([]);
@@ -112,7 +113,17 @@ function AdminDashboardContent() {
                     window.dispatchEvent(new Event('borg_admin_change'));
                 });
         }
+        
+        // Load local UI settings
+        const storedLogo = localStorage.getItem('borg_logo_placement');
+        if (storedLogo) setPreviewLogoPlacement(storedLogo as any);
     }, []);
+
+    const handleLocalLogoChange = (placement: 'left' | 'center' | 'bar') => {
+        setPreviewLogoPlacement(placement);
+        localStorage.setItem('borg_logo_placement', placement);
+        window.dispatchEvent(new Event('borg_logo_change'));
+    };
 
     // Hook to allow refreshing metrics when the date segment changes
     useEffect(() => {
@@ -531,6 +542,37 @@ function AdminDashboardContent() {
                                             </p>
                                         )}
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Brand UI Preview Settings */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-2">
+                            <div className="p-5 bg-slate-50 border-b border-slate-200">
+                                <h3 className="font-bold text-slate-800">Brand UI Preview (Local)</h3>
+                                <p className="text-xs text-slate-500 mt-1">Live toggle the masthead logo placement to preview different layouts. This setting only applies to your local administrative session.</p>
+                            </div>
+                            <div className="p-6">
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">Logo Placement Option</label>
+                                <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-100 p-2 rounded-xl">
+                                    <button 
+                                        onClick={() => handleLocalLogoChange('left')}
+                                        className={`flex-1 w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${previewLogoPlacement === 'left' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
+                                    >
+                                        Option A (Left)
+                                    </button>
+                                    <button 
+                                        onClick={() => handleLocalLogoChange('center')}
+                                        className={`flex-1 w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${previewLogoPlacement === 'center' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
+                                    >
+                                        Option B (Center Stack)
+                                    </button>
+                                    <button 
+                                        onClick={() => handleLocalLogoChange('bar')}
+                                        className={`flex-1 w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${previewLogoPlacement === 'bar' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
+                                    >
+                                        Option C (Navy Bar)
+                                    </button>
                                 </div>
                             </div>
                         </div>

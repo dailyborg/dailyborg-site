@@ -42,6 +42,21 @@ export function SiteHeader({
     // Admin alerts state
     const [adminAlerts, setAdminAlerts] = useState<{type: string; message: string}[]>([]);
 
+    // Logo Placement override state
+    const [logoPlacement, setLogoPlacement] = useState<'left' | 'center' | 'bar'>('center');
+
+    useEffect(() => {
+        const handleStorageChange = () => {
+            const placement = localStorage.getItem('borg_logo_placement');
+            if (placement && ['left', 'center', 'bar'].includes(placement)) {
+                setLogoPlacement(placement as 'left' | 'center' | 'bar');
+            }
+        };
+        handleStorageChange(); // Initialize on mount
+        window.addEventListener('borg_logo_change', handleStorageChange);
+        return () => window.removeEventListener('borg_logo_change', handleStorageChange);
+    }, []);
+
     useEffect(() => {
         const hour = new Date().getHours();
         if (hour >= 5 && hour < 12) setEdition("Morning Borg Edition");
@@ -180,7 +195,12 @@ export function SiteHeader({
 
                 {/* 2. Date Bar (Navy Bar) - Edge to Edge, narrower */}
                 <div className="bg-primary text-primary-foreground w-full flex justify-between items-center px-6 h-8 text-[10px] sm:text-xs font-sans uppercase tracking-wide">
-                    <span className="opacity-80">{currentDate}</span>
+                    <div className="flex items-center gap-3">
+                        {logoPlacement === 'bar' && (
+                            <Image src="/dailyborg-logo2.png" alt="Mascot" width={18} height={18} className="rounded-sm" priority />
+                        )}
+                        <span className="opacity-80">{currentDate}</span>
+                    </div>
                     <div className="flex items-center gap-3 sm:gap-5">
                         <span className="opacity-80 hover:opacity-100 transition-opacity cursor-default">{edition}</span>
                         {(isAdmin || isAdminParam) && (
@@ -200,25 +220,61 @@ export function SiteHeader({
                         {/* Left Space to balance layout */}
                         <div className="hidden md:flex flex-1"></div>
 
-                        {/* Logo area - Center Aligned (Option B: Vertical Stack) */}
-                        <div className="flex flex-col items-center text-center shrink-0 w-full md:w-auto">
-                            <Link href="/" className="flex flex-col items-center group">
-                                <Image
-                                    src="/dailyborg-logo2.png"
-                                    alt="Daily Borg Mascot"
-                                    width={64}
-                                    height={64}
-                                    className="-mb-2 group-hover:scale-105 transition-transform duration-200"
-                                    priority
-                                />
-                                <span className="font-[family-name:var(--font-playfair)] text-4xl md:text-6xl font-black text-foreground tracking-tight leading-none group-hover:opacity-90 transition-opacity">
-                                    The Daily Borg
+                        {/* Logo area - Dynamic rendering based on placement setting */}
+                        {logoPlacement === 'left' && (
+                            <div className="flex items-center shrink-0 w-full md:w-auto">
+                                <Link href="/" className="flex items-center gap-4 group">
+                                    <Image
+                                        src="/dailyborg-logo2.png"
+                                        alt="Daily Borg Mascot"
+                                        width={64}
+                                        height={64}
+                                        className="group-hover:scale-105 transition-transform duration-200"
+                                        priority
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="font-[family-name:var(--font-playfair)] text-4xl md:text-5xl font-black text-foreground tracking-tight leading-none group-hover:opacity-90 transition-opacity">
+                                            The Daily Borg
+                                        </span>
+                                        <span className="font-[family-name:var(--font-source-sans)] text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-[0.25em] md:tracking-[0.3em] mt-1 shrink-0">
+                                            Broadcast Operations & Reporting Grid
+                                        </span>
+                                    </div>
+                                </Link>
+                            </div>
+                        )}
+
+                        {logoPlacement === 'center' && (
+                            <div className="flex flex-col items-center text-center shrink-0 w-full md:w-auto">
+                                <Link href="/" className="flex flex-col items-center group">
+                                    <Image
+                                        src="/dailyborg-logo2.png"
+                                        alt="Daily Borg Mascot"
+                                        width={64}
+                                        height={64}
+                                        className="-mb-2 group-hover:scale-105 transition-transform duration-200"
+                                        priority
+                                    />
+                                    <span className="font-[family-name:var(--font-playfair)] text-4xl md:text-6xl font-black text-foreground tracking-tight leading-none group-hover:opacity-90 transition-opacity">
+                                        The Daily Borg
+                                    </span>
+                                </Link>
+                                <span className="font-[family-name:var(--font-source-sans)] text-[9px] sm:text-[10px] md:text-xs text-muted-foreground uppercase tracking-[0.25em] md:tracking-[0.3em] mt-2 delay-150">
+                                    Broadcast Operations & Reporting Grid
                                 </span>
-                            </Link>
-                            <span className="font-[family-name:var(--font-source-sans)] text-[9px] sm:text-[10px] md:text-xs text-muted-foreground uppercase tracking-[0.25em] md:tracking-[0.3em] mt-2 delay-150">
-                                Broadcast Operations & Reporting Grid
-                            </span>
-                        </div>
+                            </div>
+                        )}
+
+                        {logoPlacement === 'bar' && (
+                            <div className="flex flex-col items-center text-center shrink-0 w-full md:w-auto">
+                                <Link href="/" className="font-[family-name:var(--font-playfair)] text-4xl md:text-6xl font-black text-foreground tracking-tight leading-none hover:opacity-90 transition-opacity">
+                                    The Daily Borg
+                                </Link>
+                                <span className="font-[family-name:var(--font-source-sans)] text-[9px] sm:text-[10px] md:text-xs text-muted-foreground uppercase tracking-[0.25em] md:tracking-[0.3em] mt-2 delay-150">
+                                    Broadcast Operations & Reporting Grid
+                                </span>
+                            </div>
+                        )}
 
                         {/* Right Utilities */}
                         <div className="hidden md:flex flex-1 items-center justify-end gap-6 shrink-0">
