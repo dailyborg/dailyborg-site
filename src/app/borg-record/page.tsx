@@ -41,5 +41,17 @@ export default async function BorgRecordDirectory() {
         ];
     }
 
-    return <PoliticianDirectoryClient initialPoliticians={initialPoliticians} />;
+    // Extract region code from Edge headers (e.g. "NY", "OH", "CA")
+    let clientState = null;
+    try {
+        const { getRequestContext } = await import('@cloudflare/next-on-pages');
+        const ctx = getRequestContext();
+        if (ctx && ctx.cf && ctx.cf.regionCode) {
+            clientState = ctx.cf.regionCode;
+        }
+    } catch (e) {
+        // Fallback or dev mode
+    }
+
+    return <PoliticianDirectoryClient initialPoliticians={initialPoliticians} initialState={clientState} />;
 }
