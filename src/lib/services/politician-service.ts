@@ -213,34 +213,47 @@ export class PoliticianService {
         const activeMethodology = methodologyRes?.results?.[0] || methodologyRes?.[0]?.results?.[0] || null;
 
         // Fetch new Verification Engine items
-        const rawClaimsRes = await db.prepare(`SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20`).bind(politician.id).all();
-        const rawClaims = rawClaimsRes?.results || rawClaimsRes?.[0]?.results || [];
+        let rawClaims: any[] = [];
+        try {
+            const rawClaimsRes = await db.prepare(`SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20`).bind(politician.id).all();
+            rawClaims = rawClaimsRes?.results || rawClaimsRes?.[0]?.results || [];
+        } catch (e) {
+            // claims table may not exist or no data
+        }
 
         let evidenceMap: Record<string, any[]> = {};
         if (rawClaims.length > 0) {
-            const claimIds = rawClaims.map((c: any) => `'${c.id}'`).join(',');
-            const evidenceQuery = `SELECT * FROM evidence WHERE claim_id IN (${claimIds})`;
-            const evRes = await db.prepare(evidenceQuery).bind().all();
-            const allEvidence = evRes?.results || [];
+            try {
+                const claimIds = rawClaims.map((c: any) => `'${c.id}'`).join(',');
+                const evidenceQuery = `SELECT * FROM evidence WHERE claim_id IN (${claimIds})`;
+                const evRes = await db.prepare(evidenceQuery).all();
+                const allEvidence = evRes?.results || [];
 
-            allEvidence.forEach((ev: any) => {
-                if (!evidenceMap[ev.claim_id]) evidenceMap[ev.claim_id] = [];
-                evidenceMap[ev.claim_id].push(ev);
-            });
+                allEvidence.forEach((ev: any) => {
+                    if (!evidenceMap[ev.claim_id]) evidenceMap[ev.claim_id] = [];
+                    evidenceMap[ev.claim_id].push(ev);
+                });
+            } catch (e) {
+                // evidence table may not have data
+            }
         }
 
-        const stanceChangesRes = await db.prepare(`
-           SELECT sc.*, 
-                  oc.content as old_content, oc.date as old_date, oc.context as old_context,
-                  nc.content as new_content, nc.date as new_date, nc.context as new_context
-           FROM stance_changes sc
-           JOIN claims oc ON sc.old_claim_id = oc.id
-           JOIN claims nc ON sc.new_claim_id = nc.id
-           WHERE sc.politician_id = ? 
-           ORDER BY sc.created_at DESC LIMIT 10
-        `).bind(politician.id).all();
-
-        const rawStanceChanges = stanceChangesRes?.results || stanceChangesRes?.[0]?.results || [];
+        let rawStanceChanges: any[] = [];
+        try {
+            const stanceChangesRes = await db.prepare(`
+               SELECT sc.*, 
+                      oc.content as old_content, oc.date as old_date, oc.context as old_context,
+                      nc.content as new_content, nc.date as new_date, nc.context as new_context
+               FROM stance_changes sc
+               JOIN claims oc ON sc.old_claim_id = oc.id
+               JOIN claims nc ON sc.new_claim_id = nc.id
+               WHERE sc.politician_id = ? 
+               ORDER BY sc.created_at DESC LIMIT 10
+            `).bind(politician.id).all();
+            rawStanceChanges = stanceChangesRes?.results || stanceChangesRes?.[0]?.results || [];
+        } catch (e) {
+            // stance_changes table may not have data
+        }
 
         const stanceChangesFormatted = rawStanceChanges.map((sc: any) => ({
             id: sc.id,

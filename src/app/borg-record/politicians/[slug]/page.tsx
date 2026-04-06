@@ -45,6 +45,47 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                         )}
                         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background/90 to-transparent pointer-events-none z-10"></div>
                     </div>
+                    
+                    {/* At-a-Glance Metrics */}
+                    <div className="mt-6 flex flex-col gap-4">
+                        {/* Trustworthiness Bar */}
+                        <div className="group relative cursor-help">
+                            <div className="flex justify-between items-end mb-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-1">
+                                    Trust Score
+                                </span>
+                                <span className="text-xs font-bold font-serif">{politician.trustworthiness_score ?? 'N/A'}{politician.trustworthiness_score !== null ? '%' : ''}</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-muted overflow-hidden relative">
+                                <div 
+                                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 transition-all duration-1000 ease-out" 
+                                    style={{ width: `${politician.trustworthiness_score ?? 0}%` }}
+                                />
+                            </div>
+                            <div className="absolute top-10 left-0 w-full bg-popover text-popover-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
+                                Aggregated trustworthiness score based on campaign promises kept and historical vote consistency.
+                            </div>
+                        </div>
+
+                        {/* Liar-Liar Map */}
+                        <div className="group relative cursor-help border-t border-border/50 pt-4">
+                            <div className="flex justify-between items-end mb-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-[#fe8f00] transition-colors flex items-center gap-1">
+                                    <Flame className="w-3 h-3" /> Liar-Liar Map
+                                </span>
+                                <span className="text-xs font-bold font-serif text-[#fe8f00]">{factChecks.length} Recorded</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-muted overflow-hidden relative">
+                                <div 
+                                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#fe8f00] to-[#ff0000] shadow-[0_0_8px_#ff0000] transition-all duration-1000 ease-out" 
+                                    style={{ width: `${Math.min((factChecks.length / 5) * 100, 100)}%` }} 
+                                />
+                            </div>
+                            <div className="absolute top-14 left-0 w-full bg-popover text-popover-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
+                                {factChecks.length} verifiable false statements or "Pants on Fire" rulings tracked by the Discovery Engine.
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div className="w-full md:w-2/3 lg:w-3/4 space-y-6">
                     <div className="flex flex-wrap items-center gap-4">

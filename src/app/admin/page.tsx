@@ -43,6 +43,10 @@ function AdminDashboardContent() {
     const [articles, setArticles] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
+    // Global System Settings
+    const [settings, setSettings] = useState({ ai_provider: 'aiml', cloudflare_daily_operations_cap: '30' });
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
+
     // Editor State
     const [selectedArticle, setSelectedArticle] = useState<any>(null);
     const [editForm, setEditForm] = useState({ title: "", excerpt: "", content_html: "" });
@@ -70,6 +74,7 @@ function AdminDashboardContent() {
                 window.dispatchEvent(new Event('borg_admin_change'));
                 
                 fetchArticles(passphrase);
+                fetchSettings(passphrase);
             } else {
                 setAuthError("Invalid Passphrase. Access Denied.");
             }
@@ -94,6 +99,7 @@ function AdminDashboardContent() {
                     setIsAuthenticated(true);
                     window.dispatchEvent(new Event('borg_admin_change'));
                     fetchArticles(token);
+                    fetchSettings(token);
                 })
                 .catch(() => {
                     localStorage.removeItem("borg_admin_token");
@@ -120,6 +126,46 @@ function AdminDashboardContent() {
         if (res.ok) {
             const data: any = await res.json();
             setArticles(data.articles || []);
+        }
+    };
+
+    const fetchSettings = async (token: string) => {
+        try {
+            const res = await fetch('/api/admin/settings', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data: any = await res.json();
+                if (data.settings) setSettings(data.settings);
+            }
+        } catch (e) {
+            console.error("Failed to fetch settings", e);
+        }
+    };
+
+    const handleSaveSettings = async (newProvider: string, newCap: string) => {
+        setIsSavingSettings(true);
+        try {
+            const res = await fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${passphrase}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ai_provider: newProvider,
+                    cloudflare_daily_operations_cap: newCap
+                })
+            });
+            if (res.ok) {
+                setSettings({ ai_provider: newProvider, cloudflare_daily_operations_cap: newCap });
+            } else {
+                alert("Failed to save settings.");
+            }
+        } catch (e) {
+            console.error("Setting save error", e);
+        } finally {
+            setIsSavingSettings(false);
         }
     };
 
@@ -337,8 +383,91 @@ function AdminDashboardContent() {
                             </button>
                         </div>
 
+                        {/* Global AI Configuration */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-2">
+                            <div className="p-5 bg-slate-50 border-b border-slate-200">
+                                <h3 className="font-bold text-slate-800">Cost-Containment Protocol (Edge AI)</h3>
+                                <p className="text-xs text-slate-500 mt-1">When active, the autonomous engine bypasses paid external models (Gemini/Perplexity) and relies exclusively on Cloudflare Workers AI for research, fact extraction, and article structuring. Set Daily Limit correctly to avoid free-tier charges.</p>
+                            </div>
+                            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="flex flex-col gap-3">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Autonomous Core Provider</label>
+                                    <div className="flex items-center gap-4 bg-slate-100 p-2 rounded-xl">
+                                        <button 
+                                            onClick={() => handleSaveSettings('aiml', settings.cloudflare_daily_operations_cap)}
+                                            disabled={isSavingSettings}
+                                            className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all ${settings.ai_provider === 'aiml' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
+                                        >
+                                            Premium AIML (Gemini)
+                                        </button>
+                                        <button 
+                                            onClick={() => handleSaveSettings('cloudflare', settings.cloudflare_daily_operations_cap)}
+                                            disabled={isSavingSettings}
+                                            className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all ${settings.ai_provider === 'cloudflare' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-emerald-500' : 'text-slate-500 hover:bg-slate-200'}`}
+                                        >
+                                            Edge Free (Llama 3)
+                                        </button>
+                                    </div>
+                                    {settings.ai_provider === 'cloudflare' && (
+                                        <div className="mt-2 text-xs text-emerald-600 bg-emerald-50 p-3 rounded-lg border border-emerald-100 flex gap-2">
+                                            <ShieldCheck className="w-4 h-4 shrink-0" />
+                                            <span><strong>Cost-Containment Active:</strong> The Feeder pipeline requires exactly $0 compute to maintain standard publication cadence. Utilizing Unsplash Public Image Fallbacks + Llama 3 for structure.</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-col gap-3">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Cloudflare Daily Ingestion Caps</label>
+                                    <div className="flex items-end gap-3">
+                                        <div className="flex-1">
+                                            <input 
+                                                type="number"
+                                                value={settings.cloudflare_daily_operations_cap}
+                                                onChange={(e) => setSettings({...settings, cloudflare_daily_operations_cap: e.target.value})}
+                                                className="w-full text-lg font-mono p-3 bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none" 
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={() => handleSaveSettings(settings.ai_provider, settings.cloudflare_daily_operations_cap)}
+                                            disabled={isSavingSettings}
+                                            className="bg-slate-900 text-white font-bold text-sm px-6 py-3.5 rounded-xl hover:bg-slate-800 disabled:opacity-50"
+                                        >
+                                            {isSavingSettings ? 'Saving...' : 'Update Limits'}
+                                        </button>
+                                    </div>
+                                    <div className="mt-1">
+                                        <div className="flex justify-between text-xs font-bold mb-1">
+                                            <span className={parseInt(settings.cloudflare_daily_operations_cap || '0') > 35 ? 'text-amber-600' : 'text-slate-500'}>
+                                                Projected Cost vs Free Limit
+                                            </span>
+                                            <span className={parseInt(settings.cloudflare_daily_operations_cap || '0') > 43 ? 'text-red-500' : 'text-slate-500'}>
+                                                {settings.cloudflare_daily_operations_cap} / 43 Max Safe Articles
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                                            <div 
+                                                className={`h-2.5 rounded-full transition-all ${parseInt(settings.cloudflare_daily_operations_cap || '0') > 43 ? 'bg-red-500' : (parseInt(settings.cloudflare_daily_operations_cap || '0') > 35 ? 'bg-amber-400' : 'bg-emerald-500')}`}
+                                                style={{ width: `${Math.min((parseInt(settings.cloudflare_daily_operations_cap || '0') / 43) * 100, 100)}%` }}
+                                            ></div>
+                                        </div>
+                                        
+                                        {parseInt(settings.cloudflare_daily_operations_cap || '0') > 43 ? (
+                                            <p className="text-xs text-red-500 mt-2 font-bold flex items-center gap-1">
+                                                <AlertTriangle className="w-3 h-3" />
+                                                OVERAGE WARNING: This setting exceeds the ~10,000 Neural Free Tier limit (Max ~43 articles/day). You may be billed!
+                                            </p>
+                                        ) : (
+                                            <p className="text-xs text-slate-500 mt-2">
+                                                Max mathematical capacity per 24-hours before Cloudflare Llama-3 billing triggers is roughly 43 articles.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Status Matrix */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
                             {[
                                 { name: 'Sentinel', status: 'Active', icon: ShieldCheck, color: 'emerald' },
                                 { name: 'Scraper', status: 'Ready', icon: Activity, color: 'blue' },

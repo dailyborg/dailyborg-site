@@ -65,44 +65,75 @@ export default {
     // Wakes up when a Queue gets a new message.
     async queue(batch: import('@cloudflare/workers-types').MessageBatch<any>, env: Env, ctx: import('@cloudflare/workers-types').ExecutionContext) {
 
+        // Fetch Global Settings
+        let aiProvider = 'aiml';
+        let dailyCap = 30;
+        try {
+            const settingsRes = await env.DB.prepare("SELECT key, value FROM system_settings").all();
+            const settingsMap: any = (settingsRes.results || []).reduce((acc: any, row: any) => ({ ...acc, [row.key]: row.value }), {});
+            if (settingsMap.ai_provider) aiProvider = settingsMap.ai_provider;
+            if (settingsMap.cloudflare_daily_operations_cap) dailyCap = parseInt(settingsMap.cloudflare_daily_operations_cap, 10);
+        } catch (e) {}
+
+        // Enforce Quota
+        if (aiProvider === 'cloudflare') {
+            const todayOps = await env.DB.prepare("SELECT COUNT(*) as count FROM ingestion_logs WHERE status = 'inserted' AND date(created_at) = date('now')").first();
+            const count = (todayOps?.count as number) || 0;
+            if (count >= dailyCap) {
+                console.warn(`[AUTONOMOUS FEEDER] CLOUDFLARE QUOTA REACHED (${count}/${dailyCap}). Deferring batch.`);
+                return; // Do not ack, let them stay in queue until tomorrow
+            }
+        }
+
         // Route based on which queue woke us up
         if (batch.queue === 'enrichment-queue') {
-            console.log(`[AUTONOMOUS FEEDER] Processing ${batch.messages.length} messages from enrichment-queue`);
+            console.log(`[AUTONOMOUS FEEDER] Processing ${batch.messages.length} messages from enrichment-queue (Provider: ${aiProvider})`);
 
             for (const message of batch.messages) {
                 const { url, title, source } = message.body;
                 console.log(`Enriching: ${title}`);
 
                 try {
-                    // Call Perplexity Sonar via AIML API for deep context
-                    const response = await fetch("https://api.aimlapi.com/chat/completions", {
-                        method: "POST",
-                        headers: {
-                            "Authorization": `Bearer ${env.AIML_API_KEY}`,
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            model: "perplexity/sonar-pro",
-                            messages: [
-                                {
-                                    role: "system",
-                                    content: "You are a research AI. Your job is to read the provided news URL and return a highly detailed summary of the facts, quotes, and statistics contained within. Focus entirely on who said what, and what specific promises/facts were mentioned."
-                                },
-                                {
-                                    role: "user",
-                                    content: `Summarize the contents of this article and extract key factual claims: ${title} - ${url}`
-                                }
-                            ],
+                    let enrichedText = "";
+
+                    if (aiProvider === 'cloudflare') {
+                        const prompt = `You are a research AI. Read the news article from this URL: ${url} (Title: ${title}). Summarize the facts, quotes, and statistics contained within. Focus entirely on who said what, and what specific promises/facts were mentioned.`;
+                        const aiResponse = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+                            messages: [{ role: "user", content: prompt }],
                             max_tokens: 2000
-                        })
-                    });
+                        });
+                        enrichedText = (aiResponse as any).response;
+                    } else {
+                        // Call Perplexity Sonar via AIML API for deep context
+                        const response = await fetch("https://api.aimlapi.com/chat/completions", {
+                            method: "POST",
+                            headers: {
+                                "Authorization": `Bearer ${env.AIML_API_KEY}`,
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                model: "perplexity/sonar-pro",
+                                messages: [
+                                    {
+                                        role: "system",
+                                        content: "You are a research AI. Your job is to read the provided news URL and return a highly detailed summary of the facts, quotes, and statistics contained within. Focus entirely on who said what, and what specific promises/facts were mentioned."
+                                    },
+                                    {
+                                        role: "user",
+                                        content: `Summarize the contents of this article and extract key factual claims: ${title} - ${url}`
+                                    }
+                                ],
+                                max_tokens: 2000
+                            })
+                        });
 
-                    if (!response.ok) {
-                        throw new Error(`AIML API Error: ${response.status} ${response.statusText}`);
+                        if (!response.ok) {
+                            throw new Error(`AIML API Error: ${response.status} ${response.statusText}`);
+                        }
+
+                        const perplexityData = (await response.json()) as any;
+                        enrichedText = perplexityData.choices?.[0]?.message?.content;
                     }
-
-                    const perplexityData = (await response.json()) as any;
-                    const enrichedText = perplexityData.choices?.[0]?.message?.content;
 
                     if (enrichedText) {
                         // Forward enriched text to Gemini/DB queue
@@ -163,26 +194,39 @@ export default {
                         Text: ${enriched_text}
                     `;
 
-                    const geminiResponse = await fetch("https://api.aimlapi.com/chat/completions", {
-                        method: "POST",
-                        headers: {
-                            "Authorization": `Bearer ${env.AIML_API_KEY}`,
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            model: "gemini-3-flash-preview",
-                            messages: [{ role: "user", content: prompt }],
-                            response_format: { type: "json_object" },
-                            temperature: 0.1
-                        })
-                    });
+                    let jsonContent;
 
-                    if (!geminiResponse.ok) {
-                        throw new Error(`Gemini AIML Error: ${geminiResponse.status}`);
+                    if (aiProvider === 'cloudflare') {
+                        const modifiedPrompt = prompt + `\n\nAlways return strict and valid JSON format. Do not include markdown code block formatting like \`\`\`json. Return only the raw JSON string.`;
+                        const aiResponse = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+                            messages: [{ role: "user", content: modifiedPrompt }]
+                        });
+                        let rawText = (aiResponse as any).response;
+                        // Clean markdown if Llama added it
+                        rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                        jsonContent = rawText;
+                    } else {
+                        const geminiResponse = await fetch("https://api.aimlapi.com/chat/completions", {
+                            method: "POST",
+                            headers: {
+                                "Authorization": `Bearer ${env.AIML_API_KEY}`,
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                model: "gemini-3-flash-preview",
+                                messages: [{ role: "user", content: prompt }],
+                                response_format: { type: "json_object" },
+                                temperature: 0.1
+                            })
+                        });
+
+                        if (!geminiResponse.ok) {
+                            throw new Error(`Gemini AIML Error: ${geminiResponse.status}`);
+                        }
+
+                        const geminiData = (await geminiResponse.json()) as any;
+                        jsonContent = geminiData.choices?.[0]?.message?.content;
                     }
-
-                    const geminiData = (await geminiResponse.json()) as any;
-                    const jsonContent = geminiData.choices?.[0]?.message?.content;
 
                     let parsedData;
                     try { parsedData = JSON.parse(jsonContent); } catch { parsedData = { claims: [] }; }
@@ -192,37 +236,61 @@ export default {
                     const primaryPolitician = parsedData.primary_politician || "unknown";
                     const emotionalContext = parsedData.emotional_context || "neutral";
 
-                    // 3. Hybrid Image Strategy (Public Photos vs Nano Banana 2)
+                    // 3. Multi-Source Public Domain Image Matrix
                     let generatedImageUrl = null;
 
-                    // If it's not politics, or we couldn't find a primary politician to map
+                    // Only execute if not politics (politics automatically handled by Wikipedia on frontend)
                     if (category !== "Politics" || primaryPolitician === "unknown") {
+                        let sourceResolved = false;
+
+                        // Tier 1: Search Wikipedia/Wikimedia for a highly relevant article image
                         try {
-                            console.log(`[AUTONOMOUS FEEDER] Generating Nano Banana 2 image for category: ${category}`);
-                            const imagePrompt = `High quality editorial news illustration about: ${title}. Style: professional, objective news media, no text.`;
-
-                            const imageResponse = await fetch("https://api.aimlapi.com/images/generations", {
-                                method: "POST",
-                                headers: {
-                                    "Authorization": `Bearer ${env.AIML_API_KEY}`,
-                                    "Content-Type": "application/json"
-                                },
-                                body: JSON.stringify({
-                                    model: "google/nano-banana-2", // Gemini 3 Flash Image
-                                    prompt: imagePrompt,
-                                    n: 1,
-                                    size: "1024x1024"
-                                })
-                            });
-
-                            if (imageResponse.ok) {
-                                const imageData = (await imageResponse.json()) as any;
-                                generatedImageUrl = imageData.data?.[0]?.url;
-                            } else {
-                                console.warn(`[AUTONOMOUS FEEDER] Image Gen Failed: ${imageResponse.status}`);
+                            const wikiSearch = title.split(' ').slice(0, 3).join(' ');
+                            const wikiRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(wikiSearch)}&gsrlimit=1&prop=pageimages&pithumbsize=1024`);
+                            const wikiData = (await wikiRes.json()) as any;
+                            if (wikiData.query && wikiData.query.pages) {
+                                const pages = Object.values(wikiData.query.pages) as any[];
+                                if (pages.length > 0 && pages[0].thumbnail) {
+                                    generatedImageUrl = pages[0].thumbnail.source;
+                                    sourceResolved = true;
+                                    console.log(`[AUTONOMOUS FEEDER] Tier 1 Wikimedia matched: ${generatedImageUrl}`);
+                                }
                             }
-                        } catch (imgError) {
-                            console.error(`[AUTONOMOUS FEEDER] Image generation network error:`, imgError);
+                        } catch (e) {}
+
+                        // Tier 2: Unsplash & Native AI Generation Fallbacks
+                        if (!sourceResolved && aiProvider === 'aiml') {
+                            try {
+                                console.log(`[AUTONOMOUS FEEDER] Tier 2 Generating Nano Banana 2 image for category: ${category}`);
+                                const imagePrompt = `High quality editorial news illustration about: ${title}. Style: professional, objective news media, no text.`;
+
+                                const imageResponse = await fetch("https://api.aimlapi.com/images/generations", {
+                                    method: "POST",
+                                    headers: {
+                                        "Authorization": `Bearer ${env.AIML_API_KEY}`,
+                                        "Content-Type": "application/json"
+                                    },
+                                    body: JSON.stringify({
+                                        model: "google/nano-banana-2", // Gemini 3 Flash Image
+                                        prompt: imagePrompt,
+                                        n: 1,
+                                        size: "1024x1024"
+                                    })
+                                });
+
+                                if (imageResponse.ok) {
+                                    const imageData = (await imageResponse.json()) as any;
+                                    generatedImageUrl = imageData.data?.[0]?.url;
+                                } else {
+                                    console.warn(`[AUTONOMOUS FEEDER] Image Gen Failed: ${imageResponse.status}`);
+                                }
+                            } catch (imgError) {
+                                console.error(`[AUTONOMOUS FEEDER] Image generation network error:`, imgError);
+                            }
+                        } else if (!sourceResolved && aiProvider === 'cloudflare') {
+                            console.log(`[AUTONOMOUS FEEDER] Tier 3 Native Unsplash Route (Bypassing AI Gen due to cost protocols)`);
+                            // We intentionally skip Stable Diffusion pixel generation here as it bloats D1 payload via base64, 
+                            // and prefer falling back to standardized semantic UI tag loading on frontend if wikimedia fails.
                         }
                     }
 

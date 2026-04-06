@@ -1,5 +1,6 @@
 import { Agent, callable, routeAgentRequest } from "agents";
 import { processDeliveries } from './delivery';
+import { D1Database, R2Bucket, Queue, DurableObjectNamespace, MessageBatch } from "@cloudflare/workers-types";
 
 interface Env {
     DB: D1Database;
@@ -12,6 +13,7 @@ interface Env {
     TWILIO_WHATSAPP_NUMBER: string;
     ENRICHMENT_QUEUE: Queue<any>;
     IngestCoordinator: DurableObjectNamespace;
+    AI: any;
 }
 
 // ============================================================
@@ -60,9 +62,52 @@ export class IngestCoordinator extends Agent<Env> {
         `;
 
         // =======================================================
-        // AI ENRICHMENT via AIML API (Gemini 3 Flash)
+        // Fetch Global Settings
         // =======================================================
-        if (this.env.AIML_API_KEY && this.env.AIML_API_KEY.length > 5 && this.env.AIML_API_KEY !== 'mock') {
+        let aiProvider = 'aiml';
+        let dailyCap = 30;
+        try {
+            const settingsRes = await this.env.DB.prepare("SELECT key, value FROM system_settings").all();
+            const settingsMap: any = (settingsRes.results || []).reduce((acc: any, row: any) => ({ ...acc, [row.key]: row.value }), {});
+            if (settingsMap.ai_provider) aiProvider = settingsMap.ai_provider;
+            if (settingsMap.cloudflare_daily_operations_cap) dailyCap = parseInt(settingsMap.cloudflare_daily_operations_cap, 10);
+        } catch (e) {}
+
+        if (aiProvider === 'cloudflare') {
+            const todayOps = await this.env.DB.prepare("SELECT COUNT(*) as count FROM ingestion_logs WHERE status = 'inserted' AND date(created_at) = date('now')").first();
+            const count = (todayOps?.count as number) || 0;
+            if (count >= dailyCap) {
+                console.warn(`[Ingest] CLOUDFLARE QUOTA REACHED (${count}/${dailyCap}). Deferring.`);
+                return { status: "deferred", reason: "quota" };
+            }
+        }
+
+        // =======================================================
+        // AI ENRICHMENT (Llama 3 or Gemini)
+        // =======================================================
+        if (aiProvider === 'cloudflare') {
+            try {
+                const aiResponse = await this.env.AI.run('@cf/meta/llama-3-8b-instruct', {
+                    messages: [
+                        { role: "system", content: "You are an API that strictly returns valid JSON with no formatting blocks." },
+                        { role: "user", content: enrichmentPrompt }
+                    ]
+                });
+                let rawText = (aiResponse as any).response;
+                rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                
+                articleObject = JSON.parse(rawText);
+
+                const validDesks = ['Politics','Crime','Business','Entertainment','Sports','Science','Education'];
+                if (articleObject.desk && !validDesks.includes(articleObject.desk)) {
+                    articleObject.desk = 'Politics';
+                }
+            } catch (e: any) {
+                console.error("Cloudflare AI Fetch Failure:", e.message);
+                await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                    .bind(crypto.randomUUID(), title.substring(0, 50), 'fetch_failure', `Cloudflare Net Error: ${e.message}`).run();
+            }
+        } else if (this.env.AIML_API_KEY && this.env.AIML_API_KEY.length > 5 && this.env.AIML_API_KEY !== 'mock') {
             try {
                 const aiResponse = await fetch("https://api.aimlapi.com/v1/chat/completions", {
                     method: "POST",
@@ -143,11 +188,28 @@ export class IngestCoordinator extends Agent<Env> {
         }
 
         // =======================================================
-        // IMAGE PIPELINE
-        // Tier 1: Unsplash (free)  →  Tier 2: Nano Banana 2 (paid fallback)
+        // IMAGE PIPELINE (3-Tier Matrix)
+        // Tier 1: Wikimedia → Tier 2: Unsplash → Tier 3: AIML (if active)
         // =======================================================
         let heroImageUrl = `https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?q=80&w=2070&auto=format&fit=crop`;
         let imageSource = "default";
+
+        // --- TIER 1: Wikimedia Action API ---
+        if (articleObject.desk === "Politics" || articleObject.desk === "General") {
+            try {
+                const wikiSearch = articleObject.title.split(' ').slice(0, 3).join(' ');
+                const wikiRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(wikiSearch)}&gsrlimit=1&prop=pageimages&pithumbsize=1024`);
+                const wikiData = (await wikiRes.json()) as any;
+                if (wikiData.query && wikiData.query.pages) {
+                    const pages = Object.values(wikiData.query.pages) as any[];
+                    if (pages.length > 0 && pages[0].thumbnail) {
+                        heroImageUrl = pages[0].thumbnail.source;
+                        imageSource = "wikimedia";
+                        console.log(`[Tier 1] Wikimedia matched: ${heroImageUrl}`);
+                    }
+                }
+            } catch (e) {}
+        }
 
         // --- TIER 1: Unsplash ---
         try {
@@ -183,11 +245,11 @@ export class IngestCoordinator extends Agent<Env> {
             console.warn(`[Tier 1] Unsplash search failed:`, unsplashErr);
         }
 
-        // --- TIER 2: Nano Banana 2 (paid fallback) ---
-        if (imageSource === "default") {
+        // --- TIER 3: Nano Banana 2 (paid fallback) ---
+        if (imageSource === "default" && aiProvider === 'aiml') {
             try {
                 if (this.env.AIML_API_KEY && this.env.AIML_API_KEY.length > 5 && this.env.AIML_API_KEY !== 'mock') {
-                    console.log(`[Tier 2] No free image found. Generating with Nano Banana 2...`);
+                    console.log(`[Tier 3] No free image found. Generating with Nano Banana 2...`);
                     const imageRes = await fetch("https://api.aimlapi.com/v1/images/generations", {
                         method: "POST",
                         headers: {
@@ -206,15 +268,17 @@ export class IngestCoordinator extends Agent<Env> {
                         const imgData = await imageRes.json() as any;
                         heroImageUrl = imgData.data[0].url;
                         imageSource = "nano-banana-2";
-                        console.log(`[Tier 2] ✅ Generated AI image: ${heroImageUrl}`);
+                        console.log(`[Tier 3] ✅ Generated AI image: ${heroImageUrl}`);
                     } else {
                         const errText = await imageRes.text();
-                        console.warn(`[Tier 2] Nano Banana 2 failed: ${imageRes.status} - ${errText}`);
+                        console.warn(`[Tier 3] Nano Banana 2 failed: ${imageRes.status} - ${errText}`);
                     }
                 }
             } catch (imgErr) {
-                console.error(`[Tier 2] Failed to generate image:`, imgErr);
+                console.error(`[Tier 3] Failed to generate image:`, imgErr);
             }
+        } else if (imageSource === "default" && aiProvider === 'cloudflare') {
+            console.log(`[Tier 3] Skipping AI Generation to strictly uphold Cost-Containment Protocol.`);
         }
 
         console.log(`Image sourced via: ${imageSource}`);
