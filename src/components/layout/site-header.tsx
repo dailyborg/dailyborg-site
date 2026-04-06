@@ -208,7 +208,7 @@ export function SiteHeader({
                                     alt="Daily Borg Mascot"
                                     width={64}
                                     height={64}
-                                    className="mb-2 group-hover:scale-105 transition-transform duration-200"
+                                    className="-mb-2 group-hover:scale-105 transition-transform duration-200"
                                     priority
                                 />
                                 <span className="font-[family-name:var(--font-playfair)] text-4xl md:text-6xl font-black text-foreground tracking-tight leading-none group-hover:opacity-90 transition-opacity">
