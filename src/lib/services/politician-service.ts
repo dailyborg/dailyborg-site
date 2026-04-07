@@ -1,5 +1,5 @@
 // src/lib/services/politician-service.ts
-// DB dependency removed from top-level to allow headless node testing of just math functions
+import { getDbBinding } from '../db';
 
 // Strict Stance Taxonomy Values (for mathematical derivation)
 export const STANCE_WEIGHTS = {
@@ -195,8 +195,6 @@ export class PoliticianService {
             };
         }
 
-        // Dynamic import protects the pure math functions above from breaking in Node Test CLI
-        const { getDbBinding } = await import("../db");
         const db = await getDbBinding();
 
         // Execute queries sequentially for local SQLite compatibility under OpenNext
