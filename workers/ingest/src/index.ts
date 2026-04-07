@@ -160,31 +160,13 @@ export class IngestCoordinator extends Agent<Env> {
         }
 
         // =======================================================
-        // FALLBACK: High-Quality Mock Content if AI fails
+        // FALLBACK: Abort instead of creating clones
         // =======================================================
-        if (!articleObject) {
-            console.log("Using High-Quality Mock Fallback...");
-
-            // Map the scraper's feed type to a proper desk name
-            // This is CRITICAL — without it, all fallback articles default to Politics
-            const deskMap: Record<string, string> = {
-                politics: 'Politics', crime: 'Crime', business: 'Business',
-                entertainment: 'Entertainment', sports: 'Sports',
-                science: 'Science', education: 'Education', standard: 'Politics'
-            };
-            const resolvedDesk = deskMap[(type || '').toLowerCase()] || 'Politics';
-
-            articleObject = {
-                canonical_event_slug: slug,
-                title: `Report: ${title}`,
-                excerpt: `Significant developments reported from ${sourceUrl} regarding matters of public interest.`,
-                contentHtml: `<p><strong>Borg Autonomous Network Update</strong> — Our systems monitoring grid has detected a significant shift in the current geopolitical landscape, marking a pivotal moment for digital reporting.</p><p>As the system processes incoming data from ${sourceUrl}, experts suggest that the implications for state-level strategy and international relations could be profound. This report, synthesized through the Borg's multi-threaded analysis engine, identifies key vectors of change in the current governance paradigm.</p><p>The primary concern remains the integration of decentralized intelligence into traditional legislative frameworks. While initial reactions from market leaders have been mixed, the underlying trend points toward a more synchronized, algorithmic approach to crisis management. The data suggests that at least two major institutions are currently redefining their protocol for transparency, leading to a new era of verifiable governance.</p><p>Furthermore, the extraction of these patterns through automated verification ensures that the core integrity of the narrative remains uncompromised. As this situation evolves, the matrix will continue to provide real-time updates and deep-trench analysis for all sub-sectors. The current confidence score for this intelligence stream remains elevated, reflecting the high authority of the primary feeder feeds.</p><p>In conclusion, this event represents more than just a fleeting headline; it is a foundational shift in how information is synthesized and distributed at the edge. The Borg Network is optimized to maintain this signal throughout the duration of the cycle.</p><p>Sources identified in this report include the primary feeder network and verified independent monitors tracking the ${sourceUrl} domain.</p>`,
-                keyTakeaways: ["High-integrity data stream detected", "Strategic alignment shifting locally", "Autonomous verification completed"],
-                confidenceScore: 85,
-                suggestedHeroImagePrompt: "A sleek, cinematic blue digital matrix networking across a cityscape",
-                desk: resolvedDesk,
-                sources: [{ source_name: "Feeder Network", source_url: sourceUrl, source_type: "primary" }]
-            };
+        if (!articleObject || !articleObject.title) {
+            console.error("AI Parsing Failed. Aborting ingestion of mock clones.");
+            await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                .bind(crypto.randomUUID(), title.substring(0, 50), 'failed', `AI Parser returned empty result`).run();
+            return { status: "failed", reason: "missing_payload" };
         }
 
         // =======================================================

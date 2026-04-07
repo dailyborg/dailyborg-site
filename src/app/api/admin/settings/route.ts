@@ -39,6 +39,7 @@ export async function GET(request: Request) {
         // Defaults if missing
         if (!settings.ai_provider) settings.ai_provider = 'aiml';
         if (!settings.cloudflare_daily_operations_cap) settings.cloudflare_daily_operations_cap = '30';
+        if (!settings.logo_placement) settings.logo_placement = 'center';
 
         return NextResponse.json({ settings });
     } catch (error: any) {
@@ -68,6 +69,9 @@ export async function POST(request: Request) {
         }
         if (body.cloudflare_daily_operations_cap) {
             updates.push({ key: 'cloudflare_daily_operations_cap', value: String(body.cloudflare_daily_operations_cap) });
+        }
+        if (body.logo_placement && ['left', 'center', 'right'].includes(body.logo_placement)) {
+            updates.push({ key: 'logo_placement', value: body.logo_placement });
         }
 
         if (updates.length === 0) {
