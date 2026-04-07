@@ -6,13 +6,13 @@ export const runtime = 'edge';
 // Helper to ensure the table schema exists. Doing this here guarantees it works safely in production without Wrangler CLI schema push issues.
 async function initSchema(db: any) {
     try {
-        await db.exec(`
+        await db.prepare(`
             CREATE TABLE IF NOT EXISTS system_settings (
                 key TEXT PRIMARY KEY, 
                 value TEXT NOT NULL, 
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        `);
+        `).run();
     } catch (e) {
         console.error("Failed to init system_settings table:", e);
     }

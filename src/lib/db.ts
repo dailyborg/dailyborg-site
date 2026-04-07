@@ -6,7 +6,10 @@ const dummyDb = {
             run: () => Promise.resolve({ success: true }),
             all: () => Promise.resolve({ success: true, results: [] }),
             first: () => Promise.resolve(null)
-        })
+        }),
+        run: () => Promise.resolve({ success: true }),
+        all: () => Promise.resolve({ success: true, results: [] }),
+        first: () => Promise.resolve(null)
     }),
     batch: () => Promise.resolve([])
 };

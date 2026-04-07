@@ -8,13 +8,13 @@ export async function GET() {
         const db = await getDbBinding();
         
         // Ensure table exists just in case
-        await db.exec(`
+        await db.prepare(`
             CREATE TABLE IF NOT EXISTS system_settings (
                 key TEXT PRIMARY KEY, 
                 value TEXT NOT NULL, 
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        `).catch(() => {});
+        `).run().catch(() => {});
 
         const results = await db.prepare("SELECT key, value FROM system_settings WHERE key IN ('logo_placement')").all();
         const settings = (results.results || []).reduce((acc: any, row: any) => {
