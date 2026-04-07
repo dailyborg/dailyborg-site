@@ -44,9 +44,8 @@ function AdminDashboardContent() {
     const [isLoading, setIsLoading] = useState(false);
 
     // Global System Settings
-    const [settings, setSettings] = useState({ ai_provider: 'aiml', cloudflare_daily_operations_cap: '30' });
+    const [settings, setSettings] = useState<any>({ ai_provider: 'aiml', cloudflare_daily_operations_cap: '30', logo_placement: 'center' });
     const [isSavingSettings, setIsSavingSettings] = useState(false);
-    const [previewLogoPlacement, setPreviewLogoPlacement] = useState<'left' | 'center' | 'bar'>('center');
 
     // Comments Moderation State
     const [adminComments, setAdminComments] = useState<any[]>([]);
@@ -113,17 +112,7 @@ function AdminDashboardContent() {
                     window.dispatchEvent(new Event('borg_admin_change'));
                 });
         }
-        
-        // Load local UI settings
-        const storedLogo = localStorage.getItem('borg_logo_placement');
-        if (storedLogo) setPreviewLogoPlacement(storedLogo as any);
     }, []);
-
-    const handleLocalLogoChange = (placement: 'left' | 'center' | 'bar') => {
-        setPreviewLogoPlacement(placement);
-        localStorage.setItem('borg_logo_placement', placement);
-        window.dispatchEvent(new Event('borg_logo_change'));
-    };
 
     // Hook to allow refreshing metrics when the date segment changes
     useEffect(() => {
@@ -235,6 +224,33 @@ function AdminDashboardContent() {
                 setSettings({ ai_provider: newProvider, cloudflare_daily_operations_cap: newCap });
             } else {
                 alert("Failed to save settings.");
+            }
+        } catch (e) {
+            console.error("Setting save error", e);
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
+
+    const handleSaveGlobalLogo = async (placement: 'left' | 'center' | 'right') => {
+        setIsSavingSettings(true);
+        try {
+            const res = await fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${passphrase}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    logo_placement: placement
+                })
+            });
+            if (res.ok) {
+                setSettings({ ...settings, logo_placement: placement });
+                // Tell the header to react locally for instant preview while broadcasting global change
+                window.dispatchEvent(new CustomEvent('borg_logo_change', { detail: placement }));
+            } else {
+                alert("Failed to save logo settings.");
             }
         } catch (e) {
             console.error("Setting save error", e);
@@ -546,32 +562,38 @@ function AdminDashboardContent() {
                             </div>
                         </div>
 
-                        {/* Brand UI Preview Settings */}
+                        {/* Brand UI Settings */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-2">
-                            <div className="p-5 bg-slate-50 border-b border-slate-200">
-                                <h3 className="font-bold text-slate-800">Brand UI Preview (Local)</h3>
-                                <p className="text-xs text-slate-500 mt-1">Live toggle the masthead logo placement to preview different layouts. This setting only applies to your local administrative session.</p>
+                            <div className="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-bold text-slate-800">Global Brand Layout</h3>
+                                    <p className="text-xs text-slate-500 mt-1">This setting dictates where the masthead mascot is positioned for all visitors site-wide.</p>
+                                </div>
+                                {isSavingSettings && <span className="text-xs font-bold text-amber-500 animate-pulse">Syncing to Edge...</span>}
                             </div>
                             <div className="p-6">
                                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">Logo Placement Option</label>
                                 <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-100 p-2 rounded-xl">
                                     <button 
-                                        onClick={() => handleLocalLogoChange('left')}
-                                        className={`flex-1 w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${previewLogoPlacement === 'left' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
+                                        onClick={() => handleSaveGlobalLogo('left')}
+                                        disabled={isSavingSettings}
+                                        className={`flex-1 w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${settings.logo_placement === 'left' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
                                     >
-                                        Option A (Left)
+                                        Masthead Left
                                     </button>
                                     <button 
-                                        onClick={() => handleLocalLogoChange('center')}
-                                        className={`flex-1 w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${previewLogoPlacement === 'center' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
+                                        onClick={() => handleSaveGlobalLogo('center')}
+                                        disabled={isSavingSettings}
+                                        className={`flex-1 w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${settings.logo_placement === 'center' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
                                     >
-                                        Option B (Center Stack)
+                                        Masthead Center
                                     </button>
                                     <button 
-                                        onClick={() => handleLocalLogoChange('bar')}
-                                        className={`flex-1 w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${previewLogoPlacement === 'bar' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
+                                        onClick={() => handleSaveGlobalLogo('right')}
+                                        disabled={isSavingSettings}
+                                        className={`flex-1 w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${settings.logo_placement === 'right' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
                                     >
-                                        Option C (Navy Bar)
+                                        Masthead Right
                                     </button>
                                 </div>
                             </div>
