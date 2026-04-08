@@ -96,7 +96,20 @@ export class IngestCoordinator extends Agent<Env> {
                 let rawText = (aiResponse as any).response;
                 rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
                 
-                articleObject = JSON.parse(rawText);
+                // Extract just the JSON object
+                const firstBrace = rawText.indexOf('{');
+                const lastBrace = rawText.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                    rawText = rawText.substring(firstBrace, lastBrace + 1);
+                }
+
+                try {
+                    articleObject = JSON.parse(rawText);
+                } catch (e) {
+                    // Fallback to strip problematic control characters if JSON.parse fails
+                    const safeText = rawText.replace(/[\n\r\t]/g, ' ');
+                    articleObject = JSON.parse(safeText);
+                }
 
                 const validDesks = ['Politics','Crime','Business','Entertainment','Sports','Science','Education'];
                 if (articleObject.desk && !validDesks.includes(articleObject.desk)) {
