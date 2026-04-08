@@ -197,147 +197,139 @@ export class PoliticianService {
 
         const db = await getDbBinding();
 
+        // Execute queries sequentially for local SQLite compatibility under OpenNext
+        const politicianRes = await db.prepare(`SELECT * FROM politicians WHERE slug = ? AND country = 'US'`).bind(slug).all();
+        const promisesRes = await db.prepare(`SELECT * FROM promises WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY date_said DESC`).bind(slug).all();
+        const positionsRes = await db.prepare(`SELECT * FROM positions WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY topic ASC, statement_date DESC`).bind(slug).all();
+        
+        let activeMethodology = null;
         try {
-            // Execute queries sequentially for local SQLite compatibility under OpenNext
-            const politicianRes = await db.prepare(`SELECT * FROM politicians WHERE slug = ? AND country = 'US'`).bind(slug).all();
-            const promisesRes = await db.prepare(`SELECT * FROM promises WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY date_said DESC`).bind(slug).all();
-            const positionsRes = await db.prepare(`SELECT * FROM positions WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY topic ASC, statement_date DESC`).bind(slug).all();
-            const methodologyRes = await db.prepare(`SELECT * FROM methodology_versions WHERE is_active = 1 LIMIT 1`).all();
-
-            const politician = politicianRes?.results?.[0] || politicianRes?.[0]?.results?.[0]; // Handle varying return shapes between D1 / BetterSQLite
-            if (!politician) return null;
-
-            const promises = promisesRes?.results || promisesRes?.[0]?.results || [];
-            const positions = (positionsRes?.results as PositionEvent[]) || (positionsRes?.[0]?.results as PositionEvent[]) || [];
-            const activeMethodology = methodologyRes?.results?.[0] || methodologyRes?.[0]?.results?.[0] || null;
-
-            // Fetch new Verification Engine items
-            let rawClaims: any[] = [];
-            try {
-                const rawClaimsRes = await db.prepare(`SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20`).bind(politician.id).all();
-                rawClaims = rawClaimsRes?.results || rawClaimsRes?.[0]?.results || [];
-            } catch (e) {
-                // claims table may not exist or no data
-            }
-
-            let evidenceMap: Record<string, any[]> = {};
-            if (rawClaims.length > 0) {
-                try {
-                    const claimIds = rawClaims.map((c: any) => `'${c.id}'`).join(',');
-                    const evidenceQuery = `SELECT * FROM evidence WHERE claim_id IN (${claimIds})`;
-                    const evRes = await db.prepare(evidenceQuery).all();
-                    const allEvidence = evRes?.results || [];
-
-                    allEvidence.forEach((ev: any) => {
-                        if (!evidenceMap[ev.claim_id]) evidenceMap[ev.claim_id] = [];
-                        evidenceMap[ev.claim_id].push(ev);
-                    });
-                } catch (e) {
-                    // evidence table may not have data
-                }
-            }
-
-            let rawStanceChanges: any[] = [];
-            try {
-                const stanceChangesRes = await db.prepare(`
-                   SELECT sc.*, 
-                          oc.content as old_content, oc.date as old_date, oc.context as old_context,
-                          nc.content as new_content, nc.date as new_date, nc.context as new_context
-                   FROM stance_changes sc
-                   JOIN claims oc ON sc.old_claim_id = oc.id
-                   JOIN claims nc ON sc.new_claim_id = nc.id
-                   WHERE sc.politician_id = ? 
-                   ORDER BY sc.created_at DESC LIMIT 10
-                `).bind(politician.id).all();
-                rawStanceChanges = stanceChangesRes?.results || stanceChangesRes?.[0]?.results || [];
-            } catch (e) {
-                // stance_changes table may not have data
-            }
-
-            const stanceChangesFormatted = rawStanceChanges.map((sc: any) => ({
-                id: sc.id,
-                topic: sc.topic,
-                shift_description: sc.shift_description,
-                dateOfChange: sc.new_date,
-                old_claim: { content: sc.old_content, date: sc.old_date, context: sc.old_context },
-                new_claim: { content: sc.new_content, date: sc.new_date, context: sc.new_context }
-            }));
-
-            const promiseMetrics = this.calculatePromises(promises);
-            const consistencyMetrics = this.calculateConsistency(positions);
-
-            // Fetch trustworthiness history for time-series chart
-            let trustHistory: any[] = [];
-            try {
-                const trustHistRes = await db.prepare(
-                    `SELECT score, promises_kept, promises_broken, scored_at FROM trustworthiness_history WHERE politician_id = ? ORDER BY scored_at ASC LIMIT 30`
-                ).bind(politician.id).all();
-                trustHistory = trustHistRes?.results || trustHistRes?.[0]?.results || [];
-            } catch (e) {
-                // Table may not exist yet in local dev
-            }
-
-            // Fetch recent legislative votes
-            let recentVotes: any[] = [];
-            try {
-                const votesRes = await db.prepare(
-                    `SELECT v.id, v.title, v.vote_date, pv.position, pv.rationale 
-                     FROM votes v 
-                     JOIN politician_votes pv ON v.id = pv.vote_id 
-                     WHERE pv.politician_id = ? 
-                     ORDER BY v.vote_date DESC LIMIT 10`
-                ).bind(politician.id).all();
-                recentVotes = votesRes?.results || votesRes?.[0]?.results || [];
-            } catch (e) {
-                // Fallback if table doesn't exist locally
-                recentVotes = [];
-            }
-
-            // Fetch Fact Checks
-            let factChecks: any[] = [];
-            try {
-                const fcRes = await db.prepare(
-                    `SELECT * FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 5`
-                ).bind(slug).all();
-                factChecks = fcRes?.results || fcRes?.[0]?.results || [];
-            } catch (e) {
-                factChecks = [];
-            }
-
-            return {
-                politician,
-                promises,
-                positions,
-                claims: rawClaims,
-                evidenceMap,
-                aiStanceChanges: stanceChangesFormatted,
-                trustHistory,
-                recentVotes,
-                factChecks,
-                methodology: activeMethodology,
-                derivedScores: {
-                    promiseKeepsRate: promiseMetrics.rate,
-                    promiseBreakdown: promiseMetrics.breakdown,
-                    consistencyScore: consistencyMetrics.score,
-                    consistencyBreakdown: {
-                        eligibleTopics: consistencyMetrics.totalEligibleTopics,
-                        contradictions: consistencyMetrics.contradictions,
-                        shiftEvents: consistencyMetrics.shiftEvents
-                    }
-                }
-            };
-        } catch (serverError: any) {
-            return {
-                politician: {
-                    id: 'error', slug, name: String(serverError.stack || serverError.message || serverError), office_held: 'Error Handler', party: 'Error', district_state: '', time_in_office: '', country: 'US', region_level: 'Federal',
-                    trustworthiness_score: 0, promises_kept: 0, promises_broken: 0, promises_total: 0, popularity_score: 0
-                },
-                promises: [], positions: [], trustHistory: [], recentVotes: [], factChecks: [], methodology: null, claims: [], evidenceMap: {}, aiStanceChanges: [],
-                derivedScores: {
-                    promiseKeepsRate: 0, promiseBreakdown: { fulfilled: 0, broken: 0, reversed: 0, inProgress: 0 },
-                    consistencyScore: 0, consistencyBreakdown: { eligibleTopics: 0, contradictions: 0, shiftEvents: [] }
-                }
-            };
+            const methodologyRes = await db.prepare(`SELECT * FROM methodology_versions LIMIT 1`).all();
+            activeMethodology = methodologyRes?.results?.[0] || methodologyRes?.[0]?.results?.[0] || null;
+        } catch (e) {
+            // Ignore if table doesn't exist
         }
+
+        const politician = politicianRes?.results?.[0] || politicianRes?.[0]?.results?.[0]; // Handle varying return shapes between D1 / BetterSQLite
+        if (!politician) return null;
+
+        const promises = promisesRes?.results || promisesRes?.[0]?.results || [];
+        const positions = (positionsRes?.results as PositionEvent[]) || (positionsRes?.[0]?.results as PositionEvent[]) || [];
+
+        // Fetch new Verification Engine items
+        let rawClaims: any[] = [];
+        try {
+            const rawClaimsRes = await db.prepare(`SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20`).bind(politician.id).all();
+            rawClaims = rawClaimsRes?.results || rawClaimsRes?.[0]?.results || [];
+        } catch (e) {
+            // claims table may not exist or no data
+        }
+
+        let evidenceMap: Record<string, any[]> = {};
+        if (rawClaims.length > 0) {
+            try {
+                const claimIds = rawClaims.map((c: any) => `'${c.id}'`).join(',');
+                const evidenceQuery = `SELECT * FROM evidence WHERE claim_id IN (${claimIds})`;
+                const evRes = await db.prepare(evidenceQuery).all();
+                const allEvidence = evRes?.results || [];
+
+                allEvidence.forEach((ev: any) => {
+                    if (!evidenceMap[ev.claim_id]) evidenceMap[ev.claim_id] = [];
+                    evidenceMap[ev.claim_id].push(ev);
+                });
+            } catch (e) {
+                // evidence table may not have data
+            }
+        }
+
+        let rawStanceChanges: any[] = [];
+        try {
+            const stanceChangesRes = await db.prepare(`
+               SELECT sc.*, 
+                      oc.content as old_content, oc.date as old_date, oc.context as old_context,
+                      nc.content as new_content, nc.date as new_date, nc.context as new_context
+               FROM stance_changes sc
+               JOIN claims oc ON sc.old_claim_id = oc.id
+               JOIN claims nc ON sc.new_claim_id = nc.id
+               WHERE sc.politician_id = ? 
+               ORDER BY sc.created_at DESC LIMIT 10
+            `).bind(politician.id).all();
+            rawStanceChanges = stanceChangesRes?.results || stanceChangesRes?.[0]?.results || [];
+        } catch (e) {
+            // stance_changes table may not have data
+        }
+
+        const stanceChangesFormatted = rawStanceChanges.map((sc: any) => ({
+            id: sc.id,
+            topic: sc.topic,
+            shift_description: sc.shift_description,
+            dateOfChange: sc.new_date,
+            old_claim: { content: sc.old_content, date: sc.old_date, context: sc.old_context },
+            new_claim: { content: sc.new_content, date: sc.new_date, context: sc.new_context }
+        }));
+
+        const promiseMetrics = this.calculatePromises(promises);
+        const consistencyMetrics = this.calculateConsistency(positions);
+
+        // Fetch trustworthiness history for time-series chart
+        let trustHistory: any[] = [];
+        try {
+            const trustHistRes = await db.prepare(
+                `SELECT score, promises_kept, promises_broken, scored_at FROM trustworthiness_history WHERE politician_id = ? ORDER BY scored_at ASC LIMIT 30`
+            ).bind(politician.id).all();
+            trustHistory = trustHistRes?.results || trustHistRes?.[0]?.results || [];
+        } catch (e) {
+            // Table may not exist yet in local dev
+        }
+
+        // Fetch recent legislative votes
+        let recentVotes: any[] = [];
+        try {
+            const votesRes = await db.prepare(
+                `SELECT v.id, v.title, v.vote_date, pv.position, pv.rationale 
+                 FROM votes v 
+                 JOIN politician_votes pv ON v.id = pv.vote_id 
+                 WHERE pv.politician_id = ? 
+                 ORDER BY v.vote_date DESC LIMIT 10`
+            ).bind(politician.id).all();
+            recentVotes = votesRes?.results || votesRes?.[0]?.results || [];
+        } catch (e) {
+            // Fallback if table doesn't exist locally
+            recentVotes = [];
+        }
+
+        // Fetch Fact Checks
+        let factChecks: any[] = [];
+        try {
+            const fcRes = await db.prepare(
+                `SELECT * FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 5`
+            ).bind(slug).all();
+            factChecks = fcRes?.results || fcRes?.[0]?.results || [];
+        } catch (e) {
+            factChecks = [];
+        }
+
+        return {
+            politician,
+            promises,
+            positions,
+            claims: rawClaims,
+            evidenceMap,
+            aiStanceChanges: stanceChangesFormatted,
+            trustHistory,
+            recentVotes,
+            factChecks,
+            methodology: activeMethodology,
+            derivedScores: {
+                promiseKeepsRate: promiseMetrics.rate,
+                promiseBreakdown: promiseMetrics.breakdown,
+                consistencyScore: consistencyMetrics.score,
+                consistencyBreakdown: {
+                    eligibleTopics: consistencyMetrics.totalEligibleTopics,
+                    contradictions: consistencyMetrics.contradictions,
+                    shiftEvents: consistencyMetrics.shiftEvents
+                }
+            }
+        };
     }
 }

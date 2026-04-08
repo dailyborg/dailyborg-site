@@ -139,6 +139,7 @@ CREATE TABLE IF NOT EXISTS methodology_versions (
     version_name TEXT,
     description TEXT,
     formula TEXT,
+    is_active BOOLEAN DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
