@@ -47,17 +47,23 @@ export default {
         
         const body = await request.json().catch(() => ({})) as any;
         const isDeep = body.deep === true;
+        const category = body.category || null;
+        const amount = body.amount ? parseInt(body.amount, 10) : null;
         
-        ctx.waitUntil(this.runScrapingCycle(env, isDeep));
-        return new Response(`Sentinel scraping cycle (Deep: ${isDeep}) initiated in background.`, { status: 202 });
+        ctx.waitUntil(this.runScrapingCycle(env, isDeep, category, amount));
+        return new Response(`Sentinel scraping cycle (Deep: ${isDeep}, Category: ${category || 'all'}, Amount: ${amount || 'default'}) initiated in background.`, { status: 202 });
     },
 
-    async runScrapingCycle(env: Env, isDeep: boolean = false) {
-        console.log(`[Sentinel] Waking up (Deep Mode: ${isDeep}). Processing ${RSS_FEEDS.length} feeds...`);
+    async runScrapingCycle(env: Env, isDeep: boolean = false, targetCategory: string | null = null, targetAmount: number | null = null) {
+        const feedsToProcess = targetCategory && targetCategory.toLowerCase() !== 'all' 
+            ? RSS_FEEDS.filter(f => f.type.toLowerCase() === targetCategory.toLowerCase())
+            : RSS_FEEDS;
+
+        console.log(`[Sentinel] Waking up (Deep Mode: ${isDeep}, Category: ${targetCategory}, Limit: ${targetAmount}). Processing ${feedsToProcess.length} feeds...`);
         let queuedArticles = 0;
         let skippedArticles = 0;
 
-        for (const feed of RSS_FEEDS) {
+        for (const feed of feedsToProcess) {
             console.log(`[Sentinel] Fetching: ${feed.url}`);
             try {
                 const response = await fetch(feed.url, {
@@ -73,8 +79,8 @@ export default {
                 // Simple regex parser to extract <item> blocks from RSS XML without relying on heavy external parsers
                 const items = xmlData.match(/<item>([\s\S]*?)<\/item>/g) || [];
 
-                // In Deep Mode, we process up to 15 articles per feed to catch historical gaps
-                const itemsToProcess = isDeep ? items.slice(0, 15) : items.slice(0, 4);
+                const limit = targetAmount ? targetAmount : (isDeep ? 15 : 4);
+                const itemsToProcess = items.slice(0, limit);
 
                 for (const itemXml of itemsToProcess) {
                     const titleMatch = itemXml.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || itemXml.match(/<title>(.*?)<\/title>/);

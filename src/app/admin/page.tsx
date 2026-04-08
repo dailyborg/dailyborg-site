@@ -56,6 +56,12 @@ function AdminDashboardContent() {
     const [selectedArticle, setSelectedArticle] = useState<any>(null);
     const [editForm, setEditForm] = useState({ title: "", excerpt: "", content_html: "" });
 
+    // Scraper UI
+    const [scraperCategory, setScraperCategory] = useState<string>('all');
+    const [scraperAmount, setScraperAmount] = useState<number>(2);
+    const [isTriggeringScraper, setIsTriggeringScraper] = useState(false);
+    const [scraperResultMsg, setScraperResultMsg] = useState("");
+
     // Handle Authentication Check
     const login = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -256,6 +262,34 @@ function AdminDashboardContent() {
             console.error("Setting save error", e);
         } finally {
             setIsSavingSettings(false);
+        }
+    };
+
+    const handleTriggerScraper = async () => {
+        setIsTriggeringScraper(true);
+        setScraperResultMsg("");
+        try {
+            const res = await fetch('/api/admin/scraper', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${passphrase}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    category: scraperCategory,
+                    amount: scraperAmount
+                })
+            });
+            const data = await res.json() as any;
+            if (res.ok) {
+                setScraperResultMsg("Success: " + (data.message || "Pipeline triggered."));
+            } else {
+                setScraperResultMsg("Error: " + data.error);
+            }
+        } catch (e: any) {
+             setScraperResultMsg("Connection Error: " + e.message);
+        } finally {
+            setIsTriggeringScraper(false);
         }
     };
 
@@ -558,6 +592,62 @@ function AdminDashboardContent() {
                                             </p>
                                         )}
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Manual Scraper Trigger */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
+                            <div className="p-5 bg-slate-50 border-b border-slate-200">
+                                <h3 className="font-bold text-slate-800">Manual Scraper Initiation</h3>
+                                <p className="text-xs text-slate-500 mt-1">Force an immediate pipeline cycle to research, generate, and ingest new articles into the database.</p>
+                            </div>
+                            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="flex flex-col gap-3">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Category Filter</label>
+                                    <select 
+                                        className="w-full text-sm font-bold p-3 bg-slate-100 border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none text-slate-700"
+                                        value={scraperCategory}
+                                        onChange={(e) => setScraperCategory(e.target.value)}
+                                    >
+                                        <option value="all">Every Category</option>
+                                        <option value="politics">Politics</option>
+                                        <option value="crime">Crime</option>
+                                        <option value="business">Business</option>
+                                        <option value="entertainment">Entertainment</option>
+                                        <option value="sports">Sports</option>
+                                        <option value="science">Science</option>
+                                        <option value="education">Education</option>
+                                    </select>
+                                </div>
+                                <div className="flex flex-col gap-3">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Articles Per Feed</label>
+                                    <div className="flex items-center gap-3">
+                                        <input 
+                                            type="number" 
+                                            min="1" 
+                                            max="10"
+                                            value={scraperAmount} 
+                                            onChange={(e) => setScraperAmount(parseInt(e.target.value) || 1)}
+                                            className="w-24 text-lg font-mono p-2.5 bg-white border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                                        />
+                                        <button 
+                                            onClick={handleTriggerScraper}
+                                            disabled={isTriggeringScraper}
+                                            className="flex-1 bg-blue-600 text-white font-bold text-sm px-6 py-3.5 rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            {isTriggeringScraper ? (
+                                                <><RefreshCcw className="w-4 h-4 animate-spin" /> Triggering Cycle...</>
+                                            ) : (
+                                                <><Zap className="w-4 h-4" /> Trigger Pipeline Cycle</>
+                                            )}
+                                        </button>
+                                    </div>
+                                    {scraperResultMsg && (
+                                        <div className={`mt-2 text-xs font-bold p-3 rounded-lg border ${scraperResultMsg.startsWith('Error') ? 'text-red-600 bg-red-50 border-red-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
+                                            {scraperResultMsg}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
