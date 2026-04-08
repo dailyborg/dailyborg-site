@@ -47,19 +47,20 @@ export default {
         
         const body = await request.json().catch(() => ({})) as any;
         const isDeep = body.deep === true;
+        const force = body.force === true;
         const category = body.category || null;
         const amount = body.amount ? parseInt(body.amount, 10) : null;
         
-        ctx.waitUntil(this.runScrapingCycle(env, isDeep, category, amount));
-        return new Response(`Sentinel scraping cycle (Deep: ${isDeep}, Category: ${category || 'all'}, Amount: ${amount || 'default'}) initiated in background.`, { status: 202 });
+        ctx.waitUntil(this.runScrapingCycle(env, isDeep, category, amount, force));
+        return new Response(`Sentinel scraping cycle (Deep: ${isDeep}, Category: ${category || 'all'}, Amount: ${amount || 'default'}, Force: ${force}) initiated in background.`, { status: 202 });
     },
 
-    async runScrapingCycle(env: Env, isDeep: boolean = false, targetCategory: string | null = null, targetAmount: number | null = null) {
+    async runScrapingCycle(env: Env, isDeep: boolean = false, targetCategory: string | null = null, targetAmount: number | null = null, force: boolean = false) {
         const feedsToProcess = targetCategory && targetCategory.toLowerCase() !== 'all' 
             ? RSS_FEEDS.filter(f => f.type.toLowerCase() === targetCategory.toLowerCase())
             : RSS_FEEDS;
 
-        console.log(`[Sentinel] Waking up (Deep Mode: ${isDeep}, Category: ${targetCategory}, Limit: ${targetAmount}). Processing ${feedsToProcess.length} feeds...`);
+        console.log(`[Sentinel] Waking up (Deep Mode: ${isDeep}, Force: ${force}, Category: ${targetCategory}, Limit: ${targetAmount}). Processing ${feedsToProcess.length} feeds...`);
         let queuedArticles = 0;
         let skippedArticles = 0;
 
@@ -101,7 +102,7 @@ export default {
                     const urlHash = await this.hashString(link);
                     const isCached = await env.SENTINEL_CACHE.get(`seen_${urlHash}`);
 
-                    if (isCached && !isDeep) {
+                    if (isCached && !isDeep && !force) {
                         skippedArticles++;
                         continue;
                     }
@@ -116,7 +117,7 @@ export default {
                     // Dispatch to the Daily Borg Ingest Queue
                     await env.INGEST_QUEUE.send({
                         sourceUrl: link,
-                        title: title,
+                        title: force ? `${title} [Manual Pipeline Trigger ${Math.floor(Math.random() * 1000)}]` : title,
                         rawContent: rawContent,
                         type: feed.type,
                         timestamp: publishTimestamp

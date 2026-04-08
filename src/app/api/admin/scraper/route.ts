@@ -16,6 +16,7 @@ export async function POST(request: Request) {
         // Allowed parameters
         const payload = {
             deep: body.deep === true,
+            force: true, // Auto-forcing new generation on manual click to ensure immediate feedback
             category: body.category || 'all',
             amount: body.amount ? parseInt(body.amount, 10) : 2 // Default to 2
         };
