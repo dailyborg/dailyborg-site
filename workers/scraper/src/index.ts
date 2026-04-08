@@ -47,20 +47,19 @@ export default {
         
         const body = await request.json().catch(() => ({})) as any;
         const isDeep = body.deep === true;
-        const force = body.force === true;
         const category = body.category || null;
         const amount = body.amount ? parseInt(body.amount, 10) : null;
         
-        ctx.waitUntil(this.runScrapingCycle(env, isDeep, category, amount, force));
-        return new Response(`Sentinel scraping cycle (Deep: ${isDeep}, Category: ${category || 'all'}, Amount: ${amount || 'default'}, Force: ${force}) initiated in background.`, { status: 202 });
+        ctx.waitUntil(this.runScrapingCycle(env, isDeep, category, amount));
+        return new Response(`Sentinel scraping cycle (Deep: ${isDeep}, Category: ${category || 'all'}, Amount: ${amount || 'default'}) initiated in background.`, { status: 202 });
     },
 
-    async runScrapingCycle(env: Env, isDeep: boolean = false, targetCategory: string | null = null, targetAmount: number | null = null, force: boolean = false) {
+    async runScrapingCycle(env: Env, isDeep: boolean = false, targetCategory: string | null = null, targetAmount: number | null = null) {
         const feedsToProcess = targetCategory && targetCategory.toLowerCase() !== 'all' 
             ? RSS_FEEDS.filter(f => f.type.toLowerCase() === targetCategory.toLowerCase())
             : RSS_FEEDS;
 
-        console.log(`[Sentinel] Waking up (Deep Mode: ${isDeep}, Force: ${force}, Category: ${targetCategory}, Limit: ${targetAmount}). Processing ${feedsToProcess.length} feeds...`);
+        console.log(`[Sentinel] Waking up (Deep Mode: ${isDeep}, Category: ${targetCategory}, Limit: ${targetAmount}). Processing ${feedsToProcess.length} feeds...`);
         let queuedArticles = 0;
         let skippedArticles = 0;
 
@@ -80,10 +79,12 @@ export default {
                 // Simple regex parser to extract <item> blocks from RSS XML without relying on heavy external parsers
                 const items = xmlData.match(/<item>([\s\S]*?)<\/item>/g) || [];
 
-                const limit = targetAmount ? targetAmount : (isDeep ? 15 : 4);
-                const itemsToProcess = items.slice(0, limit);
+                const targetLimit = targetAmount ? targetAmount : (isDeep ? 15 : 4);
+                let newlyDiscoveredCount = 0;
 
-                for (const itemXml of itemsToProcess) {
+                for (const itemXml of items) {
+                    if (newlyDiscoveredCount >= targetLimit) break; // Reached queue quota for this specific feed
+
                     const titleMatch = itemXml.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) || itemXml.match(/<title>(.*?)<\/title>/);
                     const linkMatch = itemXml.match(/<link>(.*?)<\/link>/);
                     const descMatch = itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) || itemXml.match(/<description>(.*?)<\/description>/);
@@ -102,7 +103,7 @@ export default {
                     const urlHash = await this.hashString(link);
                     const isCached = await env.SENTINEL_CACHE.get(`seen_${urlHash}`);
 
-                    if (isCached && !isDeep && !force) {
+                    if (isCached && !isDeep) {
                         skippedArticles++;
                         continue;
                     }
@@ -117,7 +118,7 @@ export default {
                     // Dispatch to the Daily Borg Ingest Queue
                     await env.INGEST_QUEUE.send({
                         sourceUrl: link,
-                        title: force ? `${title} [Manual Pipeline Trigger ${Math.floor(Math.random() * 1000)}]` : title,
+                        title: title,
                         rawContent: rawContent,
                         type: feed.type,
                         timestamp: publishTimestamp
@@ -127,6 +128,7 @@ export default {
                     const ttl = isDeep ? 259200 : 86400;
                     await env.SENTINEL_CACHE.put(`seen_${urlHash}`, '1', { expirationTtl: ttl });
                     
+                    newlyDiscoveredCount++;
                     queuedArticles++;
                     console.log(`[Sentinel] Queued -> ${title}`);
                 }
