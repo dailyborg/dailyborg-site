@@ -40,7 +40,6 @@ export class CivicService {
                 return { success: true, addressResolved: data.normalizedInput?.line1, officialsFound: 0, ingestedCount: 0 };
             }
 
-            const db = getDbBinding();
             let newIngestCount = 0;
 
             // Google Civic separates 'officials' (people) and 'offices' (roles). We map them together.
@@ -67,13 +66,16 @@ export class CivicService {
                     const officeName = office.name;
 
                     // Does this politician already exist in our matrix?
-                    const existing = await db.prepare('SELECT id FROM politicians WHERE slug = ?').bind(slug).first();
+                    let existingQuery = `SELECT id FROM politicians WHERE name = ? COLLATE NOCASE AND region_level IN ('Local', 'State')`;
+                    let existingParams = [name];
+
+                    const existing: any = await (await getDbBinding()).prepare(existingQuery).bind(...existingParams).all();
                     
-                    if (!existing) {
+                    if (!existing || !existing.results || existing.results.length === 0) {
                         const newId = `pol_${uuidv4().replace(/-/g, '').slice(0, 15)}`;
                         
                         // Autonomous Ingestion!
-                        const stmt = db.prepare(`
+                        const stmt = (await getDbBinding()).prepare(`
                             INSERT INTO politicians 
                             (id, slug, name, office_held, party, district_state, region_level, candidate_status, time_in_office, photo_url, latest_sync_timestamp)
                             VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 'Active', ?, CURRENT_TIMESTAMP)
@@ -83,7 +85,7 @@ export class CivicService {
 
                         // Add an initial baseline claim so they aren't empty
                         const claimId = `clm_${uuidv4().replace(/-/g, '').slice(0, 15)}`;
-                        await db.prepare(`
+                        await (await getDbBinding()).prepare(`
                             INSERT INTO claims (id, politician_id, type, content, date, context)
                             VALUES (?, ?, 'Fact', ?, DATE('now'), 'Auto-Discovery via Civic Intake')
                         `).bind(claimId, newId, `${name} serves as ${officeName} for ${districtState}.`).run();
@@ -91,11 +93,13 @@ export class CivicService {
                         newIngestCount++;
                     } else {
                         // Update existing entry with the latest sync timestamp
-                        await db.prepare(`UPDATE politicians SET latest_sync_timestamp = CURRENT_TIMESTAMP WHERE slug = ?`).bind(slug).run();
+                        const existingId = existing.results[0].id;
+                        await (await getDbBinding()).prepare(`UPDATE politicians SET latest_sync_timestamp = CURRENT_TIMESTAMP WHERE id = ?`).bind(existingId).run();
                     }
                 }
             }
 
+            console.log(`[Civic Engine] Finished registering records for address query.`);
             return {
                 success: true,
                 addressResolved: data.normalizedInput ? `${data.normalizedInput.city}, ${data.normalizedInput.state}` : address,

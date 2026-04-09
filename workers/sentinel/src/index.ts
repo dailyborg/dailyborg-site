@@ -80,7 +80,16 @@ export default {
                 }
             }
 
-            // 7. Log the healing event
+            // 7. Trigger Image Medic (Bypassing 5-Cron limit via chaining)
+            try {
+                console.log("[Sentinel] Chaining Image Medic routine...");
+                await fetch("https://dailyborg-image-medic.pressroom.workers.dev", { method: "POST" });
+                actionsTaken.push("Image Medic Swept");
+            } catch (e) {
+                console.error("[Sentinel] Failed to trigger Image Medic:", e);
+            }
+
+            // 8. Log the healing event
             const status = actionsTaken.length > 0 ? 'healed' : 'healthy';
             const message = actionsTaken.length > 0 
                 ? `Sentinel detected gaps and took actions: ${actionsTaken.join(', ')}. Missing: ${missingDesks.join(', ')}` 

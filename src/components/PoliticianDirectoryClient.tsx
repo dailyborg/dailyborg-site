@@ -277,47 +277,48 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
             </div>
 
             {/* ═══════════════════ REFINED PREMIUM TABS (Stitch Aesthetic) ═══════════════════ */}
-            <div className="mb-10 w-full animate-in fade-in slide-in-from-bottom-2 duration-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                {/* Outer Glass Container */}
-                <div className="inline-flex p-1.5 bg-muted/40 backdrop-blur-md rounded-full mb-0 border border-border/50 shadow-sm max-w-full overflow-x-auto scroolbar-hide">
-                    {['Federal', 'State', 'Local'].map(level => {
-                        const isActive = levelFilter === level;
-                        return (
-                            <button
-                                key={level}
-                                onClick={() => {
-                                    if (isActive) {
-                                        setLevelFilter(null);
-                                    } else {
-                                        setLevelFilter(level);
-                                        if (level === 'Federal') {
-                                           setStateFilter(null);
-                                           setLocalTownFilter("");
+            <div className="mb-10 w-full animate-in fade-in slide-in-from-bottom-2 duration-700">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    {/* Outer Glass Container */}
+                    <div className="inline-flex p-1.5 bg-muted/40 backdrop-blur-md rounded-full mb-0 border border-border/50 shadow-sm max-w-full overflow-x-auto scroolbar-hide">
+                        {['Federal', 'State', 'Local'].map(level => {
+                            const isActive = levelFilter === level;
+                            return (
+                                <button
+                                    key={level}
+                                    onClick={() => {
+                                        if (isActive) {
+                                            setLevelFilter(null);
+                                        } else {
+                                            setLevelFilter(level);
+                                            if (level === 'Federal') {
+                                               setStateFilter(null);
+                                               setLocalTownFilter("");
+                                            }
                                         }
-                                    }
-                                }}
-                                className={`px-8 py-3 rounded-full text-xs md:text-sm font-bold uppercase tracking-[0.15em] transition-all duration-300 relative ${isActive ? 'text-background shadow-md' : 'text-foreground/70 hover:text-foreground hover:bg-foreground/5'}`}
-                            >
-                                {isActive && (
-                                    <span className="absolute inset-0 bg-foreground rounded-full -z-10 animate-in zoom-in-95 duration-200"></span>
-                                )}
-                                {level}
-                            </button>
-                        );
-                    })}
-                </div>
+                                    }}
+                                    className={`px-8 py-3 rounded-full text-xs md:text-sm font-bold uppercase tracking-[0.15em] transition-all duration-300 relative ${isActive ? 'text-background shadow-md' : 'text-foreground/70 hover:text-foreground hover:bg-foreground/5'}`}
+                                >
+                                    {isActive && (
+                                        <span className="absolute inset-0 bg-foreground rounded-full -z-10 animate-in zoom-in-95 duration-200"></span>
+                                    )}
+                                    {level}
+                                </button>
+                            );
+                        })}
+                    </div>
 
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mr-4 ml-2">
-                    <input 
-                        type="checkbox" 
-                        checked={showHistorical} 
-                        onChange={(e) => setShowHistorical(e.target.checked)}
-                        className="accent-red-500 w-4 h-4 rounded-sm border-border"
-                    />
-                    Show Past Officials Database
-                    {showHistorical && <AlertCircle className="w-3.5 h-3.5 text-red-500 inline ml-1" />}
-                </label>
-            </div>
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mr-4 ml-2">
+                        <input 
+                            type="checkbox" 
+                            checked={showHistorical} 
+                            onChange={(e) => setShowHistorical(e.target.checked)}
+                            className="accent-red-500 w-4 h-4 rounded-sm border-border"
+                        />
+                        Show Past Officials Database
+                        {showHistorical && <AlertCircle className="w-3.5 h-3.5 text-red-500 inline ml-1" />}
+                    </label>
+                </div>
 
                 {/* Smooth Expansion Dropdown Area */}
                 <div className={`transition-all duration-500 origin-top overflow-hidden ${levelFilter === 'State' || levelFilter === 'Local' ? 'max-h-[200px] opacity-100 mb-8' : 'max-h-0 opacity-0 mb-0'}`}>

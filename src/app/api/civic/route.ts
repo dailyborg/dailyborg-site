@@ -5,8 +5,8 @@ export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json();
-        const address = body.address;
+        const body: any = await req.json();
+        const address = body.address as string;
 
         if (!address || typeof address !== 'string') {
             return NextResponse.json({ success: false, error: 'Address is required to lookup localized politicians.' }, { status: 400 });
