@@ -8,6 +8,7 @@ import StanceTimeline from "@/components/StanceTimeline";
 import TrustworthinessChart from "@/components/TrustworthinessChart";
 import { BorgAlertSubscribe } from "@/components/BorgAlertSubscribe";
 import CommentSection from "@/components/CommentSection";
+import FollowPoliticianButton from "@/components/FollowPoliticianButton";
 
 import { notFound } from "next/navigation";
 import { PoliticianService, ShiftEvent } from "@/lib/services/politician-service";
@@ -35,6 +36,16 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
 
     return (
         <div className="container mx-auto px-4 md:px-8 py-8 md:py-16">
+            {politician.candidate_status === 'Former' && (
+                <div className="bg-red-500/10 border-l-4 border-red-500 p-4 mb-8 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                        <h3 className="text-red-500 font-black uppercase tracking-widest text-xs mb-1">Historical Record Archive</h3>
+                        <p className="text-muted-foreground text-sm">This official is no longer in office or has dropped out of their race. This profile is preserved for comparative historical analytics.</p>
+                    </div>
+                </div>
+            )}
+            
             {/* Profile Header */}
             <div className="flex flex-col md:flex-row gap-8 mb-12 items-start">
                 <div className="w-full md:w-1/3 lg:w-1/4">
@@ -49,43 +60,54 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                     
                     {/* At-a-Glance Metrics */}
                     <div className="mt-6 flex flex-col gap-4">
-                        {/* Trustworthiness Bar */}
-                        <div className="group relative cursor-help">
-                            <div className="flex justify-between items-end mb-1.5">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-1">
-                                    Trust Score
-                                </span>
-                                <span className="text-xs font-bold font-serif">{politician.trustworthiness_score ?? 'N/A'}{politician.trustworthiness_score !== null ? '%' : ''}</span>
+                        {politician.candidate_status === 'Candidate' ? (
+                            <div className="bg-accent/10 border border-accent p-4 mb-4">
+                                <h3 className="text-accent font-black uppercase tracking-widest text-xs flex items-center gap-2 mb-2"><AlertCircle className="w-4 h-4" /> Upcoming Candidate</h3>
+                                <p className="text-xs text-muted-foreground">Monitoring campaign platform and rhetoric. Voting record metrics are disabled until elected.</p>
                             </div>
-                            <div className="h-1.5 w-full bg-muted overflow-hidden relative">
-                                <div 
-                                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 transition-all duration-1000 ease-out" 
-                                    style={{ width: `${politician.trustworthiness_score ?? 0}%` }}
-                                />
-                            </div>
-                            <div className="absolute top-10 left-0 w-full bg-popover text-popover-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
-                                Aggregated trustworthiness score based on campaign promises kept and historical vote consistency.
-                            </div>
-                        </div>
+                        ) : (
+                            <>
+                                {/* Trustworthiness Bar */}
+                                <div className="group relative cursor-help">
+                                    <div className="flex justify-between items-end mb-1.5">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-1">
+                                            Trust Score
+                                        </span>
+                                        <span className="text-xs font-bold font-serif">{politician.trustworthiness_score ?? 'N/A'}{politician.trustworthiness_score !== null ? '%' : ''}</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-muted overflow-hidden relative">
+                                        <div 
+                                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 transition-all duration-1000 ease-out" 
+                                            style={{ width: `${politician.trustworthiness_score ?? 0}%` }}
+                                        />
+                                    </div>
+                                    <div className="absolute top-10 left-0 w-full bg-popover text-popover-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
+                                        Aggregated trustworthiness score based on campaign promises kept and historical vote consistency.
+                                    </div>
+                                </div>
 
-                        {/* Liar-Liar Map */}
-                        <div className="group relative cursor-help border-t border-border/50 pt-4">
-                            <div className="flex justify-between items-end mb-1.5">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-[#fe8f00] transition-colors flex items-center gap-1">
-                                    <Flame className="w-3 h-3" /> Liar-Liar Map
-                                </span>
-                                <span className="text-xs font-bold font-serif text-[#fe8f00]">{factChecks.length} Recorded</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-muted overflow-hidden relative">
-                                <div 
-                                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#fe8f00] to-[#ff0000] shadow-[0_0_8px_#ff0000] transition-all duration-1000 ease-out" 
-                                    style={{ width: `${Math.min((factChecks.length / 5) * 100, 100)}%` }} 
-                                />
-                            </div>
-                            <div className="absolute top-14 left-0 w-full bg-popover text-popover-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
-                                {factChecks.length} verifiable false statements or "Pants on Fire" rulings tracked by the Discovery Engine.
-                            </div>
-                        </div>
+                                {/* Liar-Liar Map */}
+                                <div className="group relative cursor-help border-t border-border/50 pt-4">
+                                    <div className="flex justify-between items-end mb-1.5">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-[#fe8f00] transition-colors flex items-center gap-1">
+                                            <Flame className="w-3 h-3" /> Liar-Liar Map
+                                        </span>
+                                        <span className="text-xs font-bold font-serif text-[#fe8f00]">{factChecks.length} Recorded</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-muted overflow-hidden relative">
+                                        <div 
+                                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#fe8f00] to-[#ff0000] shadow-[0_0_8px_#ff0000] transition-all duration-1000 ease-out" 
+                                            style={{ width: `${Math.min((factChecks.length / 5) * 100, 100)}%` }} 
+                                        />
+                                    </div>
+                                    <div className="absolute top-14 left-0 w-full bg-popover text-popover-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
+                                        {factChecks.length} verifiable false statements or "Pants on Fire" rulings tracked by the Discovery Engine.
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                        
+                        <FollowPoliticianButton politicianId={politician.id} />
                     </div>
                 </div>
                 <div className="w-full md:w-2/3 lg:w-3/4 space-y-6">
@@ -101,39 +123,48 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                     </p>
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 pt-8 border-t-[3px] border-foreground w-full">
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground mb-2">Key Votes Cast</p>
-                            <p className="text-4xl md:text-5xl font-serif font-black text-muted-foreground/50 italic">N/A</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground mb-2">Bills Sponsored</p>
-                            <p className="text-4xl md:text-5xl font-serif font-black text-muted-foreground/50 italic">N/A</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.15em] flex items-center text-muted-foreground mb-2">
-                                Promise Keeps Rate
-                                {derivedScores.promiseKeepsRate === null && <AlertCircle className="w-3 h-3 ml-1 text-accent" />}
-                            </p>
-                            <p className="text-5xl md:text-6xl font-serif font-black text-foreground tracking-tighter">
-                                {derivedScores.promiseKeepsRate !== null ? `${derivedScores.promiseKeepsRate}%` : <span className="text-2xl italic text-muted-foreground font-medium">Not Enough Data</span>}
-                            </p>
-                            {derivedScores.promiseKeepsRate !== null && (
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-accent mt-2">Based on {derivedScores.promiseBreakdown.fulfilled + derivedScores.promiseBreakdown.broken + derivedScores.promiseBreakdown.reversed} Scored Promises</p>
-                            )}
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.15em] flex items-center text-muted-foreground mb-2">
-                                Consistency Score
-                                {derivedScores.consistencyScore === null && <AlertCircle className="w-3 h-3 ml-1 text-accent" />}
-                            </p>
-                            <p className="text-5xl md:text-6xl font-serif font-black text-foreground tracking-tighter group cursor-help transition-colors hover:text-accent">
-                                {derivedScores.consistencyScore !== null ? `${derivedScores.consistencyScore}` : <span className="text-2xl italic text-muted-foreground font-medium">Not Enough Data</span>}
-                                {derivedScores.consistencyScore !== null && <span className="text-2xl md:text-3xl text-muted-foreground tracking-normal font-bold">/100</span>}
-                            </p>
-                            {derivedScores.consistencyScore !== null && (
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-accent mt-2">Based on {derivedScores.consistencyBreakdown.eligibleTopics} Topics</p>
-                            )}
-                        </div>
+                        {politician.candidate_status === 'Candidate' ? (
+                            <div className="col-span-4">
+                                <h3 className="text-2xl font-black font-serif uppercase tracking-widest text-muted-foreground">Campaign Promises Aggregated</h3>
+                                <p className="text-muted-foreground">Tracking {promises.length} promises. Final performance ratings pending election.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground mb-2">Key Votes Cast</p>
+                                    <p className="text-4xl md:text-5xl font-serif font-black text-muted-foreground/50 italic">N/A</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground mb-2">Bills Sponsored</p>
+                                    <p className="text-4xl md:text-5xl font-serif font-black text-muted-foreground/50 italic">N/A</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.15em] flex items-center text-muted-foreground mb-2">
+                                        Promise Keeps Rate
+                                        {derivedScores.promiseKeepsRate === null && <AlertCircle className="w-3 h-3 ml-1 text-accent" />}
+                                    </p>
+                                    <p className="text-5xl md:text-6xl font-serif font-black text-foreground tracking-tighter">
+                                        {derivedScores.promiseKeepsRate !== null ? `${derivedScores.promiseKeepsRate}%` : <span className="text-2xl italic text-muted-foreground font-medium">Not Enough Data</span>}
+                                    </p>
+                                    {derivedScores.promiseKeepsRate !== null && (
+                                        <p className="text-[9px] font-bold uppercase tracking-widest text-accent mt-2">Based on {derivedScores.promiseBreakdown.fulfilled + derivedScores.promiseBreakdown.broken + derivedScores.promiseBreakdown.reversed} Scored Promises</p>
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.15em] flex items-center text-muted-foreground mb-2">
+                                        Consistency Score
+                                        {derivedScores.consistencyScore === null && <AlertCircle className="w-3 h-3 ml-1 text-accent" />}
+                                    </p>
+                                    <p className="text-5xl md:text-6xl font-serif font-black text-foreground tracking-tighter group cursor-help transition-colors hover:text-accent">
+                                        {derivedScores.consistencyScore !== null ? `${derivedScores.consistencyScore}` : <span className="text-2xl italic text-muted-foreground font-medium">Not Enough Data</span>}
+                                        {derivedScores.consistencyScore !== null && <span className="text-2xl md:text-3xl text-muted-foreground tracking-normal font-bold">/100</span>}
+                                    </p>
+                                    {derivedScores.consistencyScore !== null && (
+                                        <p className="text-[9px] font-bold uppercase tracking-widest text-accent mt-2">Based on {derivedScores.consistencyBreakdown.eligibleTopics} Topics</p>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

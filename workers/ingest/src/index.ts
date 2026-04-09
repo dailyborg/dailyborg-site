@@ -59,7 +59,8 @@ export class IngestCoordinator extends Agent<Env> {
             "confidenceScore": 95,
             "suggestedHeroImagePrompt": "...",
             "desk": "Politics",
-            "sources": [{"source_name": "...", "source_url": "...", "source_type": "..."}]
+            "sources": [{"source_name": "...", "source_url": "...", "source_type": "..."}],
+            "mentioned_candidates": ["First Last", "First Last"]
           }
           DO NOT output any conversational text. ONLY output the JSON object.
         `;
@@ -126,7 +127,8 @@ export class IngestCoordinator extends Agent<Env> {
                             keyTakeaways: ["Breaking News Output", "Pending Live Verification"],
                             confidenceScore: 50,
                             desk: type || "Politics",
-                            sources: [{source_name: "External Feed", source_type: "rss"}]
+                            sources: [{source_name: "External Feed", source_type: "rss"}],
+                            mentioned_candidates: []
                         };
                     }
                 }
@@ -334,6 +336,19 @@ export class IngestCoordinator extends Agent<Env> {
                     .bind(crypto.randomUUID(), id, s.source_name, s.source_url || null, s.source_type || 'unclassified');
             });
             await this.env.DB.batch(stmts);
+        }
+
+        // Push extracted "Sentinel" names to the Politician Discovery Engine
+        if (articleObject.mentioned_candidates && articleObject.mentioned_candidates.length > 0) {
+            const reqStmts = articleObject.mentioned_candidates.map((name: string) => {
+                return this.env.DB.prepare(`
+                    INSERT INTO politician_requests (id, requested_name, user_email, reference_link, status) 
+                    VALUES (?, ?, 'sentinel@dailyborg.com', ?, 'Pending')
+                `).bind(`req_${crypto.randomUUID().slice(0, 15)}`, name, sourceUrl);
+            });
+            try { await this.env.DB.batch(reqStmts); } catch (e) {
+                console.warn("[Ingest] Failed pushing extracted candidates to discovery queue.");
+            }
         }
 
         await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')

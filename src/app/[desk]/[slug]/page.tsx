@@ -62,7 +62,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
     };
 
     return (
-        <div className="flex flex-col min-h-screen relative overflow-x-hidden">
+        <div className="flex flex-col min-h-screen relative overflow-x-hidden bg-background">
             {/* Structured Data for Google News */}
             <script
                 type="application/ld+json"
@@ -71,65 +71,91 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
             {/* Full-Width Hero Image - Fixed in Background */}
             {finalHeroImage && (
                 <div className="fixed inset-0 z-0 w-full h-[100vh] bg-black">
-                    <img src={finalHeroImage} alt={article.title} className="w-full h-full object-cover opacity-80" />
+                    <img src={finalHeroImage} alt={article.title} className="w-full h-full object-cover opacity-60" />
                 </div>
             )}
 
-            <main className={`flex-1 w-full mx-auto px-6 md:px-10 lg:px-16 max-w-[1240px] z-10 relative ${
+            {/* STAGE 1: Glassmorphic Preview Splash (Scrolls away natively) */}
+            {finalHeroImage && (
+                <div className="relative z-10 w-full h-[100vh] flex flex-col items-center justify-center px-4 md:px-8">
+                    <div className="max-w-4xl w-full bg-white/10 dark:bg-black/40 backdrop-blur-xl border border-white/20 rounded-[2.5rem] p-8 md:p-14 text-center shadow-2xl animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                        <div className="flex justify-center items-center gap-3 mb-6">
+                            <span className="bg-desk-borg text-primary-foreground px-3 py-1 text-[10px] md:text-xs uppercase tracking-widest font-black">
+                                {formattedDesk}
+                            </span>
+                            {article.article_type === 'breaking' && (
+                                <span className="bg-destructive text-destructive-foreground px-3 py-1 text-[10px] md:text-xs uppercase tracking-widest font-black animate-pulse">
+                                    Breaking
+                                </span>
+                            )}
+                        </div>
+                        <h1 className="font-[family-name:var(--font-playfair)] font-black text-4xl md:text-5xl lg:text-6xl text-white tracking-tight leading-[1.1] mb-6 drop-shadow-md">
+                            {article.title}
+                        </h1>
+                        <p className="font-[family-name:var(--font-playfair)] font-bold text-xl md:text-2xl text-white/90 leading-snug max-w-2xl mx-auto drop-shadow-sm">
+                            {article.excerpt}
+                        </p>
+                        
+                        <div className="flex items-center justify-center gap-3 font-[family-name:var(--font-source-sans)] text-[10px] md:text-xs font-bold uppercase tracking-widest text-white/70 pt-8 mt-6 border-t border-white/20">
+                            {article.author ? (
+                                <span>BY {article.author.name.toUpperCase()}</span>
+                            ) : (
+                                <span>BY {formattedDesk.toUpperCase()} DESK</span>
+                            )}
+                            <ClientTime timestamp={article.publish_date} />
+                        </div>
+
+                        <a href="#article-body" className="mt-12 inline-flex items-center gap-3 bg-white text-black px-8 py-4 rounded-full font-bold text-xs uppercase tracking-widest hover:bg-white/90 hover:scale-105 transition-all shadow-lg">
+                            Read Full Article
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                        </a>
+                    </div>
+                </div>
+            )}
+
+            {/* STAGE 2: Main Article Reading Area (Below Fold) */}
+            <main id="article-body" className={`flex-1 w-full mx-auto px-6 md:px-10 lg:px-16 max-w-[900px] z-20 relative bg-background ${
                 finalHeroImage 
-                ? 'mt-[50vh] md:mt-[60vh] pt-12 md:pt-16 pb-24 bg-white/95 dark:bg-black/95 backdrop-blur-3xl rounded-t-[2.5rem] md:rounded-t-[4rem] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] border-t border-white/20 dark:border-white/10' 
-                : 'py-8 md:py-12 bg-background'
+                ? 'pt-16 md:pt-24 pb-24 shadow-[0_-30px_60px_rgba(0,0,0,0.6)] border-t border-border/50' 
+                : 'py-8 md:py-12'
             }`}>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
+                <div className="flex flex-col gap-12 lg:gap-16">
 
-                    {/* Main Article Content (Left Column) */}
-                    <article className="lg:col-span-8 flex flex-col gap-8">
+                    {/* Main Article Content */}
+                    <article className="flex flex-col gap-8">
 
-                        {/* Lead Image (only show inline if no hero_image_url for the full-width version) */}
+                        {/* If NO Hero Image, show standard header */}
                         {!finalHeroImage && (
-                            <figure className="w-full">
-                                <div className="bg-[#EFEBE6] dark:bg-muted aspect-[16/9] w-full relative overflow-hidden flex items-center justify-center font-[family-name:var(--font-source-sans)] uppercase tracking-widest text-[#9CA3AF] text-[10px] md:text-xs font-bold border border-border">
-                                    {`LEAD IMAGE: ${formattedDesk.toUpperCase()}`}
-                                </div>
-                            </figure>
-                        )}
-
-                        {/* Article Header Details */}
-                        <header className="flex flex-col gap-6 mt-2">
-                            <div className="flex items-center gap-2">
-                                <span className="bg-desk-borg text-primary-foreground px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold">
-                                    {formattedDesk}
-                                </span>
-                                {article.article_type === 'breaking' && (
-                                    <span className="bg-destructive text-destructive-foreground px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold animate-pulse">
-                                        Breaking
-                                    </span>
-                                )}
-                            </div>
-
-                            <h1 className="font-[family-name:var(--font-playfair)] font-black text-5xl md:text-6xl text-foreground tracking-tight leading-[1.05]">
-                                {article.title}
-                            </h1>
-
-                            <p className="font-[family-name:var(--font-playfair)] font-bold text-xl md:text-2xl text-foreground/90 leading-snug">
-                                {article.excerpt}
-                            </p>
-
-                            <div className="flex items-center gap-3 font-[family-name:var(--font-source-sans)] text-[10px] md:text-xs font-bold uppercase tracking-widest text-[#64748B] dark:text-muted-foreground pt-4 border-t border-border/50 mt-2">
-                                {article.author ? (
-                                    <div className="flex items-center gap-2">
-                                        <span>BY</span>
-                                        <Link href={`/authors/${article.author.slug}`} className="text-foreground hover:text-accent underline underline-offset-2 transition-colors">
-                                            {article.author.name.toUpperCase()}
-                                        </Link>
+                            <>
+                                <figure className="w-full">
+                                    <div className="bg-[#EFEBE6] dark:bg-muted aspect-[16/9] w-full relative overflow-hidden flex items-center justify-center font-[family-name:var(--font-source-sans)] uppercase tracking-widest text-[#9CA3AF] text-[10px] md:text-xs font-bold border border-border">
+                                        {`LEAD IMAGE: ${formattedDesk.toUpperCase()}`}
                                     </div>
-                                ) : (
-                                    <span>BY {formattedDesk.toUpperCase()} DESK</span>
-                                )}
-                                <ClientTime timestamp={article.publish_date} />
-                            </div>
-                        </header>
+                                </figure>
+                                <header className="flex flex-col gap-6 mt-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-desk-borg text-primary-foreground px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold">
+                                            {formattedDesk}
+                                        </span>
+                                    </div>
+                                    <h1 className="font-[family-name:var(--font-playfair)] font-black text-5xl md:text-6xl text-foreground tracking-tight leading-[1.05]">
+                                        {article.title}
+                                    </h1>
+                                    <p className="font-[family-name:var(--font-playfair)] font-bold text-xl md:text-2xl text-foreground/90 leading-snug">
+                                        {article.excerpt}
+                                    </p>
+                                    <div className="flex items-center gap-3 font-[family-name:var(--font-source-sans)] text-[10px] md:text-xs font-bold uppercase tracking-widest text-[#64748B] dark:text-muted-foreground pt-4 border-t border-border/50 mt-2">
+                                        {article.author ? (
+                                            <span>BY {article.author.name.toUpperCase()}</span>
+                                        ) : (
+                                            <span>BY {formattedDesk.toUpperCase()} DESK</span>
+                                        )}
+                                        <ClientTime timestamp={article.publish_date} />
+                                    </div>
+                                </header>
+                            </>
+                        )}
 
                         {/* Article Text */}
                         <div 

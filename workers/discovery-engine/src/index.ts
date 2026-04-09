@@ -330,13 +330,33 @@ export default {
             }
 
             const legislators: any[] = await res.json();
-            const sample = legislators.slice(0, 5);
+            
+            // Retrieve pagination cursor
+            const cacheKey = 'congress_intake_offset';
+            // @ts-ignore - KV assumes string by default, parsing to int
+            let currentOffset = parseInt((await env.AI?.env?.SENTINEL_CACHE?.get(cacheKey) || await env.DB.prepare('SELECT 1').first() ? '0' : '0')) || 0; 
+            // Fallback since D1/KV typing might not be available in all bindings. Use local variable limit if KV fails.
+            
+            // Wait, actually the ENV defines AI, DB, not SENTINEL_CACHE. 
+            // Let's check environment bindings in `Env` interface. It only has DB and AI!
+            // I'll track it using the database instead!
+            
+            let syncCursor = await env.DB.prepare("SELECT value FROM kv_store WHERE key = ?").bind(cacheKey).first('value') as string;
+            if (!syncCursor) {
+                // Initialize kv_store table if it doesn't exist
+                await env.DB.prepare("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT)").run();
+                syncCursor = '0';
+            }
+            currentOffset = parseInt(syncCursor);
+
+            const batchSize = 50;
+            const sample = legislators.slice(currentOffset, currentOffset + batchSize);
+
+            console.log(`[Discovery] Processing Congress batch from offset ${currentOffset} to ${currentOffset + batchSize}`);
 
             for (const leg of sample) {
                 const name = `${leg.name?.first} ${leg.name?.last}`;
-                const existing = await env.DB.prepare("SELECT id FROM politicians WHERE name = ?").bind(name).first();
-                if (existing) continue;
-
+                
                 const terms = leg.terms || [];
                 const latestTerm = terms[terms.length - 1];
                 if (!latestTerm) continue;
@@ -345,19 +365,146 @@ export default {
                 const party = latestTerm.party || "Independent";
                 const districtState = latestTerm.state + (latestTerm.district ? `-${latestTerm.district}` : "");
 
-                const photoUrl = await this.resolvePoliticianImage(env, name, officeHeld, party);
-                const polId = `pol_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                // Provide a stable slug string based on name
                 const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+                const existing = await env.DB.prepare("SELECT id FROM politicians WHERE slug = ?").bind(slug).first();
+                
+                if (existing) {
+                    await env.DB.prepare(`
+                        UPDATE politicians SET 
+                            office_held = ?, party = ?, district_state = ?, latest_sync_timestamp = CURRENT_TIMESTAMP 
+                        WHERE slug = ?
+                    `).bind(officeHeld, party, districtState, slug).run();
+                    continue;
+                }
+
+                const photoUrl = await this.resolvePoliticianImage(env, name, officeHeld, party);
+                const polId = `pol_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
                 await env.DB.prepare(`
-                    INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, time_in_office, photo_url)
-                    VALUES (?, ?, ?, ?, ?, ?, 'Federal', 'Active', ?)
+                    INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, candidate_status, time_in_office, photo_url, latest_sync_timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, 'Federal', 'Active', 'Active', ?, CURRENT_TIMESTAMP)
                 `).bind(polId, slug, name, officeHeld, party, districtState, photoUrl).run();
 
                 console.log(`[Discovery] Mapped: ${name}`);
             }
+
+            // Update Cursor
+            const nextOffset = (currentOffset + batchSize) >= legislators.length ? 0 : currentOffset + batchSize;
+            await env.DB.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)").bind(cacheKey, nextOffset.toString()).run();
+
+            // ==========================================
+            // HISTORICAL ARCHIVE SWEEP (Drop-Out Detection)
+            // ==========================================
+            // If the cursor wrapped around to 0, that means we finished checking every active Congressman.
+            // Anyone who didn't get their `latest_sync_timestamp` updated during this cycle must have dropped out or ended their term!
+            if (nextOffset === 0) {
+                console.log("[Discovery] Federal roster check complete. Archiving former politicians...");
+                await env.DB.prepare(`
+                    UPDATE politicians 
+                    SET candidate_status = 'Former', time_in_office = 'Term Ended'
+                    WHERE region_level = 'Federal' AND candidate_status = 'Active' AND latest_sync_timestamp < datetime('now', '-1 day')
+                `).run();
+            }
+
         } catch (e: any) {
-            console.error("[Discovery] Intake failed:", e.message);
+            console.error("[Discovery] Congress Intake failed:", e.message);
+        }
+    },
+
+    // ====================================================================
+    // PROACTIVE STATE INTAKE (Governors & Assembly)
+    // ====================================================================
+    async intakeState(env: Env) {
+        console.log(`[Discovery] Proactive State Sync...`);
+        const US_STATES = [
+            'al','ak','az','ar','ca','co','ct','de','fl','ga','hi','id','il','in','ia','ks',
+            'ky','la','me','md','ma','mi','mn','ms','mo','mt','ne','nv','nh','nj','nm','ny',
+            'nc','nd','oh','ok','or','pa','ri','sc','sd','tn','tx','ut','vt','va','wa','wv','wi','wy'
+        ];
+
+        try {
+            const cacheKey = "state_sync_index";
+            const { results } = await env.DB.prepare("SELECT value FROM kv_store WHERE key = ?").bind(cacheKey).all();
+            const currentIndex = results && results.length > 0 ? parseInt((results[0] as any).value || '0', 10) : 0;
+            
+            // Safety bounds
+            const safeIndex = currentIndex >= US_STATES.length ? 0 : currentIndex;
+            const currentState = US_STATES[safeIndex];
+
+            console.log(`[Discovery] State Sync: Executing bulk ingestion for ${currentState.toUpperCase()}...`);
+
+            // Fetch generic JSON bulk data if available, placeholder URL for OpenStates endpoint
+            // Since OpenStates requires an API token for large GraphQL loops, we use the public CSV files hosted on their github data export.
+            const url = `https://raw.githubusercontent.com/openstates/people/main/data/${currentState}/legislature.csv`;
+            const res = await fetch(url);
+            
+            if (res.ok) {
+                const text = await res.text();
+                // Simple CSV parsing (ignoring complex escapes to fit D1 constraints)
+                const rows = text.split('\n').filter(r => r.trim().length > 0).slice(1); // skip header
+                
+                // Process at most 50 state legislators per chunk to preserve D1 limits
+                // We'll advance the state index ONLY when we run out of legislators in the state.
+                const offsetCacheKey = `state_sync_offset_${currentState}`;
+                const { results: offsetRes } = await env.DB.prepare("SELECT value FROM kv_store WHERE key = ?").bind(offsetCacheKey).all();
+                const currentOffset = offsetRes && offsetRes.length > 0 ? parseInt((offsetRes[0] as any).value || '0', 10) : 0;
+                
+                const batchSize = 50;
+                const batch = rows.slice(currentOffset, currentOffset + batchSize);
+
+                for (const row of batch) {
+                    const cols = row.split(',');
+                    if (cols.length < 3) continue;
+                    // Standard OpenStates CSV cols: id, name, current_party, current_district, current_chamber
+                    const rawName = cols[1]?.replace(/['"]/g, '').trim(); 
+                    if (!rawName) continue;
+
+                    const party = cols[2]?.replace(/['"]/g, '').trim() || 'Independent';
+                    const office = cols[4]?.replace(/['"]/g, '').trim() || 'State Assembly';
+                    const slug = `p-${rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
+                    const { results: existing } = await env.DB.prepare("SELECT id FROM politicians WHERE slug = ?").bind(slug).all();
+                    if (existing && existing.length > 0) {
+                        await env.DB.prepare("UPDATE politicians SET latest_sync_timestamp = CURRENT_TIMESTAMP WHERE id = ?").bind((existing[0] as any).id).run();
+                        continue;
+                    }
+
+                    const polId = `pol_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                    await env.DB.prepare(`
+                        INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, candidate_status, time_in_office, latest_sync_timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, 'State', 'Active', 'Active', CURRENT_TIMESTAMP)
+                    `).bind(polId, slug, rawName, office, party, currentState.toUpperCase()).run();
+                }
+
+                const nextOffset = currentOffset + batchSize;
+                if (nextOffset >= rows.length) {
+                    // Finished this state. Move to the next state!
+                    await env.DB.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)").bind(offsetCacheKey, "0").run();
+                    const nextStateIndex = safeIndex + 1;
+                    await env.DB.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)").bind(cacheKey, nextStateIndex.toString()).run();
+                    
+                    // Run State Historical Drop-out Sweep!
+                    if (nextStateIndex >= US_STATES.length) {
+                        console.log("[Discovery] State roster check complete across ALL states. Archiving former state politicians...");
+                        await env.DB.prepare(`
+                            UPDATE politicians 
+                            SET candidate_status = 'Former', time_in_office = 'Term Ended'
+                            WHERE region_level = 'State' AND candidate_status = 'Active' AND latest_sync_timestamp < datetime('now', '-7 day')
+                        `).run();
+                    }
+                } else {
+                    // Save offset for the same state next cycle
+                    await env.DB.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)").bind(offsetCacheKey, nextOffset.toString()).run();
+                }
+            } else {
+                console.warn(`[Discovery] State Bulk Data unavailable for ${currentState}. Bumping to next state.`);
+                await env.DB.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)").bind(cacheKey, (safeIndex + 1).toString()).run();
+            }
+
+        } catch (e: any) {
+             console.error("[Discovery] State Intake failed:", e.message);
         }
     },
 

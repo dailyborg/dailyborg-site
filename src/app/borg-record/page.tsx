@@ -23,6 +23,7 @@ export default async function BorgRecordDirectory() {
             party: p.party || "Independent",
             district_state: p.district_state || "--",
             region_level: p.region_level || "Federal",
+            candidate_status: p.candidate_status || "Active",
             photo_url: p.photo_url || null,
             trustworthiness_score: p.trustworthiness_score ?? null,
             promises_kept: p.promises_kept ?? 0,
@@ -38,7 +39,7 @@ export default async function BorgRecordDirectory() {
     // Fallback if db is completely empty for some reason
     if (initialPoliticians.length === 0) {
         initialPoliticians = [
-            { id: "1", slug: "sample-slug", name: "Eleanor Vance", office_held: "U.S. Senate", party: "Democrat", district_state: "OH", consistency_label: "Mixed" }
+            { id: "1", slug: "sample-slug", name: "Eleanor Vance", office_held: "U.S. Senate", party: "Democrat", district_state: "OH", candidate_status: "Active", consistency_label: "Mixed" }
         ];
     }
 

@@ -10,12 +10,14 @@ CREATE TABLE IF NOT EXISTS politicians (
     time_in_office TEXT,
     country TEXT DEFAULT 'US',
     region_level TEXT DEFAULT 'Federal',
+    candidate_status TEXT DEFAULT 'Active', -- Active, Candidate, Former
     trustworthiness_score INTEGER DEFAULT NULL,
     promises_kept INTEGER DEFAULT 0,
     promises_broken INTEGER DEFAULT 0,
     promises_total INTEGER DEFAULT 0,
     popularity_score INTEGER DEFAULT 0,
     last_scored_at TIMESTAMP,
+    latest_sync_timestamp TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -275,3 +277,14 @@ CREATE TABLE IF NOT EXISTS politician_requests (
 
 CREATE INDEX IF NOT EXISTS idx_requests_status ON politician_requests(status);
 CREATE INDEX IF NOT EXISTS idx_politicians_country ON politicians(country);
+
+-- Subscriber preferences mapping
+CREATE TABLE IF NOT EXISTS subscriber_politicians (
+    subscriber_id TEXT,
+    politician_id TEXT,
+    pinned BOOLEAN DEFAULT 0, -- Indicates if the dashboard should prioritize this local rep
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (subscriber_id, politician_id),
+    FOREIGN KEY (subscriber_id) REFERENCES subscribers(id),
+    FOREIGN KEY (politician_id) REFERENCES politicians(id)
+);

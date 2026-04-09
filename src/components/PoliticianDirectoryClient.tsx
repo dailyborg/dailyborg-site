@@ -16,9 +16,9 @@ type Politician = {
     photo_url?: string;
     trustworthiness_score?: number | null;
     promises_kept?: number;
-    promises_broken?: number;
     promises_total?: number;
     popularity_score?: number;
+    candidate_status?: string;
     consistency_label: string;
 };
 
@@ -112,7 +112,12 @@ function PoliticianCard({ pol }: { pol: Politician }) {
                     <div className={`text-[9px] font-black uppercase tracking-[0.2em] w-fit px-2.5 py-1 mb-3 border backdrop-blur-sm shadow-sm ${trust.color}`}>
                         {trust.icon} {trust.label}
                     </div>
-                    <span className={`text-[10px] font-bold uppercase tracking-widest w-fit px-2.5 py-1 mb-2 shadow-sm rounded-sm backdrop-blur-md ${pol.party === 'Democrat' ? 'bg-blue-500/80 text-white' : pol.party === 'Republican' ? 'bg-red-500/80 text-white' : 'bg-accent/80 text-white'}`}>
+                    {(pol.candidate_status === 'Candidate' || pol.candidate_status === 'Former') && (
+                        <div className={`text-[9px] font-black uppercase tracking-[0.2em] w-fit px-2.5 py-1 mb-3 border backdrop-blur-sm shadow-sm ${pol.candidate_status === 'Former' ? 'bg-red-500/80 text-white border-red-500/30' : 'bg-accent/80 text-white border-accent/30'}`}>
+                            {pol.candidate_status === 'Former' ? '★ Historical Archive' : '★ Upcoming Candidate'}
+                        </div>
+                    )}
+                    <span className={`text-[10px] font-bold uppercase tracking-widest w-fit px-2.5 py-1 mb-2 shadow-sm rounded-sm backdrop-blur-md ${pol.party === 'Democrat' ? 'bg-blue-500/80 text-white' : pol.party === 'Republican' ? 'bg-red-500/80 text-white' : 'bg-foreground/80 text-background'}`}>
                         {pol.party}
                     </span>
                     <h3 className="font-serif text-3xl font-bold leading-none mt-2 group-hover:text-accent transition-colors drop-shadow-sm">{pol.name}</h3>
@@ -146,12 +151,29 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
     // UI State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showSortDropdown, setShowSortDropdown] = useState(false);
+    const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+
+    useEffect(() => {
+        const loadPinned = () => {
+            try {
+                const saved = localStorage.getItem('tracked_politicians');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    setPinnedIds(parsed.filter((p: any) => p.pinned === true).map((p: any) => p.id));
+                }
+            } catch(e) {}
+        };
+        loadPinned();
+        window.addEventListener('borg_tracked_officials_update', loadPinned);
+        return () => window.removeEventListener('borg_tracked_officials_update', loadPinned);
+    }, []);
 
     // Filters (Default to State auto-selected using Geo IP)
     const [levelFilter, setLevelFilter] = useState<string | null>(validInitialState ? 'State' : null);
     const [partyFilter, setPartyFilter] = useState<string | null>(null);
     const [stateFilter, setStateFilter] = useState<string | null>(validInitialState);
     const [localTownFilter, setLocalTownFilter] = useState<string>("");
+    const [showHistorical, setShowHistorical] = useState(false);
     const [sortBy, setSortBy] = useState<SortOption>('name-asc');
 
     // Form state
@@ -177,11 +199,22 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
             const matchesParty = !partyFilter || p.party === partyFilter;
             const matchesState = !stateFilter || p.district_state.startsWith(stateFilter);
             const matchesTown = !localTownFilter || p.district_state.toLowerCase().includes(localTownFilter.toLowerCase());
+            
+            const isFormer = p.candidate_status === 'Former';
+            const matchesHistorical = showHistorical ? true : !isFormer; // Hide former unless toggled
 
-            return matchesSearch && matchesLevel && matchesParty && matchesState && matchesTown;
+            return matchesSearch && matchesLevel && matchesParty && matchesState && matchesTown && matchesHistorical;
         });
 
         result.sort((a, b) => {
+            // Priority: Pinned Officials completely outrank all existing sorts
+            if (pinnedIds.length > 0) {
+                const aPinned = pinnedIds.includes(a.id);
+                const bPinned = pinnedIds.includes(b.id);
+                if (aPinned && !bPinned) return -1;
+                if (!aPinned && bPinned) return 1;
+            }
+
             switch (sortBy) {
                 case 'name-asc': return a.name.localeCompare(b.name);
                 case 'name-desc': return b.name.localeCompare(a.name);
@@ -194,7 +227,7 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
         });
 
         return result;
-    }, [initialPoliticians, query, levelFilter, partyFilter, stateFilter, localTownFilter, sortBy]);
+    }, [initialPoliticians, query, levelFilter, partyFilter, stateFilter, localTownFilter, sortBy, pinnedIds]);
 
     const clearAllFilters = () => {
         setLevelFilter(null);
@@ -244,9 +277,9 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
             </div>
 
             {/* ═══════════════════ REFINED PREMIUM TABS (Stitch Aesthetic) ═══════════════════ */}
-            <div className="mb-10 w-full animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <div className="mb-10 w-full animate-in fade-in slide-in-from-bottom-2 duration-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 {/* Outer Glass Container */}
-                <div className="inline-flex p-1.5 bg-muted/40 backdrop-blur-md rounded-full mb-6 border border-border/50 shadow-sm max-w-full overflow-x-auto scroolbar-hide">
+                <div className="inline-flex p-1.5 bg-muted/40 backdrop-blur-md rounded-full mb-0 border border-border/50 shadow-sm max-w-full overflow-x-auto scroolbar-hide">
                     {['Federal', 'State', 'Local'].map(level => {
                         const isActive = levelFilter === level;
                         return (
@@ -273,6 +306,18 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
                         );
                     })}
                 </div>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mr-4 ml-2">
+                    <input 
+                        type="checkbox" 
+                        checked={showHistorical} 
+                        onChange={(e) => setShowHistorical(e.target.checked)}
+                        className="accent-red-500 w-4 h-4 rounded-sm border-border"
+                    />
+                    Show Past Officials Database
+                    {showHistorical && <AlertCircle className="w-3.5 h-3.5 text-red-500 inline ml-1" />}
+                </label>
+            </div>
 
                 {/* Smooth Expansion Dropdown Area */}
                 <div className={`transition-all duration-500 origin-top overflow-hidden ${levelFilter === 'State' || levelFilter === 'Local' ? 'max-h-[200px] opacity-100 mb-8' : 'max-h-0 opacity-0 mb-0'}`}>
