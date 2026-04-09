@@ -7,7 +7,15 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatTimeAgo(dateString: string) {
     if (!dateString) return "Just now";
-    const date = new Date(dateString);
+    
+    // SQLite sometimes outputs "YYYY-MM-DD HH:MM:SS" without the Z.
+    // We forcibly parse it as UTC to stop JS from guessing the timezone incorrectly.
+    let safeString = dateString.toString();
+    if (!safeString.endsWith('Z') && safeString.includes(' ')) {
+        safeString = safeString.replace(' ', 'T') + 'Z';
+    }
+
+    const date = new Date(safeString);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     if (isNaN(diff)) return "Just now";
@@ -22,12 +30,18 @@ export function formatTimeAgo(dateString: string) {
     const days = Math.floor(hours / 24);
     if (days < 7) return `${days}d AGO`;
     
-    // User local date formatting
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
+    // Use Eastern Time for strict consistency
+    return date.toLocaleDateString("en-US", { month: 'short', day: 'numeric', timeZone: "America/New_York" }).toUpperCase();
 }
 
 export function formatFullTimestamp(dateString: string) {
-    const date = new Date(dateString);
+    if (!dateString) return "";
+    let safeString = dateString.toString();
+    if (!safeString.endsWith('Z') && safeString.includes(' ')) {
+        safeString = safeString.replace(' ', 'T') + 'Z';
+    }
+
+    const date = new Date(safeString);
     if (isNaN(date.getTime())) return "";
     
     const options: Intl.DateTimeFormatOptions = {
@@ -36,9 +50,10 @@ export function formatFullTimestamp(dateString: string) {
         year: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: "America/New_York"
     };
     
-    // Using undefined as the first argument uses the browser's default locale
-    return date.toLocaleString(undefined, options).toUpperCase().replace(',', ' •');
+    // Force Eastern Time and add the ET indicator
+    return date.toLocaleString("en-US", options).toUpperCase().replace(',', ' •') + " ET";
 }

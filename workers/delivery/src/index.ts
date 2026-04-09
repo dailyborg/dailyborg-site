@@ -161,34 +161,62 @@ export default {
 
     buildEmailHTML(articles: Article[]): string {
         const articleBlocks = articles.map(a => `
-            <div style="margin-bottom: 30px; border-bottom: 1px solid #e2e8f0; padding-bottom: 20px;">
-                <p style="color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; font-family: 'Inter', sans-serif; margin-bottom: 5px;">${a.desk.toUpperCase()}</p>
-                <h2 style="font-family: 'Playfair Display', serif; font-size: 22px; margin-top: 0; margin-bottom: 10px; color: #0f172a;">
+            <tr>
+              <td style="padding: 24px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <p style="margin: 0 0 8px 0; color: #3b82f6; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-family: 'Inter', -apple-system, sans-serif;">${a.desk.toUpperCase()}</p>
+                <h2 style="margin: 0 0 12px 0; font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: #f8fafc; line-height: 1.3;">
                     ${a.title}
                 </h2>
-                <p style="font-family: 'Inter', sans-serif; font-size: 15px; color: #334155; line-height: 1.6;">
+                <p style="margin: 0 0 16px 0; font-family: 'Inter', -apple-system, sans-serif; font-size: 14px; color: #cbd5e1; line-height: 1.6;">
                     ${a.excerpt}
                 </p>
-                <a href="https://dailyborg.com/${a.desk.toLowerCase()}/${a.slug}" style="display: inline-block; margin-top: 10px; color: #1e3a8a; text-decoration: none; font-weight: bold; font-family: 'Inter', sans-serif; font-size: 13px;">Read Full Briefing &rarr;</a>
-            </div>
+                <a href="https://dailyborg.com/${a.desk.toLowerCase()}/${a.slug}" style="display: inline-block; color: #60a5fa; text-decoration: none; font-weight: 600; font-family: 'Inter', -apple-system, sans-serif; font-size: 13px;">Read Full Briefing &rarr;</a>
+              </td>
+            </tr>
         `).join('');
 
         return `
-            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px; font-family: 'Inter', sans-serif; background-color: #fafafa;">
-                <div style="text-align: center; margin-bottom: 40px;">
-                    <h1 style="font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 900; letter-spacing: -0.02em; color: #020617; margin: 0;">The Daily Borg</h1>
-                    <p style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.3em; color: #64748b; margin-top: 5px;">Morning Edition</p>
-                </div>
-                
-                <div style="background: white; padding: 40px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
-                    ${articleBlocks}
-                </div>
-                
-                <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #94a3b8;">
-                    <p>Delivered by The Daily Borg Automated Delivery Engine.</p>
-                    <p><a href="https://dailyborg.com/settings" style="color: #94a3b8;">Manage Subscriptions</a></p>
-                </div>
-            </div>
+          <!DOCTYPE html>
+          <html>
+          <body style="margin: 0; padding: 0; background-color: #020617; font-family: 'Inter', -apple-system, sans-serif; color: #f8fafc;">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #020617; padding: 40px 20px;">
+              <tr>
+                <td align="center">
+                  
+                  <table border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #0f172a; border-radius: 24px; border: 1px solid #1e293b; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+                    
+                    <!-- Header -->
+                    <tr>
+                      <td align="center" style="padding: 40px 40px 20px 40px;">
+                        <img src="https://dailyborg.com/dailyborg-logo2.png" alt="Daily Borg Logo" width="80" style="display: block; margin-bottom: 20px;" />
+                        <h1 style="margin: 0; font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 900; color: #f8fafc; letter-spacing: -0.02em;">The Daily Borg</h1>
+                        <p style="margin: 8px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3em; color: #94a3b8; font-weight: 700;">Morning Intelligence Briefing</p>
+                      </td>
+                    </tr>
+                    
+                    <!-- Content Wrapper -->
+                    <tr>
+                      <td style="padding: 20px 30px 40px 30px;">
+                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; overflow: hidden;">
+                            ${articleBlocks}
+                        </table>
+                      </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                      <td align="center" style="background-color: #020617; padding: 25px 40px; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;">
+                        <p style="margin: 0 0 8px 0; font-size: 12px; color: #64748b; line-height: 1.5;">Delivered by The Daily Borg Automated Delivery Engine.</p>
+                        <a href="https://dailyborg.com/admin" style="color: #475569; text-decoration: none; font-size: 12px; font-weight: 600;">Manage Your Preferences</a>
+                      </td>
+                    </tr>
+
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
         `;
     },
 

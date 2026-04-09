@@ -147,24 +147,89 @@ export async function POST(request: Request) {
     // 2. Dispatch Welcome Email via Resend if email channel
     if (channel === 'email' && email && resendApiKey) {
       const resend = new Resend(resendApiKey);
-      await resend.emails.send({
-        from: 'The Daily Borg <notifications@thedailyborg.com>',
+      const { error: resendError } = await resend.emails.send({
+        from: 'The Daily Borg <edition@dailyborg.com>',
         to: [email],
         subject: 'Welcome to The Record',
         html: `
-          <div style="font-family: serif; color: #111;">
-            <h2>Welcome to the Record.</h2>
-            <p>You are now officially subscribed to verified intelligence updates.</p>
-            <p><strong>Plan:</strong> ${plan === 'paid' ? 'Premium ($0.99/mo)' : 'Free'}</p>
-            <p><strong>Frequency:</strong> ${freq}</p>
-            ${tracked_politician ? `<p><strong>Borg Alert Active:</strong> You will now be notified of priority stance shifts or broken promises regarding ${tracked_politician.toUpperCase().replace('-', ' ')}.</p>` : ''}
-            ${(tracked_politicians && tracked_politicians.length > 0) ? `<p><strong>Entities Tracked:</strong> ${tracked_politicians.map((p: string) => p.toUpperCase().replace('-', ' ')).join(', ')}</p>` : ''}
-            ${topics?.length ? `<p><strong>Topics Tracked:</strong> ${topics.join(', ')}</p>` : ''}
-            <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;" />
-            <p style="color: #666; font-size: 12px; font-family: sans-serif; text-transform: uppercase;">The Daily Borg - Broadcast Operations & Reporting Grid</p>
-          </div>
+          <!DOCTYPE html>
+          <html>
+          <body style="margin: 0; padding: 0; background-color: #020617; font-family: 'Inter', -apple-system, sans-serif; color: #f8fafc;">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #020617; padding: 40px 20px;">
+              <tr>
+                <td align="center">
+                  
+                  <!-- Main Glassmorphic Card -->
+                  <table border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #0f172a; border-radius: 24px; border: 1px solid #1e293b; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+                    
+                    <!-- Header -->
+                    <tr>
+                      <td align="center" style="padding: 40px 40px 20px 40px;">
+                        <img src="https://dailyborg.com/dailyborg-logo2.png" alt="Daily Borg Logo" width="80" style="display: block; margin-bottom: 20px;" />
+                        <h1 style="margin: 0; font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 900; color: #f8fafc; letter-spacing: -0.02em;">The Daily Borg</h1>
+                        <p style="margin: 10px 0 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3em; color: #94a3b8; font-weight: 700;">Broadcast Operations & Reporting Grid</p>
+                      </td>
+                    </tr>
+                    
+                    <!-- Body Content -->
+                    <tr>
+                      <td style="padding: 20px 40px 40px 40px;">
+                        <div style="background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 30px;">
+                            <h2 style="margin: 0 0 15px 0; font-size: 20px; font-weight: 700; color: #f8fafc;">Welcome to the Record.</h2>
+                            <p style="margin: 0 0 25px 0; font-size: 15px; color: #cbd5e1; line-height: 1.6;">You are now officially connected to the grid. Your intelligence feed has been successfully configured.</p>
+                            
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                              <tr>
+                                <td style="padding: 12px 0; border-bottom: 1px solid #1e293b;">
+                                  <strong style="color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Clearance Level</strong><br/>
+                                  <span style="color: #f8fafc; font-size: 15px; font-weight: 600;">${plan === 'paid' ? 'Premium Protocol' : 'Standard Feed'}</span>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style="padding: 12px 0; border-bottom: 1px solid #1e293b;">
+                                  <strong style="color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Dispatch Frequency</strong><br/>
+                                  <span style="color: #f8fafc; font-size: 15px; font-weight: 600; text-transform: capitalize;">${freq}</span>
+                                </td>
+                              </tr>
+                              ${tracked_politician || (tracked_politicians && tracked_politicians.length > 0) ? `
+                              <tr>
+                                <td style="padding: 12px 0; border-bottom: 1px solid #1e293b;">
+                                  <strong style="color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Entities Tracked</strong><br/>
+                                  <span style="color: #f8fafc; font-size: 15px; font-weight: 600;">${[tracked_politician, ...(tracked_politicians || [])].filter(Boolean).map((p: string) => p.toUpperCase().replace('-', ' ')).join(', ')}</span>
+                                </td>
+                              </tr>
+                              ` : ''}
+                            </table>
+                            
+                            <div style="margin-top: 30px; text-align: center;">
+                              <a href="https://dailyborg.com" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 14px 28px; border-radius: 8px; letter-spacing: 0.05em;">ENTER THE GRID</a>
+                            </div>
+                        </div>
+                      </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                      <td style="background-color: #020617; padding: 25px 40px; text-align: center; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;">
+                        <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.5;">This dispatch was autonomous generated by The Daily Borg Network.</p>
+                        <p style="margin: 8px 0 0 0; font-size: 12px; color: #475569;">
+                          <a href="https://dailyborg.com" style="color: #cbd5e1; text-decoration: none;">dailyborg.com</a> • 
+                          <a href="https://dailyborg.com/admin" style="color: #cbd5e1; text-decoration: none;">Manage Subscriptions</a>
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
         `,
       });
+
+      if (resendError) {
+        console.error("Resend delivery failed during execution:", resendError);
+      }
     } else if (channel === 'whatsapp' && phone_number) {
       // Future WhatsApp Welcome Message Trigger
       console.log(`[Twilio/WhatsApp Stub] Send welcome to ${phone_number}`);
