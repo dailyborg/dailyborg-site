@@ -73,7 +73,7 @@ export function LeadHeroSection({ lead, sideStories }: { lead: ArticleData; side
               </Link>
             </h2>
             <div className="flex items-center gap-2 mt-1 mb-1">
-              <div className="text-sm font-sans">By <span className="font-bold">The Borg Syndicate</span></div>
+              <div className="text-sm font-sans">By <span className="font-bold uppercase tracking-wider text-xs">{(lead as any).author?.name || `${lead.desk} Desk`}</span></div>
               <span className="text-muted-foreground mx-1">•</span>
               <span className="text-sm text-muted-foreground font-sans">{lead.fullTimestamp || lead.timeAgo}</span>
               <span className="text-muted-foreground mx-1">•</span>

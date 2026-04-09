@@ -84,9 +84,11 @@ export default async function Home() {
   try {
     const db = await getDbBinding();
     const { results } = await db.prepare(`
-        SELECT * FROM articles 
-        WHERE approval_status = 'approved' 
-        ORDER BY publish_date DESC 
+        SELECT articles.*, authors.name as author_name 
+        FROM articles 
+        LEFT JOIN authors ON articles.author_id = authors.id
+        WHERE articles.approval_status = 'approved' 
+        ORDER BY articles.publish_date DESC 
         LIMIT 32
     `).bind().all();
 
@@ -121,6 +123,7 @@ export default async function Home() {
     aiGeneratedImageUrl: s.hero_image_url || null,
     hero_image_url: s.hero_image_url || null,
     article_type: s.article_type || 'standard',
+    author: s.author_name ? { name: s.author_name } : undefined
   }));
 
   // Distribute articles across sections
