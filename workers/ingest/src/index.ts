@@ -90,11 +90,12 @@ export class IngestCoordinator extends Agent<Env> {
         // =======================================================
         if (aiProvider === 'cloudflare') {
             try {
-                const aiResponse = await this.env.AI.run('@cf/meta/llama-3-8b-instruct', {
+                const aiResponse = await this.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
                     messages: [
-                        { role: "system", content: "You are an API that strictly returns valid JSON with no formatting blocks." },
+                        { role: "system", content: "You are an AI journalist API. You must return ONLY absolute valid JSON matching the exact schema." },
                         { role: "user", content: enrichmentPrompt }
-                    ]
+                    ],
+                    max_tokens: 2500
                 });
                 let rawText = (aiResponse as any).response;
                 rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -227,13 +228,18 @@ export class IngestCoordinator extends Agent<Env> {
         // --- TIER 1: Unsplash ---
         try {
             if (this.env.UNSPLASH_ACCESS_KEY && this.env.UNSPLASH_ACCESS_KEY.length > 5) {
-                const stopWords = new Set(['the','a','an','of','in','on','for','to','and','is','are','as','at','by','its','how','why','what','with','from','has','have','that','this','into','over','after','new']);
-                const keywords = articleObject.title
-                    .replace(/[^a-zA-Z0-9\s]/g, '')
-                    .split(/\s+/)
-                    .filter((w: string) => w.length > 2 && !stopWords.has(w.toLowerCase()))
-                    .slice(0, 5)
-                    .join(' ');
+                let keywords = "";
+                if (articleObject.suggestedHeroImagePrompt && articleObject.suggestedHeroImagePrompt.length > 3) {
+                    keywords = articleObject.suggestedHeroImagePrompt;
+                } else {
+                    const stopWords = new Set(['the','a','an','of','in','on','for','to','and','is','are','as','at','by','its','how','why','what','with','from','has','have','that','this','into','over','after','new']);
+                    keywords = articleObject.title
+                        .replace(/[^a-zA-Z0-9\s]/g, '')
+                        .split(/\s+/)
+                        .filter((w: string) => w.length > 2 && !stopWords.has(w.toLowerCase()))
+                        .slice(0, 5)
+                        .join(' ');
+                }
 
                 console.log(`[Tier 1] Searching Unsplash for: "${keywords}"`);
                 const unsplashRes = await fetch(
