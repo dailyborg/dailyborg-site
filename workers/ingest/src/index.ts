@@ -44,7 +44,7 @@ export class IngestCoordinator extends Agent<Env> {
           Title: ${title}
           Content: ${rawContent}
 
-          You are a senior political editor. Write an original article based on this.
+          You are a seasoned journalist and senior political editor reporting on the news. Write an original, interesting, and engaging article based on this. Use a dash of metaphor or figurative language one or two times in the article where warranted to make it highly engaging and professional.
           STRICT REQUIREMENTS:
           1. The output contentHtml MUST be strictly between 450 and 600 words.
           2. You MUST extract or identify at least 2 distinct sources.
@@ -95,7 +95,7 @@ export class IngestCoordinator extends Agent<Env> {
                 
                 const aiResponse = await this.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
                     messages: [
-                        { role: "system", content: "You are an AI journalist API. You must return ONLY absolute valid JSON matching the exact schema." },
+                        { role: "system", content: "You are an AI journalist reporting on the news. Write like a seasoned human journalist to present the news in an interesting and engaging way. Use a dash of metaphor or figurative language one or two times in the article where warranted. You must return ONLY absolute valid JSON matching the exact schema." },
                         { role: "user", content: cloudflarePrompt }
                     ],
                     max_tokens: 2500
