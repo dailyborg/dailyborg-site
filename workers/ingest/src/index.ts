@@ -120,8 +120,8 @@ export class IngestCoordinator extends Agent<Env> {
                             canonical_event_slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, ""),
                             title: title,
                             excerpt: rawContent.substring(0, 150) + "...",
-                            contentHtml: `<p>${rawContent}</p><p><em>This article was synthesized autonomously due to Edge processing limitations.</em></p>`,
-                            keyTakeaways: ["Automated processing complete", "Data extraction fallback engaged"],
+                            contentHtml: `<p>${rawContent}</p><p><em>This is a breaking news alert fetched directly from the source network and is pending full AI editorial review.</em></p>`,
+                            keyTakeaways: ["Breaking News Output", "Pending Live Verification"],
                             confidenceScore: 50,
                             desk: type || "Politics",
                             sources: [{source_name: "External Feed", source_type: "rss"}]
