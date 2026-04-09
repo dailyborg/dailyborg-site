@@ -1,8 +1,18 @@
 export function getImageForContext(dataPayload: any): string {
-  const primaryImage = dataPayload.aiGeneratedImageUrl || dataPayload.hero_image_url;
+  let primaryImage = dataPayload.aiGeneratedImageUrl || dataPayload.hero_image_url;
 
-  // 1. If the AI actively generated an image for this post
-  if (primaryImage && primaryImage !== "https://example.com/generated-hero.jpg") {
+  // Sanitize RSS tracking pixels and broken incomplete URLs
+  if (primaryImage) {
+    if (primaryImage.startsWith('//')) {
+      primaryImage = `https:${primaryImage}`;
+    }
+    if (primaryImage.length < 15 || primaryImage.includes('1x1') || primaryImage.includes("pixel")) {
+      primaryImage = null;
+    }
+  }
+
+  // 1. Process valid, surviving image urls
+  if (primaryImage && primaryImage.startsWith('http') && primaryImage !== "https://example.com/generated-hero.jpg") {
     return primaryImage;
   }
 
