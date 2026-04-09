@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { getImageForContext } from '@/lib/image-utils';
 import { formatTimeAgo, formatFullTimestamp } from '@/lib/utils';
 import { ArticleData, HeadlinesGridSection } from '@/components/layout/news-sections';
+import { ClientTime } from '@/components/ui/client-time';
 
 export default async function ArticlePage({ params }: { params: Promise<{ desk: string, slug: string }> }) {
     const resolvedParams = await params;
@@ -61,20 +62,24 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
     };
 
     return (
-        <div className="flex flex-col min-h-screen bg-background relative">
+        <div className="flex flex-col min-h-screen relative overflow-x-hidden">
             {/* Structured Data for Google News */}
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
-            {/* Full-Width Hero Image (breaks out of content container) */}
+            {/* Full-Width Hero Image - Fixed in Background */}
             {finalHeroImage && (
-                <div className="w-full bg-[#EFEBE6] dark:bg-muted aspect-[21/9] relative overflow-hidden">
-                    <img src={finalHeroImage} alt={article.title} className="w-full h-full object-cover" />
+                <div className="fixed inset-0 z-0 w-full h-[100vh] bg-black">
+                    <img src={finalHeroImage} alt={article.title} className="w-full h-full object-cover opacity-80" />
                 </div>
             )}
 
-            <main className="flex-1 w-full mx-auto px-4 md:px-6 py-8 md:py-12 max-w-[1200px]">
+            <main className={`flex-1 w-full mx-auto px-6 md:px-10 lg:px-16 max-w-[1240px] z-10 relative ${
+                finalHeroImage 
+                ? 'mt-[50vh] md:mt-[60vh] pt-12 md:pt-16 pb-24 bg-white/95 dark:bg-black/95 backdrop-blur-3xl rounded-t-[2.5rem] md:rounded-t-[4rem] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] border-t border-white/20 dark:border-white/10' 
+                : 'py-8 md:py-12 bg-background'
+            }`}>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
 
@@ -111,7 +116,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
                                 {article.excerpt}
                             </p>
 
-                            <div className="flex items-center gap-3 font-[family-name:var(--font-source-sans)] text-[10px] md:text-xs font-bold uppercase tracking-widest text-[#64748B] dark:text-muted-foreground pt-4 border-t border-border mt-2">
+                            <div className="flex items-center gap-3 font-[family-name:var(--font-source-sans)] text-[10px] md:text-xs font-bold uppercase tracking-widest text-[#64748B] dark:text-muted-foreground pt-4 border-t border-border/50 mt-2">
                                 {article.author ? (
                                     <div className="flex items-center gap-2">
                                         <span>BY</span>
@@ -122,9 +127,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
                                 ) : (
                                     <span>BY {formattedDesk.toUpperCase()} DESK</span>
                                 )}
-                                <span>{new Date(article.publish_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()}</span>
-                                <span>•</span>
-                                <span>{new Date(article.publish_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase()}</span>
+                                <ClientTime timestamp={article.publish_date} />
                             </div>
                         </header>
 

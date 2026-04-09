@@ -90,10 +90,12 @@ export class IngestCoordinator extends Agent<Env> {
         // =======================================================
         if (aiProvider === 'cloudflare') {
             try {
+                const cloudflarePrompt = enrichmentPrompt + "\nCRITICAL FORMATTING INSTRUCTION: Each paragraph in contentHtml MUST contain at least 4-6 sentences to form rich, dense journalistic columns. DO NOT produce listicles or single-sentence paragraphs. Output ONLY pure valid JSON, no markdown.";
+                
                 const aiResponse = await this.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
                     messages: [
                         { role: "system", content: "You are an AI journalist API. You must return ONLY absolute valid JSON matching the exact schema." },
-                        { role: "user", content: enrichmentPrompt }
+                        { role: "user", content: cloudflarePrompt }
                     ],
                     max_tokens: 2500
                 });
