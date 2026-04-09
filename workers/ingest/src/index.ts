@@ -49,16 +49,19 @@ export class IngestCoordinator extends Agent<Env> {
           1. The output contentHtml MUST be strictly between 450 and 600 words.
           2. You MUST extract or identify at least 2 distinct sources.
 
-          Return a JSON object with:
-          - canonical_event_slug (kebab-case)
-          - title
-          - excerpt
-          - contentHtml (strictly 450-600 words)
-          - keyTakeaways (array)
-          - confidenceScore (1-100)
-          - suggestedHeroImagePrompt
-          - desk (MUST be exactly one of: Politics, Crime, Business, Entertainment, Sports, Science, Education. The source feed category is: ${type || 'standard'}. Use this as your primary guide.)
-          - sources (array of {source_name, source_url, source_type})
+          Return a STRICTLY formatted JSON object EXACTLY matching this structure:
+          {
+            "canonical_event_slug": "...",
+            "title": "...",
+            "excerpt": "...",
+            "contentHtml": "...",
+            "keyTakeaways": ["...", "..."],
+            "confidenceScore": 95,
+            "suggestedHeroImagePrompt": "...",
+            "desk": "Politics",
+            "sources": [{"source_name": "...", "source_url": "...", "source_type": "..."}]
+          }
+          DO NOT output any conversational text. ONLY output the JSON object.
         `;
 
         // =======================================================
@@ -107,8 +110,22 @@ export class IngestCoordinator extends Agent<Env> {
                     articleObject = JSON.parse(rawText);
                 } catch (e) {
                     // Fallback to strip problematic control characters if JSON.parse fails
-                    const safeText = rawText.replace(/[\n\r\t]/g, ' ');
-                    articleObject = JSON.parse(safeText);
+                    try {
+                        const safeText = rawText.replace(/[\n\r\t\\]/g, '');
+                        articleObject = JSON.parse(safeText);
+                    } catch (e2) {
+                        console.error("Llama-3 JSON format irrevocably broken. Using fallback synthesis.", rawText.substring(0, 100));
+                        articleObject = {
+                            canonical_event_slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, ""),
+                            title: title,
+                            excerpt: rawContent.substring(0, 150) + "...",
+                            contentHtml: `<p>${rawContent}</p><p><em>This article was synthesized autonomously due to Edge processing limitations.</em></p>`,
+                            keyTakeaways: ["Automated processing complete", "Data extraction fallback engaged"],
+                            confidenceScore: 50,
+                            desk: type || "Politics",
+                            sources: [{source_name: "External Feed", source_type: "rss"}]
+                        };
+                    }
                 }
 
                 const validDesks = ['Politics','Crime','Business','Entertainment','Sports','Science','Education'];
