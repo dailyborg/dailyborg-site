@@ -14,7 +14,15 @@ export function ClientTime({ timestamp, fallback }: ClientTimeProps) {
 
   useEffect(() => {
     setMounted(true);
-    const date = new Date(timestamp);
+    
+    // SQLite sometimes outputs "YYYY-MM-DD HH:MM:SS" without the Z.
+    // We forcibly parse it as UTC to stop JS from guessing the timezone.
+    let safeString = timestamp.toString();
+    if (!safeString.endsWith('Z') && safeString.includes(' ')) {
+        safeString = safeString.replace(' ', 'T') + 'Z';
+    }
+    
+    const date = new Date(safeString);
     
     // Check if the date is valid before trying to format it
     if (isNaN(date.getTime())) {
@@ -28,6 +36,7 @@ export function ClientTime({ timestamp, fallback }: ClientTimeProps) {
         month: "short",
         day: "numeric",
         year: "numeric",
+        timeZone: "America/New_York",
       }).toUpperCase()
     );
     setFormattedTime(
@@ -35,7 +44,8 @@ export function ClientTime({ timestamp, fallback }: ClientTimeProps) {
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
-      }).toUpperCase()
+        timeZone: "America/New_York",
+      }).toUpperCase() + " ET"
     );
   }, [timestamp]);
 
