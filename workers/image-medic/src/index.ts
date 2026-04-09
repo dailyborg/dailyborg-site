@@ -91,7 +91,7 @@ async function healImages(env: Env) {
             
             try {
                 const unsplashRes = await fetch(
-                    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&orientation=landscape&per_page=1`,
+                    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&orientation=landscape&per_page=1&order_by=relevant`,
                     { headers: { 'Authorization': `Client-ID ${env.UNSPLASH_ACCESS_KEY}` } }
                 );
 

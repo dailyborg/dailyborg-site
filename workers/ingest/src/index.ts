@@ -62,6 +62,7 @@ export class IngestCoordinator extends Agent<Env> {
             "sources": [{"source_name": "...", "source_url": "...", "source_type": "..."}],
             "mentioned_candidates": ["First Last", "First Last"]
           }
+          FOR "suggestedHeroImagePrompt": Provide a highly specific 2-3 word search query optimized for Unsplash that captures the EXACT emotional tone and subject matter. Do NOT just use the politicians names, use thematic elements. For example, if it's a lawsuit or pause on an order, use "Gavel Courtroom" instead of "Happy Politician".
           DO NOT output any conversational text. ONLY output the JSON object.
         `;
 
@@ -247,7 +248,7 @@ export class IngestCoordinator extends Agent<Env> {
 
                 console.log(`[Tier 1] Searching Unsplash for: "${keywords}"`);
                 const unsplashRes = await fetch(
-                    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(keywords)}&orientation=landscape&per_page=3`,
+                    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(keywords)}&orientation=landscape&per_page=3&order_by=relevant`,
                     { headers: { 'Authorization': `Client-ID ${this.env.UNSPLASH_ACCESS_KEY}` } }
                 );
 
