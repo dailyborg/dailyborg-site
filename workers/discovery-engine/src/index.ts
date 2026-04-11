@@ -435,9 +435,9 @@ export default {
 
             console.log(`[Discovery] State Sync: Executing bulk ingestion for ${currentState.toUpperCase()}...`);
 
-            // Fetch generic JSON bulk data if available, placeholder URL for OpenStates endpoint
-            // Since OpenStates requires an API token for large GraphQL loops, we use the public CSV files hosted on their github data export.
-            const url = `https://raw.githubusercontent.com/openstates/people/main/data/${currentState}/legislature.csv`;
+            // Fetch generic JSON bulk data if available.
+            // Since OpenStates requires an API token for large GraphQL loops, we use the free public CSV exports.
+            const url = `https://data.openstates.org/people/current/${currentState}.csv`;
             const res = await fetch(url);
             
             if (res.ok) {

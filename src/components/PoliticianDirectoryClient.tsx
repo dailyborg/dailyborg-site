@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { Search, ChevronRight, X, AlertCircle, CheckCircle2, ChevronDown, Award } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, ChevronRight, X, AlertCircle, CheckCircle2, ChevronDown, Award, MapPin, Loader2 } from "lucide-react";
 import { NewsGrid } from "./ui/grid";
 
 type Politician = {
@@ -144,6 +145,7 @@ function PoliticianCard({ pol }: { pol: Politician }) {
 
 export function PoliticianDirectoryClient({ initialPoliticians, initialState }: { initialPoliticians: Politician[], initialState?: string | null }) {
     const validInitialState = initialState && US_STATES.includes(initialState) ? initialState : null;
+    const router = useRouter();
     
     // Core search
     const [query, setQuery] = useState("");
@@ -183,6 +185,39 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
     const [submitError, setSubmitError] = useState("");
+
+    // Civic Engine State
+    const [civicQuery, setCivicQuery] = useState("");
+    const [isSearchingCivic, setIsSearchingCivic] = useState(false);
+    const [civicResultCount, setCivicResultCount] = useState<number | null>(null);
+
+    const handleCivicSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!civicQuery.trim()) return;
+        setIsSearchingCivic(true);
+        setCivicResultCount(null);
+        try {
+            const res = await fetch('/api/civic', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address: civicQuery })
+            });
+            const data: any = await res.json();
+            if (data.success) {
+                // If the engine ingested new politicians, we must reload the Server component via router!
+                setCivicResultCount(data.ingestedCount);
+                if (data.ingestedCount > 0) {
+                    router.refresh();
+                } else if (data.officialsFound > 0) {
+                     setCivicResultCount(0); // already had them
+                }
+            }
+        } catch(e) {
+            console.error("Civic engine lookup failed", e);
+        } finally {
+            setIsSearchingCivic(false);
+        }
+    };
 
     const activeFilterCount = [levelFilter, partyFilter, stateFilter, localTownFilter].filter(Boolean).length;
 
@@ -341,13 +376,28 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
 
                         {levelFilter === 'Local' && (
                             <div className="relative w-full max-w-sm">
-                                <input 
-                                    type="text" 
-                                    placeholder="e.g. Cook County, Chicago..." 
-                                    value={localTownFilter} 
-                                    onChange={(e) => setLocalTownFilter(e.target.value)}
-                                    className="w-full bg-background border border-border rounded-xl py-3 px-5 text-sm font-bold uppercase tracking-widest placeholder:text-muted-foreground/40 shadow-sm hover:border-accent hover:shadow-md transition-all outline-none focus:border-accent focus:ring-4 focus:ring-accent/10" 
-                                />
+                                <form onSubmit={handleCivicSearch} className="relative w-full">
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Exact Zip Code or Address..." 
+                                        value={civicQuery} 
+                                        onChange={(e) => setCivicQuery(e.target.value)}
+                                        className="w-full bg-background border border-border rounded-xl py-3 pl-11 pr-24 text-sm font-bold uppercase tracking-widest placeholder:text-muted-foreground/40 shadow-sm hover:border-accent hover:shadow-md transition-all outline-none focus:border-accent focus:ring-4 focus:ring-accent/10" 
+                                    />
+                                    <button 
+                                        type="submit" 
+                                        disabled={isSearchingCivic || !civicQuery.trim()}
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-foreground text-background py-1.5 px-3 rounded-lg text-xs font-black uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center"
+                                    >
+                                        {isSearchingCivic ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "PING"}
+                                    </button>
+                                </form>
+                                {civicResultCount !== null && (
+                                    <p className="text-[10px] uppercase font-bold tracking-widest mt-3 text-accent text-center animate-in fade-in slide-in-from-top-1">
+                                        {civicResultCount > 0 ? `Successfully Discovered ${civicResultCount} Local Officials. Displaying now.` : `All Local Officials already tracked in database.`}
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>

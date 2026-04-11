@@ -119,18 +119,8 @@ export class IngestCoordinator extends Agent<Env> {
                         const safeText = rawText.replace(/[\n\r\t\\]/g, '');
                         articleObject = JSON.parse(safeText);
                     } catch (e2) {
-                        console.error("Llama-3 JSON format irrevocably broken. Using fallback synthesis.", rawText.substring(0, 100));
-                        articleObject = {
-                            canonical_event_slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, ""),
-                            title: title,
-                            excerpt: rawContent.substring(0, 150) + "...",
-                            contentHtml: `<p>${rawContent}</p><p><em>This is a breaking news alert fetched directly from the source network and is pending full AI editorial review.</em></p>`,
-                            keyTakeaways: ["Breaking News Output", "Pending Live Verification"],
-                            confidenceScore: 50,
-                            desk: type || "Politics",
-                            sources: [{source_name: "External Feed", source_type: "rss"}],
-                            mentioned_candidates: []
-                        };
+                        console.error("Llama-3 JSON format irrevocably broken or empty.", rawText.substring(0, 100));
+                        articleObject = null;
                     }
                 }
 
