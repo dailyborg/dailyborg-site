@@ -39,7 +39,7 @@ export default async function BorgRecordDirectory() {
     // Fallback if db is completely empty for some reason
     if (initialPoliticians.length === 0) {
         initialPoliticians = [
-            { id: "1", slug: "sample-slug", name: "Eleanor Vance", office_held: "U.S. Senate", party: "Democrat", district_state: "OH", candidate_status: "Active", consistency_label: "Mixed" }
+            { id: "1", slug: "sample-slug", name: "Eleanor Vance", office_held: "U.S. Senate", party: "Democrat", district_state: "OH", region_level: "Federal", candidate_status: "Active", consistency_label: "Mixed" }
         ];
     }
 
