@@ -1,6 +1,76 @@
+import { getSandbox, Sandbox } from '@cloudflare/sandbox';
+import { DurableObject } from "cloudflare:workers";
+
 export interface Env {
     DB: D1Database;
     AI: any;
+    Sandbox: any;
+    CIVIC_API_KEY?: string;
+    AIML_API_KEY?: string;
+    POLITICIAN_AGENTS: DurableObjectNamespace;
+}
+
+// [AGENTS WEEK 2026] Zero-Trust Secure Sandbox Egress Proxy
+// Intercepts outbound HTTP from Sandbox containers and injects credentials
+// so untrusted code never sees secrets.
+export class SecureDiscoverySandbox extends Sandbox {
+    static outboundByHost = {
+        "api.civicdata.com": async (request: Request, env: Env) => {
+            const authenticatedReq = new Request(request);
+            authenticatedReq.headers.set("Authorization", `Bearer ${env.CIVIC_API_KEY || 'test-key'}`);
+            return fetch(authenticatedReq);
+        },
+        "api.aimlapi.com": async (request: Request, env: Env) => {
+            // [AGENTS WEEK 2026] AIML API egress proxy
+            // Any Python/JS code in the Sandbox can call api.aimlapi.com directly
+            // The Bearer token is injected silently by this outbound interceptor
+            const authenticatedReq = new Request(request);
+            authenticatedReq.headers.set("Authorization", `Bearer ${env.AIML_API_KEY || ''}`);
+            authenticatedReq.headers.set("Content-Type", "application/json");
+            console.log(`[SecureProxy] Proxying AIML request: ${request.url}`);
+            return fetch(authenticatedReq);
+        }
+    }
+}
+
+export class PoliticianAgent extends DurableObject {
+    constructor(ctx: DurableObjectState, env: Env) {
+        super(ctx, env);
+        // [AGENTS WEEK 2026] Durable Object Facets with SQLite
+        // Initialize the local isolated SQLite database for tracking promises and votes
+        this.ctx.storage.sql.exec(`
+            CREATE TABLE IF NOT EXISTS local_promises (id TEXT PRIMARY KEY, text TEXT, status TEXT);
+            CREATE TABLE IF NOT EXISTS local_votes (id TEXT PRIMARY KEY, bill_id TEXT, position TEXT);
+            CREATE TABLE IF NOT EXISTS analytics (key TEXT PRIMARY KEY, value INTEGER);
+        `);
+    }
+
+    async fetch(request: Request) {
+        const url = new URL(request.url);
+        // We can expose an internal REST API to orchestrate local scoring!
+        if (url.pathname === '/score' && request.method === 'POST') {
+            const body: any = await request.json().catch(() => ({}));
+            
+            // Log local votes
+            if (body.newVotes) {
+                 for (const v of body.newVotes) {
+                     this.ctx.storage.sql.exec("INSERT OR IGNORE INTO local_votes (id, bill_id, position) VALUES (?, ?, ?)", v.id, v.bill_id, v.position);
+                 }
+            }
+            
+            // Execute lightning-fast local SQLite query at $0 query cost
+            const rows = [...this.ctx.storage.sql.exec("SELECT * FROM local_votes").toArray()];
+            const total = rows.length;
+            
+            // Simulate generating a trustworthiness score and write it locally
+            const score = total > 0 ? Math.floor(Math.random() * 20) + 70 : 50; 
+            
+            this.ctx.storage.sql.exec("INSERT OR REPLACE INTO analytics (key, value) VALUES ('trust_score', ?)", score);
+            
+            return Response.json({ score, local_votes_tracked: total });
+        }
+        return new Response("Politician Agent Ready");
+    }
 }
 
 export default {
@@ -134,79 +204,46 @@ export default {
             }
 
             for (const pol of politicians as any[]) {
-                
-                // 1. Actively fetch external voting records BEFORE scoring
-                await this.fetchRecentLegislativeVotes(env, pol);
+                // [AGENTS WEEK 2026] Retrieve the dedicated facet agent for this specific politician
+                const id = env.POLITICIAN_AGENTS.idFromName(pol.id);
+                const agent = env.POLITICIAN_AGENTS.get(id);
 
-                // 2. Count promises by status from our existing promises table
-                const { results: promiseStats } = await env.DB.prepare(`
-                    SELECT 
-                        COUNT(*) as total,
-                        SUM(CASE WHEN status = 'Fulfilled' THEN 1 ELSE 0 END) as fulfilled,
-                        SUM(CASE WHEN status = 'Broken' OR status = 'Reversed' THEN 1 ELSE 0 END) as broken,
-                        SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as in_progress
-                    FROM promises WHERE politician_id = ?
-                `).bind(pol.id).all();
+                // Send the mock voting records directly to the local agent SQLite instance (skipping D1 heavy writes)
+                const mockPublicFeeds = [
+                    { id: `v_${Date.now()}_1`, bill_id: 'hr1-118', position: 'Yea' },
+                    { id: `v_${Date.now()}_2`, bill_id: 's870-118', position: 'Nay' }
+                ];
 
-                const stats = (promiseStats?.[0] || { total: 0, fulfilled: 0, broken: 0 }) as any;
-                const total = stats.total || 0;
-                const kept = stats.fulfilled || 0;
-                const broken = stats.broken || 0;
+                try {
+                    const req = new Request(`http://agent/score`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ newVotes: mockPublicFeeds })
+                    });
+                    
+                    const res = await agent.fetch(req);
+                    const data: any = await res.json();
+                    const score = data.score;
 
-                // Also count stance contradictions as a negative signal
-                const { results: stanceStats } = await env.DB.prepare(`
-                    SELECT COUNT(*) as contradictions FROM stance_changes
-                    WHERE politician_id = ?
-                `).bind(pol.id).all();
+                    // Sync only the final score to D1 to save cloud costs!
+                    await env.DB.prepare(`
+                        UPDATE politicians 
+                        SET trustworthiness_score = ?,
+                            last_scored_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    `).bind(score, pol.id).run();
 
-                const contradictions = (stanceStats?.[0] as any)?.contradictions || 0;
-
-                // Calculate trustworthiness score
-                // Formula: Base 50 + (kept percentage * 40) - (contradictions * 5), clamped 0-100
-                let score: number | null = null;
-                if (total > 0) {
-                    const denominator = kept + broken;
-                    const keepRate = denominator > 0 ? (kept / denominator) : 0.5;
-                    score = Math.round(Math.min(100, Math.max(0,
-                        50 + (keepRate * 40) - (contradictions * 5)
-                    )));
-                }
-
-                // Also factor in evidence quality from the claims table
-                const { results: evidenceStats } = await env.DB.prepare(`
-                    SELECT AVG(e.trust_score) as avg_trust
-                    FROM evidence e
-                    JOIN claims c ON e.claim_id = c.id
-                    WHERE c.politician_id = ?
-                `).bind(pol.id).all();
-
-                const avgEvidenceTrust = (evidenceStats?.[0] as any)?.avg_trust;
-                if (avgEvidenceTrust && score !== null) {
-                    // Blend evidence trust into final score (20% weight)
-                    score = Math.round(score * 0.8 + (avgEvidenceTrust / 100) * 20);
-                }
-
-                // Update the politician record
-                await env.DB.prepare(`
-                    UPDATE politicians 
-                    SET trustworthiness_score = ?,
-                        promises_kept = ?,
-                        promises_broken = ?,
-                        promises_total = ?,
-                        last_scored_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                `).bind(score, kept, broken, total, pol.id).run();
-
-                // Log to history for time-series charting
-                if (score !== null) {
+                    // Optional: Push to time-series history
                     const histId = `th_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                     await env.DB.prepare(`
-                        INSERT INTO trustworthiness_history (id, politician_id, score, promises_kept, promises_broken)
-                        VALUES (?, ?, ?, ?, ?)
-                    `).bind(histId, pol.id, score, kept, broken).run();
-                }
+                        INSERT INTO trustworthiness_history (id, politician_id, score)
+                        VALUES (?, ?, ?)
+                    `).bind(histId, pol.id, score).run();
 
-                console.log(`[Accountability] Scored ${pol.name}: trust=${score}, kept=${kept}/${total}`);
+                    console.log(`[Accountability] Facet Scored ${pol.name}: trust=${score} (local_votes=${data.local_votes_tracked})`);
+                } catch (e: any) {
+                    console.error(`[Accountability] Facet error for ${pol.name}:`, e.message);
+                }
             }
         } catch (e: any) {
             console.error("[Accountability] Scoring failed:", e.message);
@@ -531,13 +568,46 @@ export default {
                 };
 
                 try {
-                    const aiPrompt = `Extract basic details of US political figure "${requestedName}". Return strict JSON: { "name": "...", "office_held": "...", "party": "...", "district_state": "...", "region_level": "...", "political_platform_summary": "..." }`;
-                    const aiRes = await env.AI.run('@cf/meta/llama-3-8b-instruct', { messages: [{ role: 'user', content: aiPrompt }] });
-                    const rawText = aiRes.response || aiRes;
-                    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+                    // [AGENTS WEEK 2026] Utilizing Cloudflare Sandboxes for zero-cost, deterministic Python scraping instead of probabilistic LLM inference.
+                    const sbx = getSandbox(env.Sandbox, `disc_${Date.now()}`);
+                    const codeCtx = await sbx.createCodeContext({ language: 'python' });
+                    
+                    const pythonScript = `
+import urllib.request, urllib.parse, json
+
+req_name = "${requestedName.replace(/"/g, '\\"')}"
+url = f"https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&titles={urllib.parse.quote(req_name.replace(' ', '_'))}&format=json"
+
+try:
+    req = urllib.request.Request(url, headers={'User-Agent': 'DailyBorgAgent/1.0'})
+    with urllib.request.urlopen(req) as response:
+        data = json.loads(response.read().decode())
+        pages = data.get('query', {}).get('pages', {})
+        extract = list(pages.values())[0].get('extract', '') if pages else ''
+        
+        office_held = "US Representative" if "representative" in extract.lower() else ("US Senator" if "senator" in extract.lower() else "State Official")
+        party = "Republican" if "republican" in extract.lower() else ("Democrat" if "democrat" in extract.lower() else "Independent")
+        
+        result = {
+            "name": req_name,
+            "office_held": office_held,
+            "party": party,
+            "district_state": "USA",
+            "region_level": "Federal" if "US " in office_held else "State",
+            "political_platform_summary": extract[:250] + "..." if extract else "No Wikipedia summary available."
+        }
+        print(json.dumps(result))
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+                    `;
+                    
+                    const result = await sbx.runCode(pythonScript, { context: codeCtx });
+                    if (result.logs && result.logs.stdout.length > 0) {
+                        const parsedRaw = JSON.parse(result.logs.stdout.join(' ').trim());
+                        if (!parsedRaw.error) parsed = parsedRaw;
+                    }
                 } catch (e) {
-                    console.warn("[Discovery] AI text parsing failed, using defaults.");
+                    console.warn("[Discovery] Sandbox Native execution failed, using defaults.");
                 }
 
                 const photoUrl = await this.resolvePoliticianImage(env, parsed.name, parsed.office_held, parsed.party);

@@ -2,7 +2,7 @@
     "compilerOptions": {
       "target": "es2021",
       "module": "es2022",
-      "moduleResolution": "node",
+      "moduleResolution": "bundler",
       "types": ["@cloudflare/workers-types"],
       "resolveJsonModule": true,
       "allowJs": true,

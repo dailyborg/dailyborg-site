@@ -37,6 +37,10 @@
 			{
 				"name": "IngestCoordinator",
 				"class_name": "IngestCoordinator"
+			},
+			{
+				"name": "TopicMemory",
+				"class_name": "TopicMemoryAgent"
 			}
 		]
 	},
@@ -44,6 +48,10 @@
 		{
 			"tag": "v1",
 			"new_sqlite_classes": ["IngestCoordinator"]
+		},
+		{
+			"tag": "v2",
+			"new_sqlite_classes": ["TopicMemoryAgent"]
 		}
 	],
 	"triggers": {

@@ -136,6 +136,7 @@ The following status codes are used in `ingestion_logs` for real-time monitoring
 - `quota_exceeded`: API billing usage cap reached (429). Needs funding or throttle adjustment.
 - `provider_error`: Upstream AI provider returned non-200.
 - `fetch_failure`: Network timeout or DNS issue at the edge.
+- `validation_warning`: Deterministic post-AIML validation flagged an issue (word count, sources, desk). Article still ingested but flagged for review.
 - `healed`: Sentinel detected a gap and triggered a recovery process.
 - `healthy`: Sentinel check complete with no action needed.
 

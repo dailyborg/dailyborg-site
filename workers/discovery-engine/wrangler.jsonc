@@ -2,6 +2,7 @@
 	"name": "dailyborg-discovery",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-03-05",
+	"compatibility_flags": ["nodejs_compat"],
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -12,6 +13,28 @@
 	"ai": {
         "binding": "AI"
     },
+	"sandbox": {
+		"bindings": [
+			{
+				"name": "Sandbox",
+				"container": "discovery-agent"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["PoliticianAgent"]
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "POLITICIAN_AGENTS",
+				"class_name": "PoliticianAgent"
+			}
+		]
+	},
 	"triggers": {
 		"crons": [
 			"*/10 * * * *"
