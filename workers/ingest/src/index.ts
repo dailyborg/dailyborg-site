@@ -303,50 +303,6 @@ export class IngestCoordinator extends Agent<Env> {
         // =======================================================
         if (articleObject && articleObject.title && this.env.AI) {
             try {
-                const validationScript = `
-import json, sys
-
-article = json.loads('''${JSON.stringify(articleObject).replace(/'/g, "\\'")}''')
-
-errors = []
-valid_desks = ["Politics","Crime","Business","Entertainment","Sports","Science","Education"]
-
-# Check required fields
-required = ["title","excerpt","contentHtml","keyTakeaways","confidenceScore","suggestedHeroImagePrompt","desk","sources"]
-for field in required:
-    if field not in article or not article[field]:
-        errors.append(f"Missing required field: {field}")
-
-# Word count validation (450-600 words)
-if "contentHtml" in article and article["contentHtml"]:
-    import re
-    text = re.sub(r'<[^>]+>', '', str(article["contentHtml"]))
-    word_count = len(text.split())
-    if word_count < 200:
-        errors.append(f"Word count too low: {word_count} (min 200)")
-    if word_count > 1500:
-        errors.append(f"Word count too high: {word_count} (max 1500)")
-
-# Source count validation (min 2)
-sources = article.get("sources", [])
-if len(sources) < 1:
-    errors.append(f"Insufficient sources: {len(sources)} (min 1)")
-
-# Desk validation
-desk = article.get("desk", "")
-if desk not in valid_desks:
-    errors.append(f"Invalid desk: {desk}")
-
-# Confidence score range
-score = article.get("confidenceScore", 0)
-if not isinstance(score, (int, float)) or score < 0 or score > 100:
-    errors.append(f"Invalid confidence score: {score}")
-
-result = {"valid": len(errors) == 0, "errors": errors, "word_count": word_count if "contentHtml" in article else 0}
-print(json.dumps(result))
-`;
-                // Use Cloudflare Workers AI as a lightweight code evaluation fallback
-                // In production with full Sandbox binding, this would use sbx.runCode()
                 console.log(`[SandboxValidator] Running deterministic validation...`);
                 
                 // Inline deterministic validation (runs at edge, no AI tokens)
