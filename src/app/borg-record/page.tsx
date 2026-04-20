@@ -7,16 +7,23 @@ export const dynamic = 'force-dynamic';
 
 export default async function BorgRecordDirectory() {
     // Prevent the build from failing if DB is missing on Vercel/Edge build step
-    let initialPoliticians = [];
+    let initialPoliticians: any[] = [];
     try {
         const db = await getDbBinding();
-        const res = await db.prepare(
-            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians ORDER BY name ASC LIMIT 200"
-        ).bind().all();
+        const cols = "id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score";
+        
+        // Batch 3 small queries so each tab gets data without exceeding D1 Edge limits
+        const [fedRes, stateRes, localRes] = await db.batch([
+            db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'Federal' ORDER BY name ASC LIMIT 100`),
+            db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'State' ORDER BY name ASC LIMIT 100`),
+            db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'Local' ORDER BY name ASC LIMIT 50`),
+        ]);
 
-        // Handle varying return structures between local better-sqlite and cloud D1
-        const raw = res?.results || res?.[0]?.results || [];
-        console.log("[BorgRecord] DB returned", raw.length, "politicians");
+        const fedRaw = fedRes?.results || [];
+        const stateRaw = stateRes?.results || [];
+        const localRaw = localRes?.results || [];
+        const raw = [...fedRaw, ...stateRaw, ...localRaw];
+        console.log("[BorgRecord] DB returned", raw.length, "politicians (F:", fedRaw.length, "S:", stateRaw.length, "L:", localRaw.length, ")");
 
         initialPoliticians = raw.map((p: any) => ({
             id: p.id,
