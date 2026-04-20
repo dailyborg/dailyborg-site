@@ -10,18 +10,13 @@ export default async function BorgRecordDirectory() {
     let initialPoliticians = [];
     try {
         const db = await getDbBinding();
-        const res = await db.prepare(`
-            SELECT id, slug, name, office_held, party, district_state, region_level, 
-                   candidate_status, photo_url, trustworthiness_score, 
-                   promises_kept, promises_total, popularity_score
-            FROM politicians 
-            WHERE candidate_status != 'Former' OR candidate_status IS NULL
-            ORDER BY name ASC
-            LIMIT 500
-        `).bind().all();
+        const res = await db.prepare(
+            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians ORDER BY name ASC LIMIT 50"
+        ).bind().all();
 
         // Handle varying return structures between local better-sqlite and cloud D1
         const raw = res?.results || res?.[0]?.results || [];
+        console.log("[BorgRecord] DB returned", raw.length, "politicians");
 
         initialPoliticians = raw.map((p: any) => ({
             id: p.id,
@@ -34,13 +29,13 @@ export default async function BorgRecordDirectory() {
             candidate_status: p.candidate_status || "Active",
             photo_url: p.photo_url || null,
             trustworthiness_score: p.trustworthiness_score ?? null,
-            promises_kept: p.promises_kept ?? 0,
-            promises_total: p.promises_total ?? 0,
-            popularity_score: p.popularity_score ?? 0,
+            promises_kept: 0,
+            promises_total: 0,
+            popularity_score: 0,
             consistency_label: "Analyzing"
         }));
-    } catch (e) {
-        console.warn("Failed to load initial politicians", e);
+    } catch (e: any) {
+        console.error("[BorgRecord] FAILED to load politicians:", e?.message || e);
     }
 
     // Fallback if db is completely empty for some reason
