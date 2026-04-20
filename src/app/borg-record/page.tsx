@@ -12,12 +12,10 @@ export default async function BorgRecordDirectory() {
         const db = await getDbBinding();
         const cols = "id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score";
         
-        // Batch 3 small queries so each tab gets data without exceeding D1 Edge limits
-        const [fedRes, stateRes, localRes] = await db.batch([
-            db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'Federal' ORDER BY name ASC LIMIT 100`),
-            db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'State' ORDER BY name ASC LIMIT 100`),
-            db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'Local' ORDER BY name ASC LIMIT 50`),
-        ]);
+        // Run 3 separate queries - one per tab - to stay within D1 Edge response limits
+        const fedRes = await db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'Federal' ORDER BY name ASC LIMIT 100`).bind().all();
+        const stateRes = await db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'State' ORDER BY name ASC LIMIT 100`).bind().all();
+        const localRes = await db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'Local' ORDER BY name ASC LIMIT 50`).bind().all();
 
         const fedRaw = fedRes?.results || [];
         const stateRaw = stateRes?.results || [];
