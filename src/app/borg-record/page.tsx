@@ -11,7 +11,7 @@ export default async function BorgRecordDirectory() {
     try {
         const db = await getDbBinding();
         const res = await db.prepare(
-            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians ORDER BY name ASC LIMIT 50"
+            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians ORDER BY name ASC LIMIT 200"
         ).bind().all();
 
         // Handle varying return structures between local better-sqlite and cloud D1
