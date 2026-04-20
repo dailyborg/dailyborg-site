@@ -6,15 +6,15 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export default async function BorgRecordDirectory() {
-    // Prevent the build from failing if DB is missing on Vercel/Edge build step
     let initialPoliticians: any[] = [];
     try {
         const db = await getDbBinding();
+        // Single query with LIMIT to stay within D1 Edge response size.
+        // ORDER BY name gets a mix of Federal/State/Local alphabetically.
         const res = await db.prepare(
-            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians WHERE region_level = 'Federal' ORDER BY name ASC LIMIT 50"
+            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians ORDER BY name ASC LIMIT 150"
         ).bind().all();
 
-        // Handle varying return structures between local better-sqlite and cloud D1
         const raw = res?.results || res?.[0]?.results || [];
 
         initialPoliticians = raw.map((p: any) => ({
