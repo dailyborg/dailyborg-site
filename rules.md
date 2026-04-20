@@ -162,3 +162,9 @@ The following status codes are used in `ingestion_logs` for real-time monitoring
 - Does the name match the casing of the original?
 - Is this the correct directory for this type of logic?
 - Did I check for existing workers with this name before deploying?
+
+### 🔴 Exhaustive Project Scan Before Any Change (MANDATORY)
+- **Before making ANY changes to ANY file**, you MUST do a comprehensive check of the entire project to ensure you are not overriding, erasing, or stepping on existing functionalities.
+- This includes checking front end, back end, database, worker scripts, specific code modules, and configuration text files.
+- We are just making the **necessary changes wherever they need to be made**, without regressing the massive amount of prior work we've dedicated to completing existing functionalities.
+- We spent quite a lot of time completing functionalities. If you are going to modify shared files (like database proxies or core settings), read the entire related architecture and git history thoroughly. Do not delete logic unless you explicitly know why it existed.
