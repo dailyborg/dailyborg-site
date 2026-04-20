@@ -1,5 +1,4 @@
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import path from 'path';
 
 let localDbInstance: any = null;
 
