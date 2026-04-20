@@ -13,14 +13,6 @@
 	"ai": {
         "binding": "AI"
     },
-	"sandbox": {
-		"bindings": [
-			{
-				"name": "Sandbox",
-				"container": "discovery-agent"
-			}
-		]
-	},
 	"migrations": [
 		{
 			"tag": "v1",

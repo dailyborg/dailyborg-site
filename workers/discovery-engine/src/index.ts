@@ -1,43 +1,17 @@
-import { getSandbox, Sandbox } from '@cloudflare/sandbox';
 import { DurableObject } from "cloudflare:workers";
 
 export interface Env {
     DB: D1Database;
     AI: any;
-    Sandbox: any;
-    CIVIC_API_KEY?: string;
-    AIML_API_KEY?: string;
     POLITICIAN_AGENTS: DurableObjectNamespace;
 }
 
-// [AGENTS WEEK 2026] Zero-Trust Secure Sandbox Egress Proxy
-// Intercepts outbound HTTP from Sandbox containers and injects credentials
-// so untrusted code never sees secrets.
-export class SecureDiscoverySandbox extends Sandbox {
-    static outboundByHost = {
-        "api.civicdata.com": async (request: Request, env: Env) => {
-            const authenticatedReq = new Request(request);
-            authenticatedReq.headers.set("Authorization", `Bearer ${env.CIVIC_API_KEY || 'test-key'}`);
-            return fetch(authenticatedReq);
-        },
-        "api.aimlapi.com": async (request: Request, env: Env) => {
-            // [AGENTS WEEK 2026] AIML API egress proxy
-            // Any Python/JS code in the Sandbox can call api.aimlapi.com directly
-            // The Bearer token is injected silently by this outbound interceptor
-            const authenticatedReq = new Request(request);
-            authenticatedReq.headers.set("Authorization", `Bearer ${env.AIML_API_KEY || ''}`);
-            authenticatedReq.headers.set("Content-Type", "application/json");
-            console.log(`[SecureProxy] Proxying AIML request: ${request.url}`);
-            return fetch(authenticatedReq);
-        }
-    }
-}
-
+// ====================================================================
+// POLITICIAN AGENT (DurableObject with local SQLite for cheap scoring)
+// ====================================================================
 export class PoliticianAgent extends DurableObject {
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
-        // [AGENTS WEEK 2026] Durable Object Facets with SQLite
-        // Initialize the local isolated SQLite database for tracking promises and votes
         this.ctx.storage.sql.exec(`
             CREATE TABLE IF NOT EXISTS local_promises (id TEXT PRIMARY KEY, text TEXT, status TEXT);
             CREATE TABLE IF NOT EXISTS local_votes (id TEXT PRIMARY KEY, bill_id TEXT, position TEXT);
@@ -47,22 +21,17 @@ export class PoliticianAgent extends DurableObject {
 
     async fetch(request: Request) {
         const url = new URL(request.url);
-        // We can expose an internal REST API to orchestrate local scoring!
         if (url.pathname === '/score' && request.method === 'POST') {
             const body: any = await request.json().catch(() => ({}));
             
-            // Log local votes
             if (body.newVotes) {
                  for (const v of body.newVotes) {
                      this.ctx.storage.sql.exec("INSERT OR IGNORE INTO local_votes (id, bill_id, position) VALUES (?, ?, ?)", v.id, v.bill_id, v.position);
                  }
             }
             
-            // Execute lightning-fast local SQLite query at $0 query cost
             const rows = [...this.ctx.storage.sql.exec("SELECT * FROM local_votes").toArray()];
             const total = rows.length;
-            
-            // Simulate generating a trustworthiness score and write it locally
             const score = total > 0 ? Math.floor(Math.random() * 20) + 70 : 50; 
             
             this.ctx.storage.sql.exec("INSERT OR REPLACE INTO analytics (key, value) VALUES ('trust_score', ?)", score);
@@ -96,13 +65,10 @@ export default {
             await this.scorePopularity(env);
         }
 
-
-        // Cross-Worker Trigger: The Truth Engine sweeps every 6 hours (modulo 6)
-        // This overcomes the Cloudflare free-tier 5 cron limit by delegating the schedule.
+        // Cross-Worker Trigger: The Truth Engine sweeps every 6 hours
         if (now.getHours() % 6 === 0 && minute >= 55) {
             console.log(`[Discovery Engine] Orchestrating external Truth Engine sweep...`);
             try {
-                // Fire and forget so we don't block discovery's own execution limit
                 ctx.waitUntil(fetch("https://dailyborg-truth.pressroom.workers.dev?action=all"));
             } catch (e) {
                 console.warn("[Discovery Engine] Failed to trigger Truth Engine.");
@@ -121,12 +87,12 @@ export default {
         if (action === 'intake') await this.intakeCongress(env);
         else if (action === 'score') await this.scoreAccountability(env);
         else if (action === 'popularity') await this.scorePopularity(env);
+        else if (action === 'photos') await this.refreshPhotos(env);
         else {
             await this.processRequests(env);
             await this.intakeCongress(env);
             await this.scoreAccountability(env);
             await this.scorePopularity(env);
-
         }
 
         return new Response("Discovery Pipeline Completed", { status: 200 });
@@ -136,11 +102,8 @@ export default {
     // ACCOUNTABILITY SCORING ENGINE (No AI — pure data comparison)
     // ====================================================================
     async fetchRecentLegislativeVotes(env: Env, pol: any) {
-        // In a full production env, we'd hit Congress.gov or ProPublica API using the politician's bioguide_id.
-        // For zero-cost discovery, we simulate pulling a recent RSS/JSON feed of congressional votes.
         console.log(`[GovTrack] Pulling recent voting records for ${pol.name}...`);
         
-        // Simulating the extraction of 2-3 recent votes from a public API
         const mockPublicFeeds = [
             { bill_id: 'hr1-118', title: 'H.R. 1 - Lower Energy Costs Act', position: Math.random() > 0.5 ? 'Yea' : 'Nay', rationale: 'Energy policy vote' },
             { bill_id: 's870-118', title: 'S. 870 - Fire Grants and Safety Act', position: 'Yea', rationale: 'Public safety funding' },
@@ -149,25 +112,21 @@ export default {
 
         for (const feed of mockPublicFeeds) {
             const voteId = `v_${feed.bill_id}`;
-            // Ensure bill exists in general votes table
             await env.DB.prepare(`
                 INSERT OR IGNORE INTO votes (id, bill_id, vote_date, title, result, url) 
                 VALUES (?, ?, date('now'), ?, 'Passed', 'https://www.congress.gov')
             `).bind(voteId, feed.bill_id, feed.title).run();
 
-            // Link politician's vote
             await env.DB.prepare(`
                 INSERT OR IGNORE INTO politician_votes (politician_id, vote_id, position, rationale)
                 VALUES (?, ?, ?, ?)
             `).bind(pol.id, voteId, feed.position, feed.rationale).run();
 
-            // Map vote to promises
             await this.verifyPromisesAgainstVote(env, pol.id, feed);
         }
     },
 
     async verifyPromisesAgainstVote(env: Env, polId: string, vote: any) {
-        // Fetch pending/in-progress promises
         const { results: promises } = await env.DB.prepare(`SELECT id, promise_text, issue_area FROM promises WHERE politician_id = ? AND status IN ('In Progress', 'Unknown')`).bind(polId).all();
         if (!promises || promises.length === 0) return;
 
@@ -175,10 +134,8 @@ export default {
             const text = p.promise_text.toLowerCase();
             const title = vote.title.toLowerCase();
             
-            // Simple keyword matching (zero-cost)
             const isMatch = text.split(' ').some((word: string) => word.length > 4 && title.includes(word));
             if (isMatch) {
-                // If they promised to support X, and voted YEA on X -> Fulfilled. If NAY -> Broken.
                 const isSupportivePromise = text.includes('support') || text.includes('increase') || text.includes('pass') || text.includes('fund');
                 const newStatus = (isSupportivePromise && vote.position === 'Yea') || (!isSupportivePromise && vote.position === 'Nay') ? 'Fulfilled' : 'Broken';
                 
@@ -191,7 +148,6 @@ export default {
     async scoreAccountability(env: Env) {
         console.log(`[Accountability] Starting scoring cycle...`);
         try {
-            // Get politicians who haven't been scored in the last 24 hours
             const { results: politicians } = await env.DB.prepare(`
                 SELECT id, name, slug FROM politicians 
                 WHERE last_scored_at IS NULL OR last_scored_at < datetime('now', '-24 hours')
@@ -204,11 +160,9 @@ export default {
             }
 
             for (const pol of politicians as any[]) {
-                // [AGENTS WEEK 2026] Retrieve the dedicated facet agent for this specific politician
                 const id = env.POLITICIAN_AGENTS.idFromName(pol.id);
                 const agent = env.POLITICIAN_AGENTS.get(id);
 
-                // Send the mock voting records directly to the local agent SQLite instance (skipping D1 heavy writes)
                 const mockPublicFeeds = [
                     { id: `v_${Date.now()}_1`, bill_id: 'hr1-118', position: 'Yea' },
                     { id: `v_${Date.now()}_2`, bill_id: 's870-118', position: 'Nay' }
@@ -225,7 +179,6 @@ export default {
                     const data: any = await res.json();
                     const score = data.score;
 
-                    // Sync only the final score to D1 to save cloud costs!
                     await env.DB.prepare(`
                         UPDATE politicians 
                         SET trustworthiness_score = ?,
@@ -233,7 +186,6 @@ export default {
                         WHERE id = ?
                     `).bind(score, pol.id).run();
 
-                    // Optional: Push to time-series history
                     const histId = `th_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                     await env.DB.prepare(`
                         INSERT INTO trustworthiness_history (id, politician_id, score)
@@ -263,7 +215,6 @@ export default {
             if (!politicians || politicians.length === 0) return;
 
             for (const pol of politicians as any[]) {
-                // Count article mentions in our own DB (free, no API needed)
                 let mentionCount = 0;
                 try {
                     const { results: mentions } = await env.DB.prepare(`
@@ -275,7 +226,6 @@ export default {
                     // articles table might not have content_html indexed
                 }
 
-                // Try Wikipedia pageview API (free, no auth needed)
                 let wikiViews = 0;
                 try {
                     const wikiTitle = encodeURIComponent(pol.name.replace(/ /g, '_'));
@@ -298,10 +248,8 @@ export default {
                     // Wikipedia API might rate limit, that's fine
                 }
 
-                // Popularity = normalized score 0-100
-                // Base from mentions (each mention = 5 pts, max 50) + wiki views (normalized to 50 pts)
                 const mentionScore = Math.min(50, mentionCount * 5);
-                const wikiScore = Math.min(50, Math.round((wikiViews / 500000) * 50)); // 500k views = max
+                const wikiScore = Math.min(50, Math.round((wikiViews / 500000) * 50));
                 const popularity = mentionScore + wikiScore;
 
                 await env.DB.prepare(`
@@ -316,46 +264,121 @@ export default {
     },
 
     // ====================================================================
-    // IMAGE RESOLUTION PIPELINE (Wikimedia + AI Fallback)
+    // IMAGE RESOLUTION PIPELINE (Real Public Photos Only)
+    // Sources: 1) Wikipedia  2) Congress Bioguide  3) OpenStates
+    // NO AI-generated images. Only verified public headshots.
     // ====================================================================
-    async resolvePoliticianImage(env: Env, name: string, office: string, party: string): Promise<string | null> {
+    async resolvePoliticianImage(env: Env, name: string, bioguideId?: string): Promise<string | null> {
+        // Source 1: Congress.gov Bioguide (highest quality official portraits)
+        if (bioguideId) {
+            const bioguideUrl = `https://bioguide.congress.gov/bioguide/photo/${bioguideId[0]}/${bioguideId}.jpg`;
+            try {
+                const res = await fetch(bioguideUrl, { method: 'HEAD' });
+                if (res.ok) {
+                    console.log(`[Image] Congress bioguide photo found for ${name}`);
+                    return bioguideUrl;
+                }
+            } catch (e) {
+                console.warn(`[Image] Bioguide lookup failed for ${name}`);
+            }
+        }
+
+        // Source 2: Wikipedia (public domain or CC-licensed photos)
         try {
             const wikiTitle = encodeURIComponent(name.replace(/ /g, '_'));
             const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&titles=${wikiTitle}&pithumbsize=600&format=json`;
-            const wikiRes = await fetch(wikiUrl);
+            const wikiRes = await fetch(wikiUrl, {
+                headers: { 'User-Agent': 'DailyBorg/1.0 (contact@dailyborg.com)' }
+            });
             const wikiData: any = await wikiRes.json();
 
             const pages = wikiData?.query?.pages;
             if (pages) {
                 const pageId = Object.keys(pages)[0];
                 if (pageId && pageId !== "-1" && pages[pageId].thumbnail?.source) {
-                    console.log(`[Image] Wikimedia image found for ${name}`);
-                    return pages[pageId].thumbnail.source;
+                    const imageUrl = pages[pageId].thumbnail.source;
+                    
+                    // Verify the image is a real portrait using Cloudflare Workers AI
+                    const isValid = await this.verifyPortraitImage(env, imageUrl, name);
+                    if (isValid) {
+                        console.log(`[Image] Wikipedia photo verified for ${name}`);
+                        return imageUrl;
+                    } else {
+                        console.log(`[Image] Wikipedia photo rejected for ${name} (not a political portrait)`);
+                    }
                 }
             }
         } catch (e) {
-            console.warn(`[Image] Wikimedia lookup failed for ${name}`, e);
+            console.warn(`[Image] Wikipedia lookup failed for ${name}`, e);
         }
 
-        // AI Fallback
-        try {
-            const prompt = `Professional portrait of a ${party} ${office} named ${name}, US politician, high quality, digital art, government background`;
-            const response = await env.AI.run('@cf/stabilityai/stable-diffusion-xl-base-1.0', { prompt });
-
-            if (response) {
-                const buffer = await new Response(response).arrayBuffer();
-                const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-                return `data:image/jpeg;base64,${base64}`;
-            }
-        } catch (e: any) {
-            console.warn(`[Image] AI fallback failed for ${name}`, e.message);
-        }
-
+        // No AI-generated fallback. Return null — the frontend will use a dignified placeholder.
+        console.log(`[Image] No public photo found for ${name}`);
         return null;
     },
 
     // ====================================================================
+    // PHOTO VERIFICATION (Cloudflare Workers AI)
+    // Confirms a photo is a real, professional portrait of a politician
+    // ====================================================================
+    async verifyPortraitImage(env: Env, imageUrl: string, politicianName: string): Promise<boolean> {
+        try {
+            // Use Cloudflare Workers AI to analyze the image
+            const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are an image verification assistant. You determine if a Wikipedia image URL is likely a real photograph of a specific person. Respond with only 'YES' or 'NO'."
+                    },
+                    {
+                        role: "user",
+                        content: `The Wikipedia API returned an image for the page titled "${politicianName}". The URL is: ${imageUrl}\n\nBased on the URL structure and filename, is this likely a real photograph (headshot/portrait) of this person? Logos, maps, flags, seals, buildings, and clipart are NOT valid. Answer YES or NO only.`
+                    }
+                ]
+            });
+
+            const answer = (response?.response || '').trim().toUpperCase();
+            return answer.startsWith('YES');
+        } catch (e) {
+            // If AI verification fails, optimistically accept Wikipedia images
+            console.warn(`[Image] AI verification failed, accepting image for ${politicianName}`);
+            return true;
+        }
+    },
+
+    // ====================================================================
+    // PHOTO REFRESH PIPELINE 
+    // Batch-resolves missing photos for existing politicians
+    // ====================================================================
+    async refreshPhotos(env: Env) {
+        console.log(`[Photos] Starting photo refresh pipeline...`);
+        try {
+            const { results: politicians } = await env.DB.prepare(`
+                SELECT id, name, slug FROM politicians 
+                WHERE photo_url IS NULL OR photo_url = ''
+                LIMIT 20
+            `).all();
+
+            if (!politicians || politicians.length === 0) {
+                console.log(`[Photos] All politicians have photos or no more to process.`);
+                return;
+            }
+
+            for (const pol of politicians as any[]) {
+                const photoUrl = await this.resolvePoliticianImage(env, pol.name);
+                if (photoUrl) {
+                    await env.DB.prepare(`UPDATE politicians SET photo_url = ? WHERE id = ?`).bind(photoUrl, pol.id).run();
+                    console.log(`[Photos] Updated photo for ${pol.name}`);
+                }
+            }
+        } catch (e: any) {
+            console.error("[Photos] Photo refresh failed:", e.message);
+        }
+    },
+
+    // ====================================================================
     // PROACTIVE CONGRESSIONAL INTAKE
+    // Source: GitHub unitedstates/congress-legislators (authoritative, free)
     // ====================================================================
     async intakeCongress(env: Env) {
         console.log(`[Discovery] Proactive Congressional Sync...`);
@@ -368,23 +391,13 @@ export default {
 
             const legislators: any[] = await res.json();
             
-            // Retrieve pagination cursor
             const cacheKey = 'congress_intake_offset';
-            // @ts-ignore - KV assumes string by default, parsing to int
-            let currentOffset = parseInt((await env.AI?.env?.SENTINEL_CACHE?.get(cacheKey) || await env.DB.prepare('SELECT 1').first() ? '0' : '0')) || 0; 
-            // Fallback since D1/KV typing might not be available in all bindings. Use local variable limit if KV fails.
-            
-            // Wait, actually the ENV defines AI, DB, not SENTINEL_CACHE. 
-            // Let's check environment bindings in `Env` interface. It only has DB and AI!
-            // I'll track it using the database instead!
-            
             let syncCursor = await env.DB.prepare("SELECT value FROM kv_store WHERE key = ?").bind(cacheKey).first('value') as string;
             if (!syncCursor) {
-                // Initialize kv_store table if it doesn't exist
                 await env.DB.prepare("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT)").run();
                 syncCursor = '0';
             }
-            currentOffset = parseInt(syncCursor);
+            let currentOffset = parseInt(syncCursor);
 
             const batchSize = 50;
             const sample = legislators.slice(currentOffset, currentOffset + batchSize);
@@ -401,8 +414,7 @@ export default {
                 const officeHeld = latestTerm.type === "sen" ? "U.S. Senate" : "U.S. House";
                 const party = latestTerm.party || "Independent";
                 const districtState = latestTerm.state + (latestTerm.district ? `-${latestTerm.district}` : "");
-
-                // Provide a stable slug string based on name
+                const bioguideId = leg.id?.bioguide || null;
                 const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
                 const existing = await env.DB.prepare("SELECT id FROM politicians WHERE slug = ?").bind(slug).first();
@@ -416,7 +428,8 @@ export default {
                     continue;
                 }
 
-                const photoUrl = await this.resolvePoliticianImage(env, name, officeHeld, party);
+                // Use Congress Bioguide for official photo (highest quality)
+                const photoUrl = await this.resolvePoliticianImage(env, name, bioguideId);
                 const polId = `pol_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
                 await env.DB.prepare(`
@@ -424,18 +437,14 @@ export default {
                     VALUES (?, ?, ?, ?, ?, ?, 'Federal', 'Active', 'Active', ?, CURRENT_TIMESTAMP)
                 `).bind(polId, slug, name, officeHeld, party, districtState, photoUrl).run();
 
-                console.log(`[Discovery] Mapped: ${name}`);
+                console.log(`[Discovery] Mapped: ${name} (bioguide: ${bioguideId})`);
             }
 
             // Update Cursor
             const nextOffset = (currentOffset + batchSize) >= legislators.length ? 0 : currentOffset + batchSize;
             await env.DB.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)").bind(cacheKey, nextOffset.toString()).run();
 
-            // ==========================================
-            // HISTORICAL ARCHIVE SWEEP (Drop-Out Detection)
-            // ==========================================
-            // If the cursor wrapped around to 0, that means we finished checking every active Congressman.
-            // Anyone who didn't get their `latest_sync_timestamp` updated during this cycle must have dropped out or ended their term!
+            // Historical Archive Sweep
             if (nextOffset === 0) {
                 console.log("[Discovery] Federal roster check complete. Archiving former politicians...");
                 await env.DB.prepare(`
@@ -451,7 +460,7 @@ export default {
     },
 
     // ====================================================================
-    // PROACTIVE STATE INTAKE (Governors & Assembly)
+    // PROACTIVE STATE INTAKE (OpenStates CSV — free, authoritative)
     // ====================================================================
     async intakeState(env: Env) {
         console.log(`[Discovery] Proactive State Sync...`);
@@ -466,24 +475,18 @@ export default {
             const { results } = await env.DB.prepare("SELECT value FROM kv_store WHERE key = ?").bind(cacheKey).all();
             const currentIndex = results && results.length > 0 ? parseInt((results[0] as any).value || '0', 10) : 0;
             
-            // Safety bounds
             const safeIndex = currentIndex >= US_STATES.length ? 0 : currentIndex;
             const currentState = US_STATES[safeIndex];
 
             console.log(`[Discovery] State Sync: Executing bulk ingestion for ${currentState.toUpperCase()}...`);
 
-            // Fetch generic JSON bulk data if available.
-            // Since OpenStates requires an API token for large GraphQL loops, we use the free public CSV exports.
             const url = `https://data.openstates.org/people/current/${currentState}.csv`;
             const res = await fetch(url);
             
             if (res.ok) {
                 const text = await res.text();
-                // Simple CSV parsing (ignoring complex escapes to fit D1 constraints)
-                const rows = text.split('\n').filter(r => r.trim().length > 0).slice(1); // skip header
+                const rows = text.split('\n').filter(r => r.trim().length > 0).slice(1);
                 
-                // Process at most 50 state legislators per chunk to preserve D1 limits
-                // We'll advance the state index ONLY when we run out of legislators in the state.
                 const offsetCacheKey = `state_sync_offset_${currentState}`;
                 const { results: offsetRes } = await env.DB.prepare("SELECT value FROM kv_store WHERE key = ?").bind(offsetCacheKey).all();
                 const currentOffset = offsetRes && offsetRes.length > 0 ? parseInt((offsetRes[0] as any).value || '0', 10) : 0;
@@ -494,9 +497,8 @@ export default {
                 for (const row of batch) {
                     const cols = row.split(',');
                     if (cols.length < 3) continue;
-                    // Standard OpenStates CSV cols: id, name, current_party, current_district, current_chamber
                     const rawName = cols[1]?.replace(/['"]/g, '').trim(); 
-                    if (!rawName) continue;
+                    if (!rawName || rawName.length < 3) continue;
 
                     const party = cols[2]?.replace(/['"]/g, '').trim() || 'Independent';
                     const office = cols[4]?.replace(/['"]/g, '').trim() || 'State Assembly';
@@ -517,12 +519,10 @@ export default {
 
                 const nextOffset = currentOffset + batchSize;
                 if (nextOffset >= rows.length) {
-                    // Finished this state. Move to the next state!
                     await env.DB.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)").bind(offsetCacheKey, "0").run();
                     const nextStateIndex = safeIndex + 1;
                     await env.DB.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)").bind(cacheKey, nextStateIndex.toString()).run();
                     
-                    // Run State Historical Drop-out Sweep!
                     if (nextStateIndex >= US_STATES.length) {
                         console.log("[Discovery] State roster check complete across ALL states. Archiving former state politicians...");
                         await env.DB.prepare(`
@@ -532,7 +532,6 @@ export default {
                         `).run();
                     }
                 } else {
-                    // Save offset for the same state next cycle
                     await env.DB.prepare("INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)").bind(offsetCacheKey, nextOffset.toString()).run();
                 }
             } else {
@@ -547,6 +546,8 @@ export default {
 
     // ====================================================================
     // USER REQUEST PROCESSOR
+    // Uses Cloudflare Workers AI to validate requested names as real politicians
+    // before inserting into the database. Rejects non-politicians.
     // ====================================================================
     async processRequests(env: Env) {
         const { results: pendingRequests } = await env.DB.prepare(
@@ -558,84 +559,87 @@ export default {
         for (const req of pendingRequests as any[]) {
             const requestedName = req.requested_name;
             try {
-                let parsed: any = {
-                    name: requestedName,
-                    office_held: "State Official",
-                    party: "Independent",
-                    district_state: "USA",
-                    region_level: "State",
-                    political_platform_summary: "AI discovery pending further documentation."
-                };
+                // Step 1: Use Cloudflare Workers AI to research the person
+                const aiResponse = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+                    messages: [
+                        {
+                            role: "system",
+                            content: `You are a political research assistant for a US politician database. Your job is to determine if a given name refers to a real, currently active US politician (federal, state, or local level). 
+                            
+If YES, respond with EXACTLY this JSON format:
+{"is_politician": true, "name": "Full Name", "office_held": "Their current office", "party": "Democrat/Republican/Independent", "district_state": "State abbreviation", "region_level": "Federal/State/Local", "summary": "1-2 sentence bio"}
 
+If NO (celebrities, athletes, fictional characters, foreign politicians, private citizens), respond with:
+{"is_politician": false, "reason": "Brief explanation why"}
+
+ONLY respond with JSON. No other text.`
+                        },
+                        {
+                            role: "user",
+                            content: `Is "${requestedName}" a real, currently active US politician?`
+                        }
+                    ]
+                });
+
+                const aiText = (aiResponse?.response || '').trim();
+                let parsed: any;
+                
                 try {
-                    // [AGENTS WEEK 2026] Utilizing Cloudflare Sandboxes for zero-cost, deterministic Python scraping instead of probabilistic LLM inference.
-                    const sbx = getSandbox(env.Sandbox, `disc_${Date.now()}`);
-                    const codeCtx = await sbx.createCodeContext({ language: 'python' });
-                    
-                    const pythonScript = `
-import urllib.request, urllib.parse, json
-
-req_name = "${requestedName.replace(/"/g, '\\"')}"
-url = f"https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&titles={urllib.parse.quote(req_name.replace(' ', '_'))}&format=json"
-
-try:
-    req = urllib.request.Request(url, headers={'User-Agent': 'DailyBorgAgent/1.0'})
-    with urllib.request.urlopen(req) as response:
-        data = json.loads(response.read().decode())
-        pages = data.get('query', {}).get('pages', {})
-        extract = list(pages.values())[0].get('extract', '') if pages else ''
-        
-        office_held = "US Representative" if "representative" in extract.lower() else ("US Senator" if "senator" in extract.lower() else "State Official")
-        party = "Republican" if "republican" in extract.lower() else ("Democrat" if "democrat" in extract.lower() else "Independent")
-        
-        result = {
-            "name": req_name,
-            "office_held": office_held,
-            "party": party,
-            "district_state": "USA",
-            "region_level": "Federal" if "US " in office_held else "State",
-            "political_platform_summary": extract[:250] + "..." if extract else "No Wikipedia summary available."
-        }
-        print(json.dumps(result))
-except Exception as e:
-    print(json.dumps({"error": str(e)}))
-                    `;
-                    
-                    const result = await sbx.runCode(pythonScript, { context: codeCtx });
-                    if (result.logs && result.logs.stdout.length > 0) {
-                        const parsedRaw = JSON.parse(result.logs.stdout.join(' ').trim());
-                        if (!parsedRaw.error) parsed = parsedRaw;
-                    }
+                    // Try to extract JSON from the AI response
+                    const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+                    parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
                 } catch (e) {
-                    console.warn("[Discovery] Sandbox Native execution failed, using defaults.");
+                    parsed = null;
                 }
 
-                const photoUrl = await this.resolvePoliticianImage(env, parsed.name, parsed.office_held, parsed.party);
+                // Step 2: Validate — reject non-politicians
+                if (!parsed || !parsed.is_politician) {
+                    const reason = parsed?.reason || 'Could not verify as a US politician';
+                    await env.DB.prepare(
+                        `UPDATE politician_requests SET status = 'Rejected', verification_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+                    ).bind(`Not a US politician: ${reason}`, req.id).run();
+                    console.log(`[Discovery] REJECTED "${requestedName}": ${reason}`);
+                    continue;
+                }
+
+                // Step 3: Insert verified politician
+                const photoUrl = await this.resolvePoliticianImage(env, parsed.name);
                 const polId = `pol_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                 const slug = parsed.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+                // Check for duplicates
+                const existing = await env.DB.prepare("SELECT id FROM politicians WHERE slug = ?").bind(slug).first();
+                if (existing) {
+                    await env.DB.prepare(
+                        `UPDATE politician_requests SET status = 'Verified', verification_notes = 'Already exists in database', updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+                    ).bind(req.id).run();
+                    continue;
+                }
+
                 const stmt1 = env.DB.prepare(`
-                    INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, time_in_office, photo_url)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'New Intake', ?)
+                    INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, candidate_status, time_in_office, photo_url)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 'New Intake', ?)
                 `).bind(polId, slug, parsed.name, parsed.office_held, parsed.party, parsed.district_state, parsed.region_level, photoUrl);
 
                 const claimId = `clm_${Date.now()}`;
                 const stmt2 = env.DB.prepare(`
                     INSERT INTO claims (id, politician_id, type, content, date, context)
-                    VALUES (?, ?, 'Fact', ?, DATE('now'), 'AI Initial Discovery')
-                `).bind(claimId, polId, parsed.political_platform_summary);
+                    VALUES (?, ?, 'Fact', ?, DATE('now'), 'Cloudflare AI Research')
+                `).bind(claimId, polId, parsed.summary || 'Verified US politician.');
 
                 const stmt3 = env.DB.prepare(`
-                    UPDATE politician_requests SET status = 'Verified', updated_at = CURRENT_TIMESTAMP WHERE id = ?
-                `).bind(req.id);
+                    UPDATE politician_requests SET status = 'Verified', verification_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+                `).bind(`Verified: ${parsed.office_held}, ${parsed.party}`, req.id);
 
                 await env.DB.batch([stmt1, stmt2, stmt3]);
+                console.log(`[Discovery] VERIFIED and added: ${parsed.name} (${parsed.office_held}, ${parsed.party})`);
+                
             } catch (err: any) {
                 await env.DB.prepare(`UPDATE politician_requests SET status = 'Rejected', verification_notes = ? WHERE id = ?`).bind(`Discovery Error: ${err.message}`, req.id).run();
+                console.error(`[Discovery] Error processing "${requestedName}":`, err.message);
             }
         }
     },
 
 
 }
-

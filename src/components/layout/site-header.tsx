@@ -329,7 +329,7 @@ export function SiteHeader({
                 </div>
 
                 {/* 4. Navigation Bar - Conditional: Admin links vs. Public desks */}
-                <div className="hidden md:flex border-b border-border bg-background w-full">
+                <div className="hidden md:flex border-b border-border bg-background w-full relative z-10">
                     <nav className="flex justify-center items-center w-full max-w-[1400px] mx-auto overflow-x-auto no-scrollbar gap-0">
                         {isAdmin ? (
                             <>
@@ -364,7 +364,7 @@ export function SiteHeader({
 
                                 <Link
                                     href="/borg-record"
-                                    className="font-sans text-xs font-bold uppercase tracking-wider text-desk-borg hover:text-desk-borg/90 transition-colors px-4 py-2.5 whitespace-nowrap flex-shrink-0"
+                                    className="font-sans text-xs font-bold uppercase tracking-wider text-desk-borg hover:text-desk-borg/90 transition-colors px-5 py-3 whitespace-nowrap flex-shrink-0"
                                 >
                                     Borg Record
                                 </Link>
