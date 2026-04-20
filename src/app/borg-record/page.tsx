@@ -13,8 +13,11 @@ export default async function BorgRecordDirectory() {
         const res = await db.prepare(`
             SELECT id, slug, name, office_held, party, district_state, region_level, 
                    candidate_status, photo_url, trustworthiness_score, 
-                   promises_kept, promises_broken, promises_total, popularity_score
-            FROM politicians ORDER BY name ASC
+                   promises_kept, promises_total, popularity_score
+            FROM politicians 
+            WHERE candidate_status != 'Former' OR candidate_status IS NULL
+            ORDER BY name ASC
+            LIMIT 500
         `).bind().all();
 
         // Handle varying return structures between local better-sqlite and cloud D1
@@ -32,7 +35,6 @@ export default async function BorgRecordDirectory() {
             photo_url: p.photo_url || null,
             trustworthiness_score: p.trustworthiness_score ?? null,
             promises_kept: p.promises_kept ?? 0,
-            promises_broken: p.promises_broken ?? 0,
             promises_total: p.promises_total ?? 0,
             popularity_score: p.popularity_score ?? 0,
             consistency_label: "Analyzing"
