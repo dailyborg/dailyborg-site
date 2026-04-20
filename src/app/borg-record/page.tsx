@@ -10,18 +10,12 @@ export default async function BorgRecordDirectory() {
     let initialPoliticians: any[] = [];
     try {
         const db = await getDbBinding();
-        const cols = "id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score";
-        
-        // Run 3 separate queries - one per tab - to stay within D1 Edge response limits
-        const fedRes = await db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'Federal' ORDER BY name ASC LIMIT 100`).bind().all();
-        const stateRes = await db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'State' ORDER BY name ASC LIMIT 100`).bind().all();
-        const localRes = await db.prepare(`SELECT ${cols} FROM politicians WHERE region_level = 'Local' ORDER BY name ASC LIMIT 50`).bind().all();
+        const res = await db.prepare(
+            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians WHERE region_level = 'Federal' ORDER BY name ASC LIMIT 50"
+        ).bind().all();
 
-        const fedRaw = fedRes?.results || [];
-        const stateRaw = stateRes?.results || [];
-        const localRaw = localRes?.results || [];
-        const raw = [...fedRaw, ...stateRaw, ...localRaw];
-        console.log("[BorgRecord] DB returned", raw.length, "politicians (F:", fedRaw.length, "S:", stateRaw.length, "L:", localRaw.length, ")");
+        // Handle varying return structures between local better-sqlite and cloud D1
+        const raw = res?.results || res?.[0]?.results || [];
 
         initialPoliticians = raw.map((p: any) => ({
             id: p.id,
@@ -34,13 +28,14 @@ export default async function BorgRecordDirectory() {
             candidate_status: p.candidate_status || "Active",
             photo_url: p.photo_url || null,
             trustworthiness_score: p.trustworthiness_score ?? null,
-            promises_kept: 0,
-            promises_total: 0,
-            popularity_score: 0,
+            promises_kept: p.promises_kept ?? 0,
+            promises_broken: p.promises_broken ?? 0,
+            promises_total: p.promises_total ?? 0,
+            popularity_score: p.popularity_score ?? 0,
             consistency_label: "Analyzing"
         }));
-    } catch (e: any) {
-        console.error("[BorgRecord] FAILED to load politicians:", e?.message || e);
+    } catch (e) {
+        console.warn("Failed to load initial politicians", e);
     }
 
     // Fallback if db is completely empty for some reason
