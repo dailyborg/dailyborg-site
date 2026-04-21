@@ -236,7 +236,9 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
             const matchesTown = !localTownFilter || p.district_state.toLowerCase().includes(localTownFilter.toLowerCase());
             
             const isFormer = p.candidate_status === 'Former';
-            const matchesHistorical = showHistorical ? true : !isFormer; // Hide former unless toggled
+            // Search always finds everyone (including former officials).
+            // Browsing tabs only show current officials unless "Show Past Officials" is checked.
+            const matchesHistorical = q ? true : (showHistorical ? true : !isFormer);
 
             return matchesSearch && matchesLevel && matchesParty && matchesState && matchesTown && matchesHistorical;
         });
@@ -262,7 +264,7 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
         });
 
         return result;
-    }, [initialPoliticians, query, levelFilter, partyFilter, stateFilter, localTownFilter, sortBy, pinnedIds]);
+    }, [initialPoliticians, query, levelFilter, partyFilter, stateFilter, localTownFilter, sortBy, pinnedIds, showHistorical]);
 
     const clearAllFilters = () => {
         setLevelFilter(null);
