@@ -548,7 +548,28 @@ export default {
     // USER REQUEST PROCESSOR
     // Uses Cloudflare Workers AI to validate requested names as real politicians
     // before inserting into the database. Rejects non-politicians.
+    // HARDENED: Rejects generic "State Official" labels, known non-politicians,
+    // and requires office_held to match known political office patterns.
     // ====================================================================
+
+    // Known political office patterns that are VALID
+    _isValidOfficeTitle(office: string): boolean {
+        const validPatterns = [
+            /u\.?s\.?\s*(senate|house|representative|senator|congress)/i,
+            /\b(senator|representative|congressm|congressw|delegate)\b/i,
+            /\b(governor|lt\.?\s*governor|lieutenant governor)\b/i,
+            /\b(mayor|city council|county (commissioner|executive|council|supervisor))\b/i,
+            /\b(state (senator|representative|assembly|legislature|treasurer|attorney))\b/i,
+            /\b(attorney general|secretary of state|comptroller|auditor)\b/i,
+            /\b(president of the united states|vice president)\b/i,
+            /\b(speaker of the house|senate (majority|minority) leader)\b/i,
+            /\b(judge|justice|district court|circuit court|supreme court)\b/i,
+            /\b(sheriff|district attorney|commissioner)\b/i,
+            /\b(alderman|selectman|town manager|borough president)\b/i,
+        ];
+        return validPatterns.some(pattern => pattern.test(office));
+    },
+
     async processRequests(env: Env) {
         const { results: pendingRequests } = await env.DB.prepare(
             `SELECT * FROM politician_requests WHERE status = 'Pending' LIMIT 5`
@@ -564,19 +585,26 @@ export default {
                     messages: [
                         {
                             role: "system",
-                            content: `You are a political research assistant for a US politician database. Your job is to determine if a given name refers to a real, currently active US politician (federal, state, or local level). 
-                            
-If YES, respond with EXACTLY this JSON format:
-{"is_politician": true, "name": "Full Name", "office_held": "Their current office", "party": "Democrat/Republican/Independent", "district_state": "State abbreviation", "region_level": "Federal/State/Local", "summary": "1-2 sentence bio"}
+                            content: `You are a strict political verification assistant for a US politician database. You ONLY confirm currently serving, active US politicians at the federal, state, or local level.
 
-If NO (celebrities, athletes, fictional characters, foreign politicians, private citizens), respond with:
-{"is_politician": false, "reason": "Brief explanation why"}
+IMPORTANT RULES:
+- ONLY return is_politician=true for people who CURRENTLY hold a political office in the United States.
+- Celebrities, athletes, journalists, business executives, foreign politicians, and private citizens are NOT politicians.
+- "office_held" must be a SPECIFIC political title like "U.S. Senator", "State Representative", "Mayor", "Governor", "County Commissioner", etc.
+- NEVER use generic labels like "State Official" or "Federal Official". Use the EXACT office title.
+- Former politicians who no longer hold office should have is_politician=false.
+
+If YES (currently serving US politician), respond with EXACTLY this JSON:
+{"is_politician": true, "name": "Full Legal Name", "office_held": "EXACT current office title", "party": "Democrat/Republican/Independent", "district_state": "XX", "region_level": "Federal/State/Local", "summary": "1-2 sentence bio"}
+
+If NO, respond with:
+{"is_politician": false, "reason": "Brief explanation"}
 
 ONLY respond with JSON. No other text.`
                         },
                         {
                             role: "user",
-                            content: `Is "${requestedName}" a real, currently active US politician?`
+                            content: `Is "${requestedName}" a currently serving, active US politician? Be strict — only confirm if you are certain they currently hold a US political office.`
                         }
                     ]
                 });
@@ -585,7 +613,6 @@ ONLY respond with JSON. No other text.`
                 let parsed: any;
                 
                 try {
-                    // Try to extract JSON from the AI response
                     const jsonMatch = aiText.match(/\{[\s\S]*\}/);
                     parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
                 } catch (e) {
@@ -602,7 +629,27 @@ ONLY respond with JSON. No other text.`
                     continue;
                 }
 
-                // Step 3: Insert verified politician
+                // Step 3: HARD GATE — Reject generic/vague office titles
+                // The AI often hallucinates "State Official" for non-politicians.
+                const officeHeld = (parsed.office_held || '').trim();
+                if (!officeHeld || officeHeld === 'State Official' || officeHeld === 'Federal Official' || officeHeld === 'Official' || officeHeld === 'Public Servant') {
+                    await env.DB.prepare(
+                        `UPDATE politician_requests SET status = 'Rejected', verification_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+                    ).bind(`Rejected: AI returned generic office title "${officeHeld}" — likely not a real politician`, req.id).run();
+                    console.log(`[Discovery] REJECTED "${requestedName}": generic office title "${officeHeld}"`);
+                    continue;
+                }
+
+                // Step 4: Validate office title matches known political patterns
+                if (!this._isValidOfficeTitle(officeHeld)) {
+                    await env.DB.prepare(
+                        `UPDATE politician_requests SET status = 'Rejected', verification_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+                    ).bind(`Rejected: "${officeHeld}" does not match any known US political office pattern`, req.id).run();
+                    console.log(`[Discovery] REJECTED "${requestedName}": unrecognized office "${officeHeld}"`);
+                    continue;
+                }
+
+                // Step 5: Insert verified politician
                 const photoUrl = await this.resolvePoliticianImage(env, parsed.name);
                 const polId = `pol_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                 const slug = parsed.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -619,7 +666,7 @@ ONLY respond with JSON. No other text.`
                 const stmt1 = env.DB.prepare(`
                     INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, candidate_status, time_in_office, photo_url)
                     VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 'New Intake', ?)
-                `).bind(polId, slug, parsed.name, parsed.office_held, parsed.party, parsed.district_state, parsed.region_level, photoUrl);
+                `).bind(polId, slug, parsed.name, officeHeld, parsed.party, parsed.district_state, parsed.region_level, photoUrl);
 
                 const claimId = `clm_${Date.now()}`;
                 const stmt2 = env.DB.prepare(`
@@ -629,10 +676,10 @@ ONLY respond with JSON. No other text.`
 
                 const stmt3 = env.DB.prepare(`
                     UPDATE politician_requests SET status = 'Verified', verification_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-                `).bind(`Verified: ${parsed.office_held}, ${parsed.party}`, req.id);
+                `).bind(`Verified: ${officeHeld}, ${parsed.party}`, req.id);
 
                 await env.DB.batch([stmt1, stmt2, stmt3]);
-                console.log(`[Discovery] VERIFIED and added: ${parsed.name} (${parsed.office_held}, ${parsed.party})`);
+                console.log(`[Discovery] VERIFIED and added: ${parsed.name} (${officeHeld}, ${parsed.party})`);
                 
             } catch (err: any) {
                 await env.DB.prepare(`UPDATE politician_requests SET status = 'Rejected', verification_notes = ? WHERE id = ?`).bind(`Discovery Error: ${err.message}`, req.id).run();
