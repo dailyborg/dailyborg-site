@@ -170,8 +170,8 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
         return () => window.removeEventListener('borg_tracked_officials_update', loadPinned);
     }, []);
 
-    // Filters (Default to State auto-selected using Geo IP)
-    const [levelFilter, setLevelFilter] = useState<string | null>(validInitialState ? 'State' : null);
+    // Filters (Default to Federal tab — state filter pre-filled from Geo IP for when user switches to State tab)
+    const [levelFilter, setLevelFilter] = useState<string | null>('Federal');
     const [partyFilter, setPartyFilter] = useState<string | null>(null);
     const [stateFilter, setStateFilter] = useState<string | null>(validInitialState);
     const [localTownFilter, setLocalTownFilter] = useState<string>("");
