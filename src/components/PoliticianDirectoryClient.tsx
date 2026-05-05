@@ -219,7 +219,7 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
         }
     };
 
-    const activeFilterCount = [levelFilter, partyFilter, stateFilter, localTownFilter].filter(Boolean).length;
+    const activeFilterCount = [levelFilter, partyFilter, levelFilter !== 'Federal' ? stateFilter : null, localTownFilter].filter(Boolean).length;
 
     const filteredAndSorted = useMemo(() => {
         let result = initialPoliticians.filter(p => {
@@ -232,7 +232,7 @@ export function PoliticianDirectoryClient({ initialPoliticians, initialState }: 
 
             const matchesLevel = !levelFilter || p.region_level === levelFilter;
             const matchesParty = !partyFilter || p.party === partyFilter;
-            const matchesState = !stateFilter || p.district_state.startsWith(stateFilter);
+            const matchesState = !stateFilter || levelFilter === 'Federal' || p.district_state.startsWith(stateFilter);
             const matchesTown = !localTownFilter || p.district_state.toLowerCase().includes(localTownFilter.toLowerCase());
             
             const isFormer = p.candidate_status === 'Former';

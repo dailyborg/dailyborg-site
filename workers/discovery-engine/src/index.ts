@@ -428,6 +428,22 @@ export default {
                     continue;
                 }
 
+                // Also check by last name to prevent duplicates (e.g., "Bernard Sanders" vs "Bernie Sanders")
+                const lastName = leg.name?.last || '';
+                const existingByName = lastName.length > 2 ? await env.DB.prepare(
+                    "SELECT id, slug FROM politicians WHERE name LIKE ? AND region_level = 'Federal'"
+                ).bind(`%${lastName}`).first() : null;
+
+                if (existingByName) {
+                    await env.DB.prepare(`
+                        UPDATE politicians SET 
+                            office_held = ?, party = ?, district_state = ?, latest_sync_timestamp = CURRENT_TIMESTAMP 
+                        WHERE id = ?
+                    `).bind(officeHeld, party, districtState, (existingByName as any).id).run();
+                    console.log(`[Discovery] Dedup match: "${name}" -> existing "${(existingByName as any).slug}"`);
+                    continue;
+                }
+
                 // Use Congress Bioguide for official photo (highest quality)
                 const photoUrl = await this.resolvePoliticianImage(env, name, bioguideId);
                 const polId = `pol_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
