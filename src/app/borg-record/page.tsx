@@ -12,7 +12,7 @@ export default async function BorgRecordDirectory() {
         // Single query with LIMIT to stay within D1 Edge response size.
         // ORDER BY name gets a mix of Federal/State/Local alphabetically.
         const res = await db.prepare(
-            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians ORDER BY name ASC LIMIT 150"
+            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians ORDER BY candidate_status ASC, name ASC LIMIT 1000"
         ).bind().all();
 
         const raw = res?.results || res?.[0]?.results || [];

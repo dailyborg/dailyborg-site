@@ -329,7 +329,7 @@ export function SiteHeader({
                 </div>
 
                 {/* 4. Navigation Bar - Conditional: Admin links vs. Public desks */}
-                <div className="hidden md:flex border-b border-border bg-background w-full relative z-10">
+                <div className="hidden md:flex border-b border-border bg-background w-full relative z-20">
                     <nav className="flex justify-center items-center w-full max-w-[1400px] mx-auto overflow-x-auto no-scrollbar gap-0">
                         {isAdmin ? (
                             <>

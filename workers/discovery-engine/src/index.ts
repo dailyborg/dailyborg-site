@@ -680,8 +680,8 @@ ONLY respond with JSON. No other text.`
                 }
 
                 const stmt1 = env.DB.prepare(`
-                    INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, candidate_status, time_in_office, photo_url)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 'New Intake', ?)
+                    INSERT INTO politicians (id, slug, name, office_held, party, district_state, region_level, candidate_status, time_in_office, photo_url, latest_sync_timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 'New Intake', ?, CURRENT_TIMESTAMP)
                 `).bind(polId, slug, parsed.name, officeHeld, parsed.party, parsed.district_state, parsed.region_level, photoUrl);
 
                 const claimId = `clm_${Date.now()}`;

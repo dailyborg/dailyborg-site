@@ -124,7 +124,7 @@ export function DynamicLiveStrip({ isAdmin = false }: DynamicLiveStripProps) {
                         return (
                             <div
                                 key={setIndex}
-                                className={`absolute inset-0 flex items-center gap-4 md:gap-8 w-max transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                                className={`absolute inset-y-0 left-0 flex items-center gap-4 md:gap-8 w-max transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                             >
                                 {set.map((update, index) => {
                                     const Icon = update.icon;

@@ -101,8 +101,8 @@ Respond ONLY with valid JSON matching this schema:
             try {
                 await env.DB.batch([
                     env.DB.prepare(`
-                        INSERT INTO politicians (id, slug, name, office_held, party, district_state, time_in_office, country, region_level)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, 'US', 'Federal')
+                        INSERT INTO politicians (id, slug, name, office_held, party, district_state, time_in_office, country, region_level, latest_sync_timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 'US', 'Federal', CURRENT_TIMESTAMP)
                     `).bind(
                         polId,
                         generatedData.slug,
