@@ -1,10 +1,7 @@
 | Task | Status | Notes |
 | :--- | :--- | :--- |
-| **Fix Navigation Layout Overlap** | [x] | Edit dynamic-live-strip.tsx and site-header.tsx |
-| **Fix `/borg-record` Page Query** | [x] | Edit page.tsx |
-| **Fix Worker Sync Timestamps** | [x] | Edit workers/discovery-engine and workers/draft-engine |
-| **Deploy Temporary SQL Executor Route** | [x] | Create route.tsx |
-| **Execute Database Cleanups & Maintenance** | [x] | Run queries via temporary API endpoint |
-| **Verify Cleanup & System Functionality** | [x] | Verify on site / local testing |
-| **Remove Temporary SQL Executor Route** | [x] | Delete route.tsx after verification |
-| **Commit and Deploy Changes** | [x] | Run git commands and wrangler deploy |
+| **Rename 8 skill folders** | [x] | git mv to shorter names |
+| **Rename 14 long files inside skills** | [x] | git mv to shorter names |
+| **Update all cross-references** | [x] | Fix paths in SKILL.md files, tests, etc. |
+| **Verify no broken references** | [x] | grep for old names, run build |
+| **Commit and push** | [x] | Single commit with all renames |

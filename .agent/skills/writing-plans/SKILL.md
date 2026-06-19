@@ -104,5 +104,5 @@ After saving the plan, use a single execution path:
 Execution requirements:
 - **Entry workflow:** `.agent/workflows/execute-plan.md`
 - **Execution skill:** `.agent/skills/executing-plans/SKILL.md`
-- **Enforced execution model:** `.agent/skills/single-flow-task-execution/SKILL.md`
+- **Enforced execution model:** `.agent/skills/sfte/SKILL.md`
 - **Tracking:** update `<project-root>/docs/plans/task.md` (table-only tracker)

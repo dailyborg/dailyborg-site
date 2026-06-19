@@ -64,27 +64,27 @@ require_absent "$ROOT_DIR/docs/plans/task.md"
 required_skills=(
   "brainstorming"
   "executing-plans"
-  "finishing-a-development-branch"
-  "receiving-code-review"
-  "requesting-code-review"
-  "systematic-debugging"
-  "test-driven-development"
+  "finish-dev"
+  "rec-review"
+  "req-review"
+  "sys-debug"
+  "tdd"
   "using-git-worktrees"
   "using-superpowers"
-  "verification-before-completion"
+  "verify-done"
   "writing-plans"
-  "writing-skills"
-  "single-flow-task-execution"
+  "write-skills"
+  "sfte"
 )
 
 for skill in "${required_skills[@]}"; do
   require_file "$AGENT_DIR/skills/$skill/SKILL.md"
 done
 
-# Verify prompt template files for single-flow-task-execution
-require_file "$AGENT_DIR/skills/single-flow-task-execution/implementer-prompt.md"
-require_file "$AGENT_DIR/skills/single-flow-task-execution/spec-reviewer-prompt.md"
-require_file "$AGENT_DIR/skills/single-flow-task-execution/code-quality-reviewer-prompt.md"
+# Verify prompt template files for sfte
+require_file "$AGENT_DIR/skills/sfte/impl.md"
+require_file "$AGENT_DIR/skills/sfte/spec-rev.md"
+require_file "$AGENT_DIR/skills/sfte/qual-rev.md"
 
 echo ""
 echo "Checking frontmatter..."
@@ -92,19 +92,19 @@ echo "Checking frontmatter..."
 for skill in "${required_skills[@]}"; do
   file="$AGENT_DIR/skills/$skill/SKILL.md"
 
-  if rg -q '^---$' "$file"; then
+  if grep -q '^---$' "$file"; then
     pass "$skill has frontmatter delimiters"
   else
     fail "$skill missing frontmatter delimiters"
   fi
 
-  if rg -q '^name:\s*[^[:space:]].*$' "$file"; then
+  if grep -E -q '^name:[[:space:]]*[^[:space:]].*$' "$file"; then
     pass "$skill has name field"
   else
     fail "$skill missing name field"
   fi
 
-  if rg -q '^description:\s*[^[:space:]].*$' "$file"; then
+  if grep -E -q '^description:[[:space:]]*[^[:space:]].*$' "$file"; then
     pass "$skill has description field"
   else
     fail "$skill missing description field"
@@ -127,7 +127,7 @@ legacy_patterns=(
 )
 
 for pattern in "${legacy_patterns[@]}"; do
-  if rg -q "$pattern" "$AGENT_DIR/skills"; then
+  if grep -r -q "$pattern" "$AGENT_DIR/skills"; then
     fail "Legacy pattern found in skills: $pattern"
   else
     pass "Legacy pattern absent: $pattern"
@@ -149,7 +149,7 @@ mapping_checks=(
 )
 
 for pattern in "${mapping_checks[@]}"; do
-  if rg -q "$pattern" "$AGENT_DIR/AGENTS.md"; then
+  if grep -E -q "$pattern" "$AGENT_DIR/AGENTS.md"; then
     pass "AGENTS includes mapping: $pattern"
   else
     fail "AGENTS missing mapping: $pattern"

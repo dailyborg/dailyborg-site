@@ -8,7 +8,7 @@ Use this template when running a code quality review step in single-flow mode.
 
 ```
 task_boundary:
-  Use template at requesting-code-review/code-reviewer.md
+  Use template at req-review/reviewer.md
 
   WHAT_WAS_IMPLEMENTED: [from implementer's report]
   PLAN_OR_REQUIREMENTS: Task N from [plan-file]

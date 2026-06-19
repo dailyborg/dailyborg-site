@@ -1,5 +1,5 @@
 ---
-name: writing-skills
+name: write-skills
 description: Use when creating new skills, editing existing skills, or verifying skills work before deployment
 ---
 
@@ -15,9 +15,9 @@ You write test cases (pressure scenarios with explicit task execution), watch th
 
 **Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill teaches the right thing.
 
-**REQUIRED BACKGROUND:** You MUST understand `.agent/skills/test-driven-development/SKILL.md` before using this skill. That skill defines the fundamental RED-GREEN-REFACTOR cycle. This skill adapts TDD to documentation.
+**REQUIRED BACKGROUND:** You MUST understand `.agent/skills/tdd/SKILL.md` before using this skill. That skill defines the fundamental RED-GREEN-REFACTOR cycle. This skill adapts TDD to documentation.
 
-**Official guidance:** For Antigravity's official skill authoring best practices, see antigravity-best-practices.md. This document provides additional patterns and guidelines that complement the TDD-focused approach in this skill.
+**Official guidance:** For Antigravity's official skill authoring best practices, see `best-practices.md`. This document provides additional patterns and guidelines that complement the TDD-focused approach in this skill.
 
 ## What is a Skill?
 
@@ -309,10 +309,10 @@ wc -w skills/path/SKILL.md
 
 Use skill name only, with explicit requirement markers:
 
-- ✅ Good: `**REQUIRED SKILL:** Use .agent/skills/test-driven-development/SKILL.md`
-- ✅ Good: `**REQUIRED BACKGROUND:** You MUST understand .agent/skills/systematic-debugging/SKILL.md`
-- ❌ Bad: `See skills/testing/test-driven-development` (unclear if required)
-- ❌ Bad: `@skills/testing/test-driven-development/SKILL.md` (force-loads, burns context)
+- ✅ Good: `**REQUIRED SKILL:** Use .agent/skills/tdd/SKILL.md`
+- ✅ Good: `**REQUIRED BACKGROUND:** You MUST understand .agent/skills/sys-debug/SKILL.md`
+- ❌ Bad: `See skills/testing/tdd` (unclear if required)
+- ❌ Bad: `@skills/testing/tdd/SKILL.md` (force-loads, burns context)
 
 **Why no @ links:** `@` syntax force-loads files immediately, consuming 200k+ context before you need them.
 
@@ -344,7 +344,7 @@ digraph when_flowchart {
 - Linear instructions → Numbered lists
 - Labels without semantic meaning (step1, helper2)
 
-See @graphviz-conventions.dot for graphviz style rules.
+See `graphviz.dot` for graphviz style rules.
 
 **Visualizing for your human partner:** Use `render-graphs.js` in this directory to render a skill's flowcharts to SVG:
 
@@ -432,7 +432,7 @@ Edit skill without testing? Same violation.
 - Don't "adapt" while running tests
 - Delete means delete
 
-**REQUIRED BACKGROUND:** `.agent/skills/test-driven-development/SKILL.md` explains why this matters. Same principles apply to documentation.
+**REQUIRED BACKGROUND:** `.agent/skills/tdd/SKILL.md` explains why this matters. Same principles apply to documentation.
 
 ## Testing All Skill Types
 
@@ -506,7 +506,7 @@ Different skill types need different test approaches:
 
 Skills that enforce discipline (like TDD) need to resist rationalization. Agents are smart and will find loopholes when under pressure.
 
-**Psychology note:** Understanding WHY persuasion techniques work helps you apply them systematically. See persuasion-principles.md for research foundation (Cialdini, 2021; Meincke et al., 2025) on authority, commitment, scarcity, social proof, and unity principles.
+**Psychology note:** Understanding WHY persuasion techniques work helps you apply them systematically. See `persuasion.md` for research foundation (Cialdini, 2021; Meincke et al., 2025) on authority, commitment, scarcity, social proof, and unity principles.
 
 ### Close Every Loophole Explicitly
 
@@ -602,7 +602,7 @@ Run same scenarios WITH skill. Agent should now comply.
 
 Agent found new rationalization? Add explicit counter. Re-test until bulletproof.
 
-**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology:
+**Testing methodology:** See `test-skills.md` for the complete testing methodology:
 
 - How to write pressure scenarios
 - Pressure types (time, sunk cost, authority, exhaustion)

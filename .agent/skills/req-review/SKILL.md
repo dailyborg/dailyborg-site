@@ -1,5 +1,5 @@
 ---
-name: requesting-code-review
+name: req-review
 description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
 ---
 
@@ -34,7 +34,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 **2. Run structured code review checklist:**
 
-Use `requesting-code-review/code-reviewer.md` template and review the diff against requirements. In Antigravity single-flow mode, do not dispatch generic coding agents.
+Use `req-review/reviewer.md` template and review the diff against requirements. In Antigravity single-flow mode, do not dispatch generic coding agents.
 
 **Placeholders:**
 
@@ -112,4 +112,4 @@ You: [Fix progress indicators]
 - Show code/tests that prove it works
 - Request clarification
 
-See template at: requesting-code-review/code-reviewer.md
+See template at: req-review/reviewer.md

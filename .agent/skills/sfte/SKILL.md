@@ -1,5 +1,5 @@
 ---
-name: single-flow-task-execution
+name: sfte
 description: Use when executing implementation plans, handling multiple independent tasks, or doing structured task-by-task development with review gates in Antigravity.
 ---
 
@@ -29,15 +29,15 @@ digraph when_to_use {
     "Have implementation plan?" [shape=diamond];
     "Tasks mostly independent?" [shape=diamond];
     "Multiple problems to solve?" [shape=diamond];
-    "single-flow-task-execution" [shape=box];
+    "sfte" [shape=box];
     "executing-plans" [shape=box];
     "Manual execution or brainstorm first" [shape=box];
 
     "Have implementation plan?" -> "Tasks mostly independent?" [label="yes"];
     "Have implementation plan?" -> "Manual execution or brainstorm first" [label="no"];
-    "Tasks mostly independent?" -> "single-flow-task-execution" [label="yes"];
+    "Tasks mostly independent?" -> "sfte" [label="yes"];
     "Tasks mostly independent?" -> "Manual execution or brainstorm first" [label="no - tightly coupled"];
-    "Multiple problems to solve?" -> "single-flow-task-execution" [label="yes - work through them sequentially"];
+    "Multiple problems to solve?" -> "sfte" [label="yes - work through them sequentially"];
     "Multiple problems to solve?" -> "Manual execution or brainstorm first" [label="no - single task"];
 }
 ```
@@ -78,7 +78,7 @@ digraph process {
         "Run spec compliance review (./spec-reviewer-prompt.md)" [shape=box];
         "Spec confirms code matches spec?" [shape=diamond];
         "Fix spec gaps" [shape=box];
-        "Run code quality review (./code-quality-reviewer-prompt.md)" [shape=box];
+        "Run code quality review (./qual-rev.md)" [shape=box];
         "Code quality approved?" [shape=diamond];
         "Fix quality issues" [shape=box];
         "Mark task complete in docs/plans/task.md" [shape=box];
@@ -87,26 +87,26 @@ digraph process {
     "Read plan, extract all tasks with full text, note context" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Run final code review for entire implementation" [shape=box];
-    "Use finishing-a-development-branch skill" [shape=box style=filled fillcolor=lightgreen];
+    "Use finish-dev skill" [shape=box style=filled fillcolor=lightgreen];
 
-    "Read plan, extract all tasks with full text, note context" -> "Execute implementation (./implementer-prompt.md)";
-    "Execute implementation (./implementer-prompt.md)" -> "Questions about requirements?";
+    "Read plan, extract all tasks with full text, note context" -> "Execute implementation (./impl.md)";
+    "Execute implementation (./impl.md)" -> "Questions about requirements?";
     "Questions about requirements?" -> "Answer questions, provide context" [label="yes"];
-    "Answer questions, provide context" -> "Execute implementation (./implementer-prompt.md)";
+    "Answer questions, provide context" -> "Execute implementation (./impl.md)";
     "Questions about requirements?" -> "Implement, test, commit, self-review" [label="no"];
-    "Implement, test, commit, self-review" -> "Run spec compliance review (./spec-reviewer-prompt.md)";
-    "Run spec compliance review (./spec-reviewer-prompt.md)" -> "Spec confirms code matches spec?";
+    "Implement, test, commit, self-review" -> "Run spec compliance review (./spec-rev.md)";
+    "Run spec compliance review (./spec-rev.md)" -> "Spec confirms code matches spec?";
     "Spec confirms code matches spec?" -> "Fix spec gaps" [label="no"];
-    "Fix spec gaps" -> "Run spec compliance review (./spec-reviewer-prompt.md)" [label="re-review"];
-    "Spec confirms code matches spec?" -> "Run code quality review (./code-quality-reviewer-prompt.md)" [label="yes"];
-    "Run code quality review (./code-quality-reviewer-prompt.md)" -> "Code quality approved?";
+    "Fix spec gaps" -> "Run spec compliance review (./spec-rev.md)" [label="re-review"];
+    "Spec confirms code matches spec?" -> "Run code quality review (./qual-rev.md)" [label="yes"];
+    "Run code quality review (./qual-rev.md)" -> "Code quality approved?";
     "Code quality approved?" -> "Fix quality issues" [label="no"];
-    "Fix quality issues" -> "Run code quality review (./code-quality-reviewer-prompt.md)" [label="re-review"];
+    "Fix quality issues" -> "Run code quality review (./qual-rev.md)" [label="re-review"];
     "Code quality approved?" -> "Mark task complete in docs/plans/task.md" [label="yes"];
     "Mark task complete in docs/plans/task.md" -> "More tasks remain?";
-    "More tasks remain?" -> "Execute implementation (./implementer-prompt.md)" [label="yes"];
+    "More tasks remain?" -> "Execute implementation (./impl.md)" [label="yes"];
     "More tasks remain?" -> "Run final code review for entire implementation" [label="no"];
-    "Run final code review for entire implementation" -> "Use finishing-a-development-branch skill";
+    "Run final code review for entire implementation" -> "Use finish-dev skill";
 }
 ```
 
@@ -221,7 +221,7 @@ Update `docs/plans/task.md` with current status.
 ## Example Workflow
 
 ```
-You: I'm using single-flow-task-execution to execute this plan.
+You: I'm using sfte to execute this plan.
 
 [Read plan file: docs/plans/feature-plan.md]
 [Extract all 5 tasks with full text and context]
@@ -230,7 +230,7 @@ You: I'm using single-flow-task-execution to execute this plan.
 --- Task 1: Hook installation script ---
 
 [Prepare task brief with full text + context]
-[Execute implementation following ./implementer-prompt.md structure]
+[Execute implementation following ./impl.md structure]
 
 Questions: "Should the hook be installed at user or system level?"
 Answer: "User level (~/.config/superpowers/hooks/)"
@@ -241,10 +241,10 @@ Implementation:
   - Self-review: Found I missed --force flag, added it
   - Committed
 
-[Run spec compliance review following ./spec-reviewer-prompt.md]
+[Run spec compliance review following ./spec-rev.md]
 Spec review: Spec compliant — all requirements met, nothing extra
 
-[Run code quality review following ./code-quality-reviewer-prompt.md]
+[Run code quality review following ./qual-rev.md]
 Code review: Strengths: Good test coverage, clean. Issues: None. Approved.
 
 [Mark Task 1 complete in docs/plans/task.md]
@@ -284,7 +284,7 @@ Code review: Approved
 [Run final code review on entire implementation]
 Final review: All requirements met, ready to merge
 
-[Use finishing-a-development-branch skill]
+[Use finish-dev skill]
 Done!
 ```
 
@@ -352,13 +352,13 @@ Before claiming all work is done:
 
 - **using-git-worktrees** — Set up isolated workspace before starting
 - **writing-plans** — Creates the plan this skill executes
-- **requesting-code-review** — Code review template for quality reviews
-- **finishing-a-development-branch** — Complete development after all tasks
+- **req-review** — Code review template for quality reviews
+- **finish-dev** — Complete development after all tasks
 
 **Should also use:**
 
-- **test-driven-development** — Follow TDD for each task
-- **verification-before-completion** — Final verification checklist
+- **tdd** — Follow TDD for each task
+- **verify-done** — Final verification checklist
 
 **Alternative workflow:**
 
