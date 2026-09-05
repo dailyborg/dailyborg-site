@@ -1,4 +1,15 @@
-# Status (updated 2026-09-05 mid-morning Eastern, takeover session)
+# Status (updated 2026-09-05, 15:45 UTC, takeover session)
+
+## Resume here (next session, any machine)
+
+Everything is committed and pushed (last commit 93c9fd6); nothing is half done. Fresh machine: follow "How this project travels" in the root CLAUDE.md (clone, SSH key and memory from the Drive, `npm install`, `npx wrangler login`), then do these in order:
+
+1. **Confirm the D1 reset worked** (any time after 00:00 UTC 2026-09-06, which is 8 PM Eastern on 2026-09-05): open https://dailyborg.com/borg-record/politicians/tammy-baldwin. Expect a full profile. A 500 after the reset is a real bug: run `npm run check`, then read `src/lib/services/politician-service.ts` getProfile and the profile page.
+2. **Confirm the crons primed the data:** `curl "https://dailyborg-discovery.pressroom.workers.dev/"` should show `federal_roster_synced_at` after the reset and `votes.house_cursor` / `votes.senate_cursor` above 0. If not, run `?action=federal` then `?action=votes` by hand (runbook, last section).
+3. **Check the roster and rulings pages:** /borg-record (federal list with photos), one representative profile, /borg-record/liar-liar, /borg-record/compare. Then /admin with the passphrase from `_credentials/admin-passphrase.txt` on the Drive.
+4. **Watch the D1 usage graph** (Cloudflare dashboard > Workers & Pages > D1 > dailyborg-db > Metrics) for two days. Target: under 500,000 rows read per day. The old build read 8,000,000.
+5. Then continue with the to-do list and the questions at the bottom of this file. Dr. Cato's answers so far: Google Civic key deleted (done), congress.gov key obtained and installed (votes shipped), old Antigravity folder may be deleted (archived on the Drive), roll-call votes must always use two sources (done).
+
 
 ## Where things stand
 
