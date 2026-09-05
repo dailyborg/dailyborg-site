@@ -1,65 +1,52 @@
-import { getDbBinding } from "@/lib/db";
+import { PoliticianService, LEVELS, US_STATE_CODES, type Level } from "@/lib/services/politician-service";
 import { PoliticianDirectoryClient } from "@/components/PoliticianDirectoryClient";
 import CommentSection from "@/components/CommentSection";
 
-export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
+export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
-export default async function BorgRecordDirectory() {
-    let initialPoliticians: any[] = [];
+type SearchParams = { [key: string]: string | string[] | undefined };
+
+function first(v: string | string[] | undefined): string | null {
+    if (Array.isArray(v)) return v[0] ?? null;
+    return v ?? null;
+}
+
+/**
+ * The Borg Record directory.
+ * The level and state live in the URL (?level=State&state=NY) so the server reads only that slice of the
+ * roster (index backed, cached for ten minutes) instead of shipping every official to the browser.
+ */
+export default async function BorgRecordDirectory({ searchParams }: { searchParams: Promise<SearchParams> }) {
+    const sp = await searchParams;
+    const levelParam = first(sp.level);
+    const level: Level = (LEVELS as readonly string[]).includes(levelParam || "") ? (levelParam as Level) : "Federal";
+    const stateParam = (first(sp.state) || "").toUpperCase();
+    const includeFormer = first(sp.former) === "1";
+
+    // Visitor's region from Cloudflare, used to pre-select a state on the State and Local tabs.
+    let geoState: string | null = null;
     try {
-        const db = await getDbBinding();
-        // Single query with LIMIT to stay within D1 Edge response size.
-        // ORDER BY name gets a mix of Federal/State/Local alphabetically.
-        const res = await db.prepare(
-            "SELECT id, slug, name, office_held, party, district_state, region_level, candidate_status, photo_url, trustworthiness_score FROM politicians ORDER BY candidate_status ASC, name ASC LIMIT 1000"
-        ).bind().all();
-
-        const raw = res?.results || res?.[0]?.results || [];
-
-        initialPoliticians = raw.map((p: any) => ({
-            id: p.id,
-            slug: p.slug,
-            name: p.name,
-            office_held: p.office_held || "Federal Official",
-            party: p.party || "Independent",
-            district_state: p.district_state || "--",
-            region_level: p.region_level || "Federal",
-            candidate_status: p.candidate_status || "Active",
-            photo_url: p.photo_url || null,
-            trustworthiness_score: p.trustworthiness_score ?? null,
-            promises_kept: p.promises_kept ?? 0,
-            promises_broken: p.promises_broken ?? 0,
-            promises_total: p.promises_total ?? 0,
-            popularity_score: p.popularity_score ?? 0,
-            consistency_label: "Analyzing"
-        }));
-    } catch (e) {
-        console.warn("Failed to load initial politicians", e);
-    }
-
-    // Fallback if db is completely empty for some reason
-    if (initialPoliticians.length === 0) {
-        initialPoliticians = [
-            { id: "1", slug: "sample-slug", name: "Eleanor Vance", office_held: "U.S. Senate", party: "Democrat", district_state: "OH", region_level: "Federal", candidate_status: "Active", consistency_label: "Mixed" }
-        ];
-    }
-
-    // Extract region code from Edge headers (e.g. "NY", "OH", "CA")
-    let clientState = null;
-    try {
-        const { getRequestContext } = await import('@cloudflare/next-on-pages');
+        const { getRequestContext } = await import("@cloudflare/next-on-pages");
         const ctx = getRequestContext();
-        if (ctx && ctx.cf && ctx.cf.regionCode) {
-            clientState = ctx.cf.regionCode;
-        }
-    } catch (e) {
-        // Fallback or dev mode
+        const code = (ctx?.cf as any)?.regionCode as string | undefined;
+        if (code && (ctx?.cf as any)?.country === "US" && US_STATE_CODES.includes(code)) geoState = code;
+    } catch {
+        // local dev or no context
     }
+
+    const state = US_STATE_CODES.includes(stateParam) ? stateParam : (level !== "Federal" ? geoState : null);
+    const politicians = await PoliticianService.listDirectory(level, state, includeFormer);
 
     return (
         <>
-            <PoliticianDirectoryClient initialPoliticians={initialPoliticians} initialState={clientState} />
+            <PoliticianDirectoryClient
+                initialPoliticians={politicians}
+                level={level}
+                state={state}
+                includeFormer={includeFormer}
+                geoState={geoState}
+            />
             <div className="container mx-auto px-4 md:px-8 pb-16">
                 <CommentSection pageType="borg-record" pageSlug="directory" />
             </div>

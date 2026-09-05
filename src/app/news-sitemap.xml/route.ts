@@ -1,4 +1,5 @@
 import { getDbBinding } from "@/lib/db";
+import { cachedJson } from "@/lib/cache";
 
 export const runtime = 'edge';
 
@@ -8,16 +9,17 @@ export async function GET() {
     // Google News sitemap MUST only contain articles from the last 2 days (48 hours)
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
-    const { results } = await db.prepare(`
-        SELECT a.title, a.slug, a.desk, a.publish_date, au.name as author_name
-        FROM articles a
-        LEFT JOIN authors au ON a.author_id = au.id
-        WHERE a.publish_date >= ? AND a.approval_status = 'approved'
-        ORDER BY a.publish_date DESC
-        LIMIT 1000
-    `).bind(fortyEightHoursAgo).all();
-
-    const articles = results || [];
+    const articles = await cachedJson('news-sitemap', 600, async () => {
+        const { results } = await db.prepare(`
+            SELECT a.title, a.slug, a.desk, a.publish_date, au.name as author_name
+            FROM articles a
+            LEFT JOIN authors au ON a.author_id = au.id
+            WHERE a.publish_date >= ? AND a.approval_status = 'approved'
+            ORDER BY a.publish_date DESC
+            LIMIT 500
+        `).bind(fortyEightHoursAgo).all();
+        return (results || []) as any[];
+    });
 
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"

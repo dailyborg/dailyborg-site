@@ -55,7 +55,7 @@ export function DynamicLiveStrip({ isAdmin = false }: DynamicLiveStripProps) {
         }
 
         fetchLiveIntelligence();
-        const interval = setInterval(fetchLiveIntelligence, 60 * 1000);
+        const interval = setInterval(fetchLiveIntelligence, 5 * 60 * 1000);
         return () => clearInterval(interval);
     }, [isAdmin]);
 
@@ -88,7 +88,7 @@ export function DynamicLiveStrip({ isAdmin = false }: DynamicLiveStripProps) {
         }
 
         fetchAdminMetrics();
-        const interval = setInterval(fetchAdminMetrics, 30 * 1000); // Refresh every 30s
+        const interval = setInterval(fetchAdminMetrics, 2 * 60 * 1000);
         return () => clearInterval(interval);
     }, [isAdmin]);
 

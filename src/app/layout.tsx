@@ -20,8 +20,10 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "The Daily Borg",
-  description: "Broadcast Operations & Reporting Grid - The Public Record, Documented.",
+  metadataBase: new URL("https://dailyborg.com"),
+  title: { default: "The Daily Borg", template: "%s | The Daily Borg" },
+  description: "Broadcast Operations & Reporting Grid. The public record of United States officials, documented from official rosters and published fact-check rulings.",
+  openGraph: { siteName: "The Daily Borg", type: "website", url: "https://dailyborg.com" },
 };
 
 export default function RootLayout({

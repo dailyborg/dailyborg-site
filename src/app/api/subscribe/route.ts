@@ -1,12 +1,23 @@
 import { NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { Resend } from 'resend';
 
 export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {
-    const { email, phone_number, plan_type, delivery_channel, frequency, topics, tracked_politician, tracked_politicians } = await request.json() as any;
+    const { email: rawEmail, phone_number: rawPhone, plan_type, delivery_channel, frequency, topics, tracked_politician, tracked_politicians } = await request.json() as any;
+    const email = typeof rawEmail === 'string' && rawEmail.trim() ? rawEmail.trim().toLowerCase() : undefined;
+    const phone_number = typeof rawPhone === 'string' && rawPhone.trim() ? rawPhone.replace(/[^0-9+]/g, '') : undefined;
+
+    if (email && (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email) || email.length > 200)) {
+      return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
+    }
+    if (phone_number && !/^\+?[0-9]{7,15}$/.test(phone_number)) {
+      return NextResponse.json({ error: "Please enter a valid phone number with country code" }, { status: 400 });
+    }
+    if (!Array.isArray(topics ?? []) || (Array.isArray(topics) && topics.length > 20)) {
+      return NextResponse.json({ error: "Invalid topics" }, { status: 400 });
+    }
 
     if (!email && !phone_number) {
       return NextResponse.json({ error: "Email or Phone Number is required" }, { status: 400 });
@@ -38,29 +49,6 @@ export async function POST(request: Request) {
 
     if (!db) {
       return NextResponse.json({ error: "Database not bound" }, { status: 500 });
-    }
-
-    // Auto-migrate in dev to bypass ephemeral Miniflare memory resets
-    try {
-      await db.prepare(`
-        CREATE TABLE IF NOT EXISTS subscribers (
-            id TEXT PRIMARY KEY,
-            email TEXT UNIQUE,
-            phone_number TEXT UNIQUE,
-            plan_type TEXT DEFAULT 'free',
-            delivery_channel TEXT DEFAULT 'email',
-            frequency TEXT DEFAULT 'daily',
-            topics TEXT,
-            tracked_politicians TEXT DEFAULT '[]',
-            stripe_customer_id TEXT,
-            stripe_subscription_id TEXT,
-            stripe_status TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-      `).run();
-    } catch (e) {
-      console.warn("Auto-migration skipped or failed:", e);
     }
 
     const topicsJson = JSON.stringify(topics || []);
@@ -146,8 +134,10 @@ export async function POST(request: Request) {
 
     // 2. Dispatch Welcome Email via Resend if email channel
     if (channel === 'email' && email && resendApiKey) {
-      const resend = new Resend(resendApiKey);
-      const { error: resendError } = await resend.emails.send({
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
         from: 'The Daily Borg <edition@dailyborg.com>',
         to: [email],
         subject: 'Welcome to The Record',
@@ -225,10 +215,11 @@ export async function POST(request: Request) {
           </body>
           </html>
         `,
-      });
+        }),
+      }).catch(() => null);
 
-      if (resendError) {
-        console.error("Resend delivery failed during execution:", resendError);
+      if (!resendRes || !resendRes.ok) {
+        console.error("Resend delivery failed during execution:", resendRes ? resendRes.status : "network error");
       }
     } else if (channel === 'whatsapp' && phone_number) {
       // Future WhatsApp Welcome Message Trigger

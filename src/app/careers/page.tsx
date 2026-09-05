@@ -23,7 +23,7 @@ export default function CareersPage() {
                         <div className="border border-border p-6 hover:border-foreground transition-colors cursor-pointer group">
                             <h3 className="font-[family-name:var(--font-playfair)] text-2xl font-black uppercase mb-2 group-hover:underline underline-offset-4">Systems Architect (Data Ingestion)</h3>
                             <div className="text-xs font-bold font-[family-name:var(--font-source-sans)] uppercase tracking-widest text-muted-foreground mb-4">Remote / Edge Computing</div>
-                            <p className="font-[family-name:var(--font-source-sans)] text-sm text-foreground mb-0">负责 optimizing our global Cloudflare Worker pipeline. You will synthesize raw RSS and API feeds into pristine, Severity-scored JSON payloads at the edge.</p>
+                            <p className="font-[family-name:var(--font-source-sans)] text-sm text-foreground mb-0">Own the Cloudflare Worker pipeline that turns wire feeds into published stories at the edge.</p>
                         </div>
 
                         {/* Job Listing 2 */}

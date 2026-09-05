@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Daily Borg
 
-## Getting Started
+Autonomous newspaper (seven desks, AI-written from wire RSS) plus the Borg Record, a public
+accountability index of United States officials built from official rosters and published
+PolitiFact rulings. Live at https://dailyborg.com.
 
-First, run the development server:
+Read `CLAUDE.md` first (accounts, rules, folder map), then `docs/STATUS.md`.
+
+## Stack
+
+- Site: Next.js 14 (App Router, edge runtime) on Cloudflare Pages through `@cloudflare/next-on-pages`. Project `dailyborg-site`.
+- Data: one Cloudflare D1 database `dailyborg-db`. Schema baseline in `src/schema.sql`, changes in `src/migrations/`.
+- Workers (`workers/`): `discovery-engine` (roster sync), `sentinel` (maintenance), `scraper` (RSS to queue), `ingest` (AI writing + briefings), `truth-engine` (PolitiFact rulings).
+- Images: R2 bucket `borg-images`; scraper dedup in KV `SENTINEL_CACHE`; `ingest-queue` between scraper and ingest.
+
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev            # Next.js at http://localhost:3000 (no database; pages show their empty states)
+npm run check          # TypeScript for the site
+npm run check:workers  # TypeScript for every worker
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+To run a worker locally with a local D1 and real outbound network (useful for the discovery sync):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd workers/discovery-engine
+npx wrangler dev --test-scheduled --local
+# then in another terminal:
+curl "http://localhost:8787/?action=federal"
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Local secrets: copy the matching `*.dev.vars` file from the Drive (`claude\code\dailyborg\_credentials`) to `.dev.vars` in the site root or the worker folder. They are gitignored.
 
-## Learn More
+## Build and deploy
 
-To learn more about Next.js, take a look at the following resources:
+Deploys need a Cloudflare API token for the Pressroom account. Full order of operations is in
+`docs/DEPLOY-RUNBOOK.md`. Short version:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npx wrangler whoami                                   # must show Pressroom@dailyborg.com
+npx wrangler d1 execute dailyborg-db --remote --file=src/migrations/0010_takeover_hardening.sql
+for w in discovery-engine sentinel scraper truth-engine ingest; do (cd workers/$w && npx wrangler deploy); done
+npm run deploy                                        # builds with next-on-pages and deploys the Pages project
+# On Windows, if next-on-pages fails with 'spawn npx ENOENT': npx vercel build --yes && npx @cloudflare/next-on-pages --skip-build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Where things live
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See the folder map in `CLAUDE.md`. Every folder has its own `CLAUDE.md` explaining what belongs there.

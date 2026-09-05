@@ -33,7 +33,7 @@ export function DynamicTicker({ children }: DynamicTickerProps) {
 
         fetchHeadlines();
         // Refresh every 5 minutes to keep it "Live" without hammering the D1
-        const interval = setInterval(fetchHeadlines, 5 * 60 * 1000);
+        const interval = setInterval(fetchHeadlines, 10 * 60 * 1000);
         return () => clearInterval(interval);
     }, []);
 

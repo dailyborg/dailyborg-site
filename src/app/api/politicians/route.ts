@@ -1,35 +1,21 @@
-import { NextResponse } from 'next/server';
-import { getRequestContext } from '@cloudflare/next-on-pages';
+import { NextRequest, NextResponse } from 'next/server';
+import { PoliticianService } from '@/lib/services/politician-service';
+import { publicCacheHeaders } from '@/lib/cache';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+/**
+ * GET /api/politicians?q=<name>   indexed prefix search across every official (2+ characters)
+ * GET /api/politicians            the most viewed active federal officials (for pickers)
+ */
+export async function GET(request: NextRequest) {
     try {
-        let db;
-        try {
-            const context = getRequestContext();
-            db = (context.env as any).DB;
-        } catch (e) {
-            console.warn("Running outside Cloudflare context. Falling back to local DB module.");
-            const { getDbBinding } = await import('../../../lib/db');
-            db = await getDbBinding();
-        }
-
-        if (!db) {
-            return NextResponse.json({ error: "Database not bound" }, { status: 500 });
-        }
-
-        const query = await db.prepare(`
-            SELECT id, name, slug, party, office_held, photo_url 
-            FROM politicians 
-            ORDER BY name ASC
-        `).all();
-
-        return NextResponse.json({ politicians: query.results || [] }, { status: 200 });
-
+        const q = (request.nextUrl.searchParams.get('q') || '').trim();
+        const politicians = q.length >= 2 ? await PoliticianService.search(q) : await PoliticianService.featured(60);
+        return NextResponse.json({ politicians }, { status: 200, headers: publicCacheHeaders(300) });
     } catch (error: any) {
         console.error("Politicians API Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
     }
 }

@@ -1,16 +1,17 @@
 {
     "name": "dailyborg-scraper",
-    "version": "1.0.0",
-    "description": "RSS Ingestion Engine for The Daily Borg",
+    "version": "2.0.0",
+    "private": true,
+    "description": "RSS scout for The Daily Borg: queues fresh stories into ingest-queue",
     "main": "src/index.ts",
     "scripts": {
-        "dev": "wrangler dev",
+        "check": "tsc --noEmit",
+        "dev": "wrangler dev --test-scheduled",
         "deploy": "wrangler deploy"
     },
-    "dependencies": {},
     "devDependencies": {
-        "@cloudflare/workers-types": "^4.20240222.0",
-        "typescript": "^5.0.4",
-        "wrangler": "^3.0.0"
+        "@cloudflare/workers-types": "^4.20260409.1",
+        "typescript": "^5.9.3",
+        "wrangler": "^4.75.0"
     }
 }

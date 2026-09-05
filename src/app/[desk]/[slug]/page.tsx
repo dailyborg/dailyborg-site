@@ -43,7 +43,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
         "@type": "NewsArticle",
         "headline": article.title,
         "description": article.excerpt,
-        "image": [finalHeroImage || "https://dailyborg.com/images/default-news.jpg"],
+        "image": [finalHeroImage || "https://dailyborg.com/dailyborg-logo2.png"],
         "datePublished": article.publish_date,
         "dateModified": article.publish_date,
         "author": [{
@@ -56,7 +56,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ desk: 
             "name": "DailyBorg",
             "logo": {
                 "@type": "ImageObject",
-                "url": "https://dailyborg.com/logo.png"
+                "url": "https://dailyborg.com/dailyborg-logo2.png"
             }
         }
     };

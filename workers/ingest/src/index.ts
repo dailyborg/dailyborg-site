@@ -185,21 +185,27 @@ export class IngestCoordinator extends Agent<Env> {
         // Fetch Global Settings
         // =======================================================
         let aiProvider = 'aiml';
-        let dailyCap = 30;
+        let dailyCap = 40; // hard cap on published articles per day, every provider. Protects the AIML bill and the D1 free tier.
         try {
             const settingsRes = await this.env.DB.prepare("SELECT key, value FROM system_settings").all();
             const settingsMap: any = (settingsRes.results || []).reduce((acc: any, row: any) => ({ ...acc, [row.key]: row.value }), {});
             if (settingsMap.ai_provider) aiProvider = settingsMap.ai_provider;
-            if (settingsMap.cloudflare_daily_operations_cap) dailyCap = parseInt(settingsMap.cloudflare_daily_operations_cap, 10);
+            if (settingsMap.daily_article_cap) dailyCap = parseInt(settingsMap.daily_article_cap, 10);
+            else if (settingsMap.cloudflare_daily_operations_cap) dailyCap = parseInt(settingsMap.cloudflare_daily_operations_cap, 10);
+            if (!Number.isFinite(dailyCap) || dailyCap < 1) dailyCap = 40;
         } catch (e) {}
 
-        if (aiProvider === 'cloudflare') {
-            const todayOps = await this.env.DB.prepare("SELECT COUNT(*) as count FROM ingestion_logs WHERE status = 'inserted' AND date(created_at) = date('now')").first();
-            const count = (todayOps?.count as number) || 0;
-            if (count >= dailyCap) {
-                console.warn(`[Ingest] CLOUDFLARE QUOTA REACHED (${count}/${dailyCap}). Deferring.`);
-                return { status: "deferred", reason: "quota" };
+        // Index-backed count (idx_ingestion_logs_status_created). Runs once per queued article.
+        const todayOps = await this.env.DB.prepare("SELECT COUNT(*) as count FROM ingestion_logs WHERE status = 'inserted' AND created_at >= date('now')").first();
+        const publishedToday = (todayOps?.count as number) || 0;
+        if (publishedToday >= dailyCap) {
+            console.warn(`[Ingest] Daily article cap reached (${publishedToday}/${dailyCap}). Skipping "${title}".`);
+            const lastNotice = await this.env.DB.prepare("SELECT created_at FROM ingestion_logs WHERE status = 'quota_exceeded' AND created_at >= datetime('now', '-1 hour') LIMIT 1").first();
+            if (!lastNotice) {
+                await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                    .bind(crypto.randomUUID(), 'daily-cap', 'quota_exceeded', `Daily article cap of ${dailyCap} reached; further articles skipped until midnight UTC.`).run();
             }
+            return { status: "skipped", reason: "daily_cap" };
         }
 
         // =======================================================
@@ -471,18 +477,8 @@ export class IngestCoordinator extends Agent<Env> {
             await this.env.DB.batch(stmts);
         }
 
-        // Push extracted "Sentinel" names to the Politician Discovery Engine
-        if (articleObject.mentioned_candidates && articleObject.mentioned_candidates.length > 0) {
-            const reqStmts = articleObject.mentioned_candidates.map((name: string) => {
-                return this.env.DB.prepare(`
-                    INSERT INTO politician_requests (id, requested_name, user_email, reference_link, status) 
-                    VALUES (?, ?, 'sentinel@dailyborg.com', ?, 'Pending')
-                `).bind(`req_${crypto.randomUUID().slice(0, 15)}`, name, sourceUrl);
-            });
-            try { await this.env.DB.batch(reqStmts); } catch (e) {
-                console.warn("[Ingest] Failed pushing extracted candidates to discovery queue.");
-            }
-        }
+        // Names the model spots in an article are NOT sent to the politician roster any more.
+        // The roster is built only from authoritative datasets (see workers/discovery-engine).
 
         await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
             .bind(crypto.randomUUID(), articleObject.canonical_event_slug, 'inserted', `Successfully inserted article id: ${id}`).run();
@@ -514,15 +510,10 @@ export class IngestCoordinator extends Agent<Env> {
 // ============================================================
 export default {
     async scheduled(event: any, env: Env, ctx: any): Promise<void> {
-        const cron = event.cron;
-        let windowHours = 24;
-
-        if (cron.includes(' 5')) {
-            windowHours = 168;
-            console.log("Weekly Schedule Detected");
-        } else {
-            console.log("Daily Schedule Detected");
-        }
+        // Single daily cron. Friday's run sends the weekly edition (7 day window) instead of the daily one.
+        const isFriday = new Date().getUTCDay() === 5;
+        const windowHours = isFriday ? 168 : 24;
+        console.log(isFriday ? "Weekly edition run" : "Daily edition run");
 
         ctx.waitUntil(processDeliveries(env, windowHours * 60 * 60 * 1000));
     },

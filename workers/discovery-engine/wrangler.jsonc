@@ -1,4 +1,6 @@
 {
+	// dailyborg-discovery: keeps the politician roster accurate from public datasets. One hourly cron.
+	// Account: Pressroom@dailyborg.com. Database: dailyborg-db (the one production D1). Never point this at another project.
 	"name": "dailyborg-discovery",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-03-05",
@@ -10,26 +12,8 @@
 			"database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3"
 		}
 	],
-	"ai": {
-        "binding": "AI"
-    },
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": ["PoliticianAgent"]
-		}
-	],
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "POLITICIAN_AGENTS",
-				"class_name": "PoliticianAgent"
-			}
-		]
-	},
 	"triggers": {
-		"crons": [
-			"*/10 * * * *"
-		]
-	}
+		"crons": ["5 * * * *"]
+	},
+	"observability": { "enabled": true }
 }

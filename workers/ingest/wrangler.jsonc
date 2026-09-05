@@ -1,4 +1,6 @@
 {
+	// dailyborg-ingest: queue consumer that writes articles with Gemini (AIML) and sends the daily/weekly briefing at 08:00 UTC.
+	// Account: Pressroom@dailyborg.com. Database: dailyborg-db. Secrets: AIML_API_KEY, UNSPLASH_ACCESS_KEY, RESEND_API_KEY, optional TWILIO_*.
 	"$schema": "../../node_modules/wrangler/config-schema.json",
 	"name": "dailyborg-ingest",
 	"main": "src/index.ts",
@@ -55,11 +57,9 @@
 		}
 	],
 	"triggers": {
-		"crons": [
-			"0 8 * * *",
-			"0 8 * * 5"
-		]
+		"crons": ["0 8 * * *"]
 	},
+	"observability": { "enabled": true },
 	"ai": {
 		"binding": "AI"
 	}

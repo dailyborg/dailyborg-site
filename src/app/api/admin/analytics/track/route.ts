@@ -21,6 +21,12 @@ export async function POST(request: Request) {
 
         // 2. Parse basic generic tracking payload
         const userAgent = reqData.userAgent || request.headers.get("user-agent") || "unknown";
+        if (/bot|crawl|spider|slurp|preview|headless|lighthouse|monitor|curl|wget|python-requests|facebookexternalhit/i.test(userAgent)) {
+            return NextResponse.json({ success: true, ignored: true });
+        }
+        if (typeof path !== "string" || path.length > 300) {
+            return NextResponse.json({ success: false }, { status: 400 });
+        }
 
         // 3. Extract IP
         const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "127.0.0.1";

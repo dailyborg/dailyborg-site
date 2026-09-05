@@ -16,13 +16,12 @@ export default function ContactPage() {
                         The Daily Borg operates a distributed network of editorial oversight and data ingestion nodes. To interact with our system or provide verifiable disclosures, select the appropriate protocol below.
                     </p>
 
-                    <h2>Secure Tip Line (Encrypted)</h2>
+                    <h2>Corrections and Tips</h2>
                     <p>
-                        For whistleblowers, primary sources, and verified disclosures, we operate an encrypted, zero-logging intake node. Transmissions submitted here will trigger immediate algorithmic review and prioritization.
+                        For primary sources and corrections. Every message is read by a person. If a published ruling or a roster entry is wrong, tell us and include the link.
                     </p>
                     <ul>
-                        <li><strong>Signal:</strong> +1 (555) 019-BORG</li>
-                        <li><strong>Secure Mail:</strong> intake@thedailyborg.com</li>
+                                                <li><strong>Secure Mail:</strong> pressroom@dailyborg.com</li>
                     </ul>
 
                     <h2>Press & Media Inquiries</h2>
@@ -30,7 +29,7 @@ export default function ContactPage() {
                         For syndication requests, system audits, or official commentary from our operations lead, utilize the standard press channel.
                     </p>
                     <ul>
-                        <li><strong>Email:</strong> operations@thedailyborg.com</li>
+                        <li><strong>Email:</strong> pressroom@dailyborg.com</li>
                     </ul>
 
                     <h2>System Support</h2>
@@ -38,7 +37,7 @@ export default function ContactPage() {
                         If you are experiencing anomalies rendering the Broadcast Grid or accessing your subscriber metrics, please contact our diagnostic team.
                     </p>
                     <ul>
-                        <li><strong>Email:</strong> support@thedailyborg.com</li>
+                        <li><strong>Email:</strong> pressroom@dailyborg.com</li>
                     </ul>
 
                     <div className="p-6 bg-muted border-l-4 border-accent mt-12">

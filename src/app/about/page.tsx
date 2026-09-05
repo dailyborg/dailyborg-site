@@ -18,7 +18,7 @@ export default function AboutPage() {
 
                     <h2>Our Mission</h2>
                     <p>
-                        In an era dominated by opinion and cognitive bias, The Daily Borg exists to synthesize reality. Our editorial systems ingest, parse, and verify millions of data points across global legislative bodies, financial tickers, and cultural nodes in real-time. 
+                        In an era dominated by opinion and cognitive bias, The Daily Borg exists to synthesize reality. Our systems read wire reports, write the day's stories, and keep a public record of officials that is built only from official rosters and published fact-check rulings. Where the data is thin, the site says so rather than guessing. 
                     </p>
 
                     <h2>Original Reporting & Standards</h2>
@@ -28,23 +28,21 @@ export default function AboutPage() {
 
                     <h2>Editorial Transparency & Contact</h2>
                     <p>
-                        DailyBorg is headquartered in Washington, D.C. We believe our readers have a right to know who is delivering their news and how to contact them.
+                        The Daily Borg is published by TSYBORG. Readers have a right to know how the reporting is produced and how to reach us.
                     </p>
                     <ul>
-                        <li><strong>Email:</strong> editor@dailyborg.com</li>
-                        <li><strong>Phone:</strong> (202) 555-0198</li>
-                        <li><strong>Address:</strong> 100 Capitol St, Suite 400, Washington D.C., 20001, USA</li>
+                        <li><strong>Email:</strong> pressroom@dailyborg.com</li>
                     </ul>
 
                     <h2>Our Editorial Team</h2>
                     <p>
-                        Our journalism is powered by an autonomous editorial engine overseen and directed by our team of political analysts, investigative reporters, and policy correspondents. Every article we publish features a clear, linked byline connecting you directly to the author''s professional biography and credentials.
+                        Our journalism is powered by an autonomous editorial engine overseen and directed by our team of political analysts, investigative reporters, and policy correspondents. Every article we publish features a clear, linked byline connecting you directly to the author&apos;s professional biography and credentials.
                     </p>
 
                     <hr className="my-12 border-border" />
 
                     <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">
-                        Documentation Revised: March 2026 // Editorial Standards Manual V.4.1
+                        Documentation Revised: September 2026 // Editorial Standards Manual V.5
                     </p>
                 </article>
             </div>

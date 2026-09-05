@@ -1,28 +1,21 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getDbBinding } from '@/lib/db';
 
 export const runtime = 'edge';
 
 // GET /api/admin/comments — List all comments for moderation
 export async function GET(request: Request) {
-    const authHeader = request.headers.get('authorization');
-    const expectedPass = process.env.ADMIN_PASSPHRASE || 'borg-admin-2026';
-
-    if (authHeader !== `Bearer ${expectedPass}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
 
     try {
         const db = await getDbBinding();
         const url = new URL(request.url);
         const status = url.searchParams.get('status') || 'all';
 
-        let query = `SELECT * FROM comments ORDER BY created_at DESC LIMIT 100`;
-        if (status !== 'all') {
-            query = `SELECT * FROM comments WHERE status = '${status}' ORDER BY created_at DESC LIMIT 100`;
-        }
-
-        const result = await db.prepare(query).all();
+        const wanted = ['visible', 'removed'].includes(status) ? status : 'all';
+        const result = await db.prepare(`SELECT * FROM comments WHERE (? = 'all' OR status = ?) ORDER BY created_at DESC LIMIT 100`).bind(wanted, wanted).all();
         const comments = result?.results || [];
 
         return NextResponse.json({ comments });
@@ -34,12 +27,8 @@ export async function GET(request: Request) {
 
 // PUT /api/admin/comments — Edit a comment
 export async function PUT(request: Request) {
-    const authHeader = request.headers.get('authorization');
-    const expectedPass = process.env.ADMIN_PASSPHRASE || 'borg-admin-2026';
-
-    if (authHeader !== `Bearer ${expectedPass}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
 
     try {
         const { id, content, status } = await request.json() as any;
@@ -70,12 +59,8 @@ export async function PUT(request: Request) {
 
 // DELETE /api/admin/comments — Permanently delete a comment
 export async function DELETE(request: Request) {
-    const authHeader = request.headers.get('authorization');
-    const expectedPass = process.env.ADMIN_PASSPHRASE || 'borg-admin-2026';
-
-    if (authHeader !== `Bearer ${expectedPass}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
 
     try {
         const { id } = await request.json() as any;

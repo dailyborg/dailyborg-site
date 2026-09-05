@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getDbBinding } from '@/lib/db';
 
 export const runtime = 'edge';
 
 export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
     const params = await props.params;
-    const authHeader = request.headers.get('authorization');
-    const expectedPass = process.env.ADMIN_PASSPHRASE || 'borg-admin-2026';
-
-    if (authHeader !== `Bearer ${expectedPass}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
 
     try {
         const body: any = await request.json();

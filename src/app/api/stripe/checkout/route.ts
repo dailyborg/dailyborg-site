@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { readEnv } from '@/lib/admin-auth';
 
 export const runtime = 'edge';
 
@@ -12,19 +13,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Missing subscriber ID" }, { status: 400 });
         }
 
-        const stripeSecret = process.env.STRIPE_SECRET_KEY || (process.env as any).STRIPE_SECRET_KEY_MOCK || 'sk_test_MockToken123xyz';
-
-        // For local testing without real keys, return a mock redirect
-        if (stripeSecret === 'sk_test_MockToken123xyz') {
-            console.warn("No Stripe Secret Key found. Mocking checkout success for dev environment.");
-            return NextResponse.json({ url: `/subscribe?success=true&mock_id=${subscriberId}` });
+        const stripeSecret = readEnv('STRIPE_SECRET_KEY');
+        if (!stripeSecret) {
+            return NextResponse.json({ error: "Premium checkout is not configured yet. Your free subscription is active." }, { status: 503 });
         }
-
-        const stripe = new Stripe(stripeSecret, {
-            apiVersion: '2026-02-25.clover',
-        });
-
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+        const stripe = new Stripe(stripeSecret);
+        const baseUrl = readEnv('NEXT_PUBLIC_SITE_URL') || 'https://dailyborg.com';
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],

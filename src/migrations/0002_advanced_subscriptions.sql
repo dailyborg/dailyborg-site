@@ -21,13 +21,5 @@ CREATE TABLE IF NOT EXISTS subscribers (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Down
-DROP TABLE IF EXISTS subscribers;
-
-CREATE TABLE IF NOT EXISTS subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    desks TEXT, -- JSON array of desk names
-    entities TEXT, -- JSON array of entity slugs
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- (The original file had a '-- Down' section here that dropped the table it had just created.
+--  It was removed on 2026-09-05 because wrangler runs the whole file.)

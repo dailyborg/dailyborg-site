@@ -1,4 +1,6 @@
 {
+    // dailyborg-scraper: reads the RSS feeds and queues new stories for dailyborg-ingest.
+    // Account: Pressroom@dailyborg.com. Uses KV (SENTINEL_CACHE) for 24h dedup, no D1. No secrets.
     "$schema": "../../node_modules/wrangler/config-schema.json",
     "name": "dailyborg-scraper",
     "main": "src/index.ts",
@@ -18,8 +20,7 @@
         }
     ],
     "triggers": {
-        "crons": [
-            "0 * * * *" // Run at minute 0 past every hour
-        ]
-    }
+        "crons": ["50 */2 * * *"]
+    },
+    "observability": { "enabled": true }
 }

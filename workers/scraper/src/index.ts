@@ -44,12 +44,21 @@ export default {
         if (request.method !== "POST") {
             return new Response("Method not allowed. POST to trigger scraper.", { status: 405 });
         }
-        
+
+        // Manual triggers (admin panel, sentinel) are limited to one every 10 minutes so a stray
+        // caller cannot flood the ingest queue and the AIML bill.
+        const lock = await env.SENTINEL_CACHE.get("manual_trigger_lock");
+        if (lock) {
+            return new Response("Scraper was triggered less than 10 minutes ago. Try again later.", { status: 429 });
+        }
+        await env.SENTINEL_CACHE.put("manual_trigger_lock", "1", { expirationTtl: 600 });
+
         const body = await request.json().catch(() => ({})) as any;
         const isDeep = body.deep === true;
         const category = body.category || null;
-        const amount = body.amount ? parseInt(body.amount, 10) : null;
-        
+        const amountRaw = body.amount ? parseInt(body.amount, 10) : null;
+        const amount = amountRaw && Number.isFinite(amountRaw) ? Math.min(Math.max(amountRaw, 1), 10) : null;
+
         ctx.waitUntil(this.runScrapingCycle(env, isDeep, category, amount));
         return new Response(`Sentinel scraping cycle (Deep: ${isDeep}, Category: ${category || 'all'}, Amount: ${amount || 'default'}) initiated in background.`, { status: 202 });
     },
@@ -79,7 +88,7 @@ export default {
                 // Simple regex parser to extract <item> blocks from RSS XML without relying on heavy external parsers
                 const items = xmlData.match(/<item>([\s\S]*?)<\/item>/g) || [];
 
-                const targetLimit = targetAmount ? targetAmount : (isDeep ? 15 : 4);
+                const targetLimit = targetAmount ? targetAmount : (isDeep ? 8 : 3);
                 let newlyDiscoveredCount = 0;
 
                 for (const itemXml of items) {

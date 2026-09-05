@@ -1,34 +1,15 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/admin-auth';
 import { getDbBinding } from '@/lib/db';
 
 export const runtime = 'edge';
 
-// Helper to ensure the table schema exists. Doing this here guarantees it works safely in production without Wrangler CLI schema push issues.
-async function initSchema(db: any) {
-    try {
-        await db.prepare(`
-            CREATE TABLE IF NOT EXISTS system_settings (
-                key TEXT PRIMARY KEY, 
-                value TEXT NOT NULL, 
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `).run();
-    } catch (e) {
-        console.error("Failed to init system_settings table:", e);
-    }
-}
-
 export async function GET(request: Request) {
-    const authHeader = request.headers.get('authorization');
-    const expectedPass = process.env.ADMIN_PASSPHRASE || 'borg-admin-2026';
-
-    if (authHeader !== `Bearer ${expectedPass}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
 
     try {
         const db = await getDbBinding();
-        await initSchema(db);
 
         const results = await db.prepare("SELECT key, value FROM system_settings").all();
         const settings = (results.results || []).reduce((acc: any, row: any) => {
@@ -38,7 +19,7 @@ export async function GET(request: Request) {
 
         // Defaults if missing
         if (!settings.ai_provider) settings.ai_provider = 'aiml';
-        if (!settings.cloudflare_daily_operations_cap) settings.cloudflare_daily_operations_cap = '30';
+        if (!settings.daily_article_cap) settings.daily_article_cap = settings.cloudflare_daily_operations_cap || '40';
         if (!settings.logo_placement) settings.logo_placement = 'center';
 
         return NextResponse.json({ settings });
@@ -49,16 +30,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const authHeader = request.headers.get('authorization');
-    const expectedPass = process.env.ADMIN_PASSPHRASE || 'borg-admin-2026';
-
-    if (authHeader !== `Bearer ${expectedPass}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
 
     try {
         const db = await getDbBinding();
-        await initSchema(db);
 
         const body: any = await request.json();
         
@@ -67,8 +43,9 @@ export async function POST(request: Request) {
         if (body.ai_provider && ['aiml', 'cloudflare'].includes(body.ai_provider)) {
             updates.push({ key: 'ai_provider', value: body.ai_provider });
         }
-        if (body.cloudflare_daily_operations_cap) {
-            updates.push({ key: 'cloudflare_daily_operations_cap', value: String(body.cloudflare_daily_operations_cap) });
+        const cap = body.daily_article_cap ?? body.cloudflare_daily_operations_cap;
+        if (cap !== undefined && Number.isFinite(parseInt(String(cap), 10)) && parseInt(String(cap), 10) >= 1 && parseInt(String(cap), 10) <= 500) {
+            updates.push({ key: 'daily_article_cap', value: String(parseInt(String(cap), 10)) });
         }
         if (body.logo_placement && ['left', 'center', 'right'].includes(body.logo_placement)) {
             updates.push({ key: 'logo_placement', value: body.logo_placement });

@@ -16,7 +16,7 @@ export function SiteFooter() {
                             </div>
                         </div>
                         <p className="font-[family-name:var(--font-source-sans)] text-sm md:text-base text-muted-foreground leading-relaxed max-w-sm">
-                            The public record, documented without bias, interference, or delay. Algorithmic news distribution serving the global populace 24 hours a day.
+                            Reporting written around the clock from wire sources, and a public record of United States officials built only from official rosters and published fact-check rulings.
                         </p>
                         <div className="flex items-center gap-2 mt-4 text-xs font-bold uppercase tracking-widest text-accent">
                             <Activity className="w-3.5 h-3.5 animate-sparkline" />
@@ -38,9 +38,9 @@ export function SiteFooter() {
                         <h4 className="font-[family-name:var(--font-source-sans)] text-xs font-bold uppercase tracking-widest text-foreground">Records</h4>
                         <ul className="flex flex-col gap-3 font-[family-name:var(--font-source-sans)] text-sm font-semibold tracking-wide text-muted-foreground">
                             <li><Link href="/borg-record" className="hover:text-foreground transition-colors">Borg Record</Link></li>
-                            <li><Link href="/borg-record?tab=voting" className="hover:text-foreground transition-colors">Voting Records</Link></li>
-                            <li><Link href="/borg-record?tab=statements" className="hover:text-foreground transition-colors">Public Statements</Link></li>
-                            <li><Link href="/borg-record?tab=promises" className="hover:text-foreground transition-colors">Promise Tracker</Link></li>
+                            <li><Link href="/borg-record/liar-liar" className="hover:text-foreground transition-colors">Liar Liar Index</Link></li>
+                            <li><Link href="/borg-record/compare" className="hover:text-foreground transition-colors">Head-to-Head</Link></li>
+                            <li><Link href="/borg-record?level=State" className="hover:text-foreground transition-colors">State Legislatures</Link></li>
                         </ul>
                     </div>
 

@@ -97,7 +97,7 @@ export function SiteHeader({
             } catch {}
         }
         fetchAlerts();
-        const interval = setInterval(fetchAlerts, 60000); // Refresh every minute
+        const interval = setInterval(fetchAlerts, 120000);
         return () => clearInterval(interval);
     }, [isAdmin]);
 

@@ -1,15 +1,16 @@
 {
   "name": "dailyborg-truth",
-  "version": "1.0.0",
-  "description": "Autonomous external fact-checker & verification matrix",
+  "version": "2.0.0",
+  "private": true,
   "main": "src/index.ts",
   "scripts": {
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev"
+    "check": "tsc --noEmit",
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260405.1",
+    "@cloudflare/workers-types": "^4.20260409.1",
     "typescript": "^5.9.3",
-    "wrangler": "^3.114.17"
+    "wrangler": "^4.75.0"
   }
 }

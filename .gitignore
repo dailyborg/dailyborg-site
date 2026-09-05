@@ -1,47 +1,47 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# --- dependencies (never commit, every level) ---
 node_modules/
+**/node_modules/
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
-# testing
-/coverage
+# --- secrets (live ONLY on the tsyborgrunnings Google Drive) ---
+.dev.vars
+**/.dev.vars
+.env
+.env.*
+_credentials/
+**/_credentials/
+*.pem
+*.key
 
-# next.js
+# --- project memory (mirrored to the Drive, not to GitHub) ---
+memory/
+
+# --- build output ---
 /.next/
 /out/
+/build/
+/dist/
+/.vercel/
+/.open-next/
+.wrangler/
+**/.wrangler/
+**/dist/
+*.tsbuildinfo
+next-env.d.ts
+cloudflare-env.d.ts
 
-# production
-/build
-
-# misc
-/stitch.zip
-.DS_Store
-*.pem
-
-# debug
+# --- logs, scratch, editor ---
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+tmp_*
+scratch/
+.DS_Store
+Thumbs.db
+/coverage
+/test-results/
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-/.vercel/
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# Cloudflare / OpenNext
-/.open-next/
-.wrangler/
-/dist/
+# --- design source archives ---
+/stitch.zip

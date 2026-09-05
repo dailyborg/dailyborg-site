@@ -44,7 +44,7 @@ function AdminDashboardContent() {
     const [isLoading, setIsLoading] = useState(false);
 
     // Global System Settings
-    const [settings, setSettings] = useState<any>({ ai_provider: 'aiml', cloudflare_daily_operations_cap: '30', logo_placement: 'center' });
+    const [settings, setSettings] = useState<any>({ ai_provider: 'aiml', daily_article_cap: '40', logo_placement: 'center' });
     const [isSavingSettings, setIsSavingSettings] = useState(false);
 
     // Comments Moderation State
@@ -223,11 +223,11 @@ function AdminDashboardContent() {
                 },
                 body: JSON.stringify({
                     ai_provider: newProvider,
-                    cloudflare_daily_operations_cap: newCap
+                    daily_article_cap: newCap
                 })
             });
             if (res.ok) {
-                setSettings({ ai_provider: newProvider, cloudflare_daily_operations_cap: newCap });
+                setSettings({ ai_provider: newProvider, daily_article_cap: newCap });
             } else {
                 alert("Failed to save settings.");
             }
@@ -453,7 +453,7 @@ function AdminDashboardContent() {
                                 <div className="absolute top-0 right-0 p-6 opacity-10"><Users className="w-16 h-16 text-blue-600" /></div>
                                 <div className="text-slate-500 uppercase text-xs font-bold tracking-wider">Unique Visitors (Today)</div>
                                 <div className="text-5xl font-black text-slate-900">{metrics.uniqueVisitorsToday}</div>
-                                <p className="text-xs text-emerald-600 font-bold">+12% from yesterday</p>
+                                <p className="text-xs text-slate-500">Distinct visitors since midnight UTC</p>
                             </div>
 
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-2 relative overflow-hidden">
@@ -524,14 +524,14 @@ function AdminDashboardContent() {
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Autonomous Core Provider</label>
                                     <div className="flex items-center gap-4 bg-slate-100 p-2 rounded-xl">
                                         <button 
-                                            onClick={() => handleSaveSettings('aiml', settings.cloudflare_daily_operations_cap)}
+                                            onClick={() => handleSaveSettings('aiml', settings.daily_article_cap)}
                                             disabled={isSavingSettings}
                                             className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all ${settings.ai_provider === 'aiml' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-blue-500' : 'text-slate-500 hover:bg-slate-200'}`}
                                         >
                                             Premium AIML (Gemini)
                                         </button>
                                         <button 
-                                            onClick={() => handleSaveSettings('cloudflare', settings.cloudflare_daily_operations_cap)}
+                                            onClick={() => handleSaveSettings('cloudflare', settings.daily_article_cap)}
                                             disabled={isSavingSettings}
                                             className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all ${settings.ai_provider === 'cloudflare' ? 'bg-white shadow border border-slate-200 text-slate-900 border-b-2 border-b-emerald-500' : 'text-slate-500 hover:bg-slate-200'}`}
                                         >
@@ -547,18 +547,18 @@ function AdminDashboardContent() {
                                 </div>
 
                                 <div className="flex flex-col gap-3">
-                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Cloudflare Daily Ingestion Caps</label>
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Daily article cap (all providers)</label>
                                     <div className="flex items-end gap-3">
                                         <div className="flex-1">
                                             <input 
                                                 type="number"
-                                                value={settings.cloudflare_daily_operations_cap}
-                                                onChange={(e) => setSettings({...settings, cloudflare_daily_operations_cap: e.target.value})}
+                                                value={settings.daily_article_cap}
+                                                onChange={(e) => setSettings({...settings, daily_article_cap: e.target.value})}
                                                 className="w-full text-lg font-mono p-3 bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none" 
                                             />
                                         </div>
                                         <button 
-                                            onClick={() => handleSaveSettings(settings.ai_provider, settings.cloudflare_daily_operations_cap)}
+                                            onClick={() => handleSaveSettings(settings.ai_provider, settings.daily_article_cap)}
                                             disabled={isSavingSettings}
                                             className="bg-slate-900 text-white font-bold text-sm px-6 py-3.5 rounded-xl hover:bg-slate-800 disabled:opacity-50"
                                         >
@@ -567,28 +567,28 @@ function AdminDashboardContent() {
                                     </div>
                                     <div className="mt-1">
                                         <div className="flex justify-between text-xs font-bold mb-1">
-                                            <span className={parseInt(settings.cloudflare_daily_operations_cap || '0') > 35 ? 'text-amber-600' : 'text-slate-500'}>
+                                            <span className={parseInt(settings.daily_article_cap || '0') > 35 ? 'text-amber-600' : 'text-slate-500'}>
                                                 Projected Cost vs Free Limit
                                             </span>
-                                            <span className={parseInt(settings.cloudflare_daily_operations_cap || '0') > 43 ? 'text-red-500' : 'text-slate-500'}>
-                                                {settings.cloudflare_daily_operations_cap} / 43 Max Safe Articles
+                                            <span className={parseInt(settings.daily_article_cap || '0') > 43 ? 'text-red-500' : 'text-slate-500'}>
+                                                {settings.daily_article_cap} articles per day
                                             </span>
                                         </div>
                                         <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                                             <div 
-                                                className={`h-2.5 rounded-full transition-all ${parseInt(settings.cloudflare_daily_operations_cap || '0') > 43 ? 'bg-red-500' : (parseInt(settings.cloudflare_daily_operations_cap || '0') > 35 ? 'bg-amber-400' : 'bg-emerald-500')}`}
-                                                style={{ width: `${Math.min((parseInt(settings.cloudflare_daily_operations_cap || '0') / 43) * 100, 100)}%` }}
+                                                className={`h-2.5 rounded-full transition-all ${parseInt(settings.daily_article_cap || '0') > 43 ? 'bg-red-500' : (parseInt(settings.daily_article_cap || '0') > 35 ? 'bg-amber-400' : 'bg-emerald-500')}`}
+                                                style={{ width: `${Math.min((parseInt(settings.daily_article_cap || '0') / 43) * 100, 100)}%` }}
                                             ></div>
                                         </div>
                                         
-                                        {parseInt(settings.cloudflare_daily_operations_cap || '0') > 43 ? (
+                                        {parseInt(settings.daily_article_cap || '0') > 43 ? (
                                             <p className="text-xs text-red-500 mt-2 font-bold flex items-center gap-1">
                                                 <AlertTriangle className="w-3 h-3" />
-                                                OVERAGE WARNING: This setting exceeds the ~10,000 Neural Free Tier limit (Max ~43 articles/day). You may be billed!
+                                                High cap: in Edge Free mode this can exceed the Workers AI free tier; in AIML mode it raises the monthly bill.
                                             </p>
                                         ) : (
                                             <p className="text-xs text-slate-500 mt-2">
-                                                Max mathematical capacity per 24-hours before Cloudflare Llama-3 billing triggers is roughly 43 articles.
+                                                Each article costs one Gemini call and possibly one image generation through the AI/ML API. 40 per day is the safe default.
                                             </p>
                                         )}
                                     </div>
@@ -692,11 +692,18 @@ function AdminDashboardContent() {
                         {/* Status Matrix */}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
                             {[
-                                { name: 'Sentinel', status: 'Active', icon: ShieldCheck, color: 'emerald' },
-                                { name: 'Scraper', status: 'Ready', icon: Activity, color: 'blue' },
-                                { name: 'Ingest', status: metrics.logs.some(l => l.status.includes('error')) ? 'Degraded' : 'Active', icon: Zap, color: metrics.logs.some(l => l.status.includes('error')) ? 'orange' : 'emerald' },
-                                { name: 'Discovery', status: 'Ready', icon: Users, color: 'blue' },
-                            ].map((s) => (
+                                { name: 'Sentinel', slug: 'sentinel-health', icon: ShieldCheck },
+                                { name: 'Discovery', slug: 'discovery', icon: Users },
+                                { name: 'Ingest', slug: null, icon: Zap },
+                                { name: 'Daily cap', slug: 'daily-cap', icon: Activity },
+                            ].map((w) => {
+                                const relevant = metrics.logs.filter((l: any) => w.slug ? l.event_slug === w.slug : !['sentinel-health', 'discovery', 'daily-cap'].includes(l.event_slug));
+                                const last = relevant[0];
+                                const bad = last && ['error', 'auth_error', 'quota_exceeded', 'provider_error', 'fetch_failure', 'failed'].includes(last.status);
+                                const status = !last ? 'No activity' : bad ? (last.status === 'quota_exceeded' ? 'Cap reached' : 'Degraded') : 'Active';
+                                const color = !last ? 'slate' : bad ? 'orange' : 'emerald';
+                                return { name: w.name, status, icon: w.icon, color };
+                            }).map((s) => (
                                 <div key={s.name} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
                                     <div className={`p-3 rounded-xl bg-${s.color}-100 text-${s.color}-600`}>
                                         <s.icon className="w-6 h-6" />

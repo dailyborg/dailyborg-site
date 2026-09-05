@@ -1,17 +1,17 @@
 {
-  "name": "discovery-engine",
-  "version": "1.0.0",
-  "description": "Autonomous Political Discovery Engine",
+  "name": "dailyborg-discovery",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Borg Record roster sync from public datasets (congress-legislators, executive.json, OpenStates, Wikidata)",
   "main": "src/index.ts",
   "scripts": {
-    "dev": "wrangler dev",
+    "check": "tsc --noEmit",
+    "dev": "wrangler dev --test-scheduled",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/ai": "^1.1.0",
-    "@cloudflare/sandbox": "^0.8.10",
-    "@cloudflare/workers-types": "^4.20240320.1",
-    "typescript": "^5.2.2",
-    "wrangler": "^4.80.0"
+    "@cloudflare/workers-types": "^4.20260409.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.75.0"
   }
 }

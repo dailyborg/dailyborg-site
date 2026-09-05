@@ -1,19 +1,12 @@
+# Cloudflare Pages project for the Next.js site. Account: Pressroom@dailyborg.com.
+# This file names dailyborg-site and the ONE production database. Never point it anywhere else.
 name = "dailyborg-site"
-main = ".vercel/output/static/_worker.js/index.js"
-compatibility_date = "2024-03-19"
+pages_build_output_dir = ".vercel/output/static"
+compatibility_date = "2026-03-05"
 compatibility_flags = ["nodejs_compat"]
-
-[assets]
-directory = ".vercel/output/static"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "dailyborg-db"
-database_id = "c412efcd-54d8-47a6-9ca5-8522417992c3"
-migrations_dir = "src/migrations"
-
-[[d1_databases]]
-binding = "dailyborg-db"
 database_name = "dailyborg-db"
 database_id = "c412efcd-54d8-47a6-9ca5-8522417992c3"
 migrations_dir = "src/migrations"

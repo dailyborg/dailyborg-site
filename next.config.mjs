@@ -1,18 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    unoptimized: true,
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'cdn.aimlapi.com',
-      },
-    ],
-  },
+  // Cloudflare Pages serves images as-is; Next's optimizer is not available at the edge.
+  images: { unoptimized: true },
+  // Type checking is run separately with `npm run check`; ESLint is not part of the build.
+  eslint: { ignoreDuringBuilds: true },
+  poweredByHeader: false,
 };
 
 export default nextConfig;

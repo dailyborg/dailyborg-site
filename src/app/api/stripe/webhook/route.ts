@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { readEnv } from '@/lib/admin-auth';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 
 export const runtime = 'edge';
@@ -13,22 +14,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
         }
 
-        const stripeSecret = process.env.STRIPE_SECRET_KEY || (process.env as any).STRIPE_SECRET_KEY_MOCK || 'sk_test_MockToken123xyz';
-        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || (process.env as any).STRIPE_WEBHOOK_SECRET_MOCK || 'whsec_MockWebhookSecret';
-
-        const stripe = new Stripe(stripeSecret, {
-            apiVersion: '2026-02-25.clover',
-        });
+        const stripeSecret = readEnv('STRIPE_SECRET_KEY');
+        const webhookSecret = readEnv('STRIPE_WEBHOOK_SECRET');
+        if (!stripeSecret || !webhookSecret) {
+            return NextResponse.json({ error: "Stripe webhooks are not configured" }, { status: 503 });
+        }
+        const stripe = new Stripe(stripeSecret);
 
         let event: Stripe.Event;
 
         try {
-            // For true local dev without Stripe CLI, you might bypass signature verification
-            if (webhookSecret === 'whsec_MockWebhookSecret') {
-                event = JSON.parse(payload);
-            } else {
-                event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
-            }
+            // Edge runtime: signature verification must use the async (SubtleCrypto) variant.
+            event = await stripe.webhooks.constructEventAsync(payload, signature, webhookSecret);
         } catch (err: any) {
             console.error(`Webhook signature verification failed: ${err.message}`);
             return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });

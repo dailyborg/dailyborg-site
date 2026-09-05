@@ -1,260 +1,143 @@
+/**
+ * dailyborg-truth
+ *
+ * Records real, published fact-check rulings for the officials in the Borg Record.
+ *
+ * The previous version asked an 8-billion-parameter model to decide whether a real person had "lied",
+ * then attached the result to whichever politician shared a last name with a word in the article.
+ * That produced fabricated accusations against real people. This version does none of that.
+ *
+ * What it does instead:
+ *   1. Every 6 hours it reads PolitiFact's public fact-check RSS feed.
+ *   2. Each item links to /factchecks/<year>/<mon>/<day>/<speaker-slug>/..., so the speaker is identified
+ *      by PolitiFact's own slug, and the ruling is the alt text of the Truth-O-Meter image in the item body.
+ *   3. It stores the ruling only when the speaker slug matches one of our politicians exactly
+ *      (letters and digits only, so "jd-vance" matches "j-d-vance").
+ *   4. It then recomputes the trust score for the affected officials from the stored rulings, and writes a
+ *      trustworthiness_history row only when the score changed.
+ *
+ * Every stored row carries the PolitiFact URL as its source, so readers can verify each entry themselves.
+ */
+
 export interface Env {
     DB: D1Database;
-    AI: any;
+}
+
+const FEED_URL = "https://www.politifact.com/rss/factchecks/";
+const USER_AGENT = "DailyBorg/2.0 (https://dailyborg.com; pressroom@dailyborg.com)";
+
+const RATING_MAP: Record<string, string> = {
+    "true": "true", "mostly true": "mostly_true", "half true": "half_true",
+    "mostly false": "mostly_false", "false": "false", "pants on fire": "pants_on_fire", "pants on fire!": "pants_on_fire",
+};
+// How much each ruling pulls the trust score down (0 = fully truthful, 1 = fully false).
+const FALSENESS: Record<string, number> = { true: 0, mostly_true: 0.2, half_true: 0.5, mostly_false: 0.8, false: 1, pants_on_fire: 1 };
+const MIN_RULINGS_FOR_SCORE = 3;
+
+function nameKey(s: string): string {
+    return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+function decodeEntities(s: string): string {
+    return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+        .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#39;|&apos;/g, "'")
+        .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+        .replace(/[“”]/g, "\"").replace(/[’]/g, "'").replace(/�/g, "'");
+}
+
+function tag(xml: string, name: string): string {
+    const m = xml.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`));
+    return m ? decodeEntities(m[1]).trim() : "";
+}
+
+interface Ruling { speakerSlug: string; statement: string; rating: string; analysis: string; url: string; date: string; }
+
+export function parseFeed(xml: string): Ruling[] {
+    const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+    const out: Ruling[] = [];
+    for (const item of items) {
+        const link = tag(item, "link");
+        const m = link.match(/\/factchecks\/(\d{4})\/([a-z]{3})\/(\d{1,2})\/([a-z0-9-]+)\//i);
+        if (!m) continue;
+        const body = tag(item, "content:encoded");
+        const alt = body.match(/alt="([^"]+)"/i)?.[1]?.toLowerCase().trim() || "";
+        const rating = RATING_MAP[alt];
+        if (!rating) continue;
+        const statement = tag(item, "description") || tag(item, "title");
+        // PolitiFact republishes some rulings in Spanish under a second URL. Keep the English original only.
+        if (/[áéíóúñ¿¡]/i.test(statement) && /(el|la|los|las|de|que|en|una|del)/i.test(statement)) continue;
+        const paragraph = decodeEntities((body.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1] || "").replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+        const months: Record<string, string> = { jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12" };
+        const date = `${m[1]}-${months[m[2].toLowerCase()] || "01"}-${m[3].padStart(2, "0")}`;
+        out.push({ speakerSlug: m[4], statement: statement.slice(0, 500), rating, analysis: paragraph.slice(0, 600), url: link, date });
+    }
+    return out;
+}
+
+async function syncPolitiFact(env: Env): Promise<string> {
+    const res = await fetch(FEED_URL, { headers: { "User-Agent": USER_AGENT } });
+    if (!res.ok) throw new Error(`PolitiFact feed returned ${res.status}`);
+    const rulings = parseFeed(await res.text());
+    if (rulings.length === 0) return "PolitiFact feed had no parseable items";
+
+    // One indexed lookup per distinct speaker slug in the feed (20 items, usually fewer than 15 speakers).
+    const slugs = [...new Set(rulings.map(r => r.speakerSlug))];
+    const keys = slugs.map(nameKey);
+    // Politician slugs are stored as "susan-collins" or "susan-collins-me"; compare on the letters-only key
+    // of the slug with any state suffix removed.
+    const { results } = await env.DB.prepare(
+        `SELECT slug FROM politicians WHERE candidate_status <> 'Former' AND (${slugs.map(() => "slug = ? OR slug LIKE ?").join(" OR ")})`
+    ).bind(...slugs.flatMap(s => [s, `${s}-__`])).all<{ slug: string }>();
+    const ourSlugs = results || [];
+    const bySpeaker = new Map<string, string>();
+    for (const row of ourSlugs) {
+        const base = row.slug.replace(/-[a-z]{2}$/, "");
+        const k = nameKey(base);
+        const idx = keys.indexOf(k);
+        if (idx >= 0 && !bySpeaker.has(slugs[idx])) bySpeaker.set(slugs[idx], row.slug);
+    }
+
+    let stored = 0;
+    const touched = new Set<string>();
+    for (const r of rulings) {
+        const slug = bySpeaker.get(r.speakerSlug);
+        if (!slug) continue;
+        const result = await env.DB.prepare(
+            "INSERT OR IGNORE INTO fact_checks (id, politician_slug, statement, rating, analysis_text, source_url, date) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).bind(crypto.randomUUID(), slug, r.statement, r.rating, `PolitiFact ruling: ${r.analysis}`, r.url, r.date).run();
+        if (result.meta.changes > 0) { stored++; touched.add(slug); }
+    }
+
+    for (const slug of touched) await recomputeTrust(env, slug);
+    return `PolitiFact: ${rulings.length} rulings read, ${bySpeaker.size} matched our officials, ${stored} new stored`;
+}
+
+/** Trust score = 100 minus the average falseness of the official's stored rulings, once there are enough rulings. */
+async function recomputeTrust(env: Env, slug: string): Promise<void> {
+    const { results } = await env.DB.prepare("SELECT rating FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 50").bind(slug).all<{ rating: string }>();
+    const ratings = (results || []).map(r => r.rating).filter(r => r in FALSENESS);
+    const pol = await env.DB.prepare("SELECT id, trustworthiness_score FROM politicians WHERE slug = ?").bind(slug).first<{ id: string; trustworthiness_score: number | null }>();
+    if (!pol) return;
+    if (ratings.length < MIN_RULINGS_FOR_SCORE) return;
+    const avg = ratings.reduce((s, r) => s + FALSENESS[r], 0) / ratings.length;
+    const score = Math.round(100 - avg * 100);
+    if (pol.trustworthiness_score === score) return;
+    await env.DB.batch([
+        env.DB.prepare("UPDATE politicians SET trustworthiness_score = ?, last_scored_at = CURRENT_TIMESTAMP WHERE id = ?").bind(score, pol.id),
+        env.DB.prepare("INSERT INTO trustworthiness_history (id, politician_id, score) VALUES (?, ?, ?)").bind(`th_${crypto.randomUUID().slice(0, 12)}`, pol.id, score),
+    ]);
 }
 
 export default {
-    async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-        console.log(`[Truth Engine] Initiating 6-hour autonomous truth matrix cycle...`);
-
-        // 1. Double-verify and store any fact checks found via recent articles.
-        await this.factCheckRecentArticles(env);
-
-        // 2. Poll external fact-checking syndicates (RSS)
-        await this.syncExternalFactCheckers(env);
-
-        // 3. Dig into historical archives for tracked politicians
-        await this.syncHistoricalArchives(env);
+    async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+        ctx.waitUntil(syncPolitiFact(env).then(r => console.log("[truth]", r)).catch(e => console.error("[truth]", e)));
     },
-
-    async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
-        const action = url.searchParams.get('action') || 'all';
-
-        console.log(`[Truth Engine] Manual trigger received. Action: ${action}`);
-
-        if (action === 'articles') await this.factCheckRecentArticles(env);
-        else if (action === 'external') await this.syncExternalFactCheckers(env);
-        else if (action === 'history') await this.syncHistoricalArchives(env);
-        else {
-            await this.factCheckRecentArticles(env);
-            await this.syncExternalFactCheckers(env);
-            await this.syncHistoricalArchives(env);
+        if (url.searchParams.get("action") === "sync") {
+            try { return Response.json({ ok: true, result: await syncPolitiFact(env) }); }
+            catch (e: any) { return Response.json({ ok: false, error: String(e?.message || e) }, { status: 500 }); }
         }
-
-        return new Response("Truth Engine matrix cycle completed.", { status: 200 });
+        return new Response("dailyborg-truth online. ?action=sync to read the PolitiFact feed now.", { status: 200 });
     },
-
-    // =========================================================================================
-    // 1. RECENT ARTICLES (Transferred & upgraded from discovery-engine)
-    // =========================================================================================
-    async factCheckRecentArticles(env: Env) {
-        console.log(`[Truth Engine] Scanning recent Daily Borg articles...`);
-
-        const { results: recentArticles } = await env.DB.prepare(`
-            SELECT id, title, content_html FROM articles 
-            WHERE publish_date > datetime('now', '-24 hours')
-            ORDER BY RANDOM() LIMIT 5
-        `).all();
-
-        if (!recentArticles || recentArticles.length === 0) return;
-
-        const { results: activePoliticians } = await env.DB.prepare(`SELECT slug, name, party FROM politicians`).all();
-        if (!activePoliticians || activePoliticians.length === 0) return;
-
-        for (const article of recentArticles as any[]) {
-            const articleText = article.content_html.replace(/<[^>]*>?/gm, ''); 
-            
-            const mentioned = activePoliticians.filter((p: any) => articleText.includes(p.name) || articleText.includes(p.name.split(' ').pop()));
-            
-            for (const pol of mentioned as any[]) {
-                try {
-                    const extracted = await this.extractClaimWithAI(env, pol, articleText);
-                    if (extracted && extracted.statement) {
-                        // Enter the Double-Verification Matrix
-                        await this.executeDoubleVerificationMatrix(env, pol, extracted.statement, extracted.rating, "Daily Borg Analysis", `https://dailyborg.com/articles/${article.id}`);
-                    }
-                } catch (e: any) {
-                    console.error(`[Truth Engine] Error scanning article for ${pol.name}:`, e.message);
-                }
-            }
-        }
-    },
-
-    async extractClaimWithAI(env: Env, pol: any, textContext: string) {
-        const prompt = `
-Analyze the following news excerpt for any direct claims, promises, or statements made by ${pol.name}.
-If they made a statement that is verifiably false or considered a "lie" based on general public consensus, report it.
-If there are no false statements, reply with exactly: NONE
-
-Article Excerpt: ${textContext.substring(0, 1000)}
-
-Respond strictly in JSON format:
-{
-  "statement": "The exact lie they told",
-  "rating": "pants_on_fire" | "mostly_false",
-  "analysis_text": "Why it is false"
-}
-`;
-        const aiResponse = await env.AI.run('@cf/meta/llama-3-8b-instruct', { messages: [{ role: 'user', content: prompt }] });
-        const textResponse = aiResponse.response || aiResponse;
-
-        if (textResponse && !textResponse.includes('NONE') && textResponse.includes('{')) {
-            const jsonMatch = textResponse.match(/\{[\s\S]*?\}/);
-            if (jsonMatch) return JSON.parse(jsonMatch[0]);
-        }
-        return null;
-    },
-
-    // =========================================================================================
-    // 2. EXTERNAL FACT-CHECKING SYNDICATES (RSS Polling)
-    // =========================================================================================
-    async syncExternalFactCheckers(env: Env) {
-        console.log(`[Truth Engine] Sweeping external fact-checking syndicates...`);
-        
-        // Example: Snopes or PolitiFact public RSS feeds.
-        const feeds = [
-            'https://www.politifact.com/rss/all/' // Free public RSS
-        ];
-
-        const { results: activePoliticians } = await env.DB.prepare(`SELECT slug, name FROM politicians`).all();
-
-        for (const feedUrl of feeds) {
-            try {
-                const res = await fetch(feedUrl, { headers: { 'User-Agent': 'DailyBorg Tracker/1.0' }});
-                if (!res.ok) continue;
-                
-                const xml = await res.text();
-                
-                // Parse items out of XML string (dirty regex pattern map for Edge Worker compatibility)
-                const itemsMatch = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
-                
-                for (const itemXml of itemsMatch.slice(0, 5)) { // Only process latest 5 to save limits
-                    const titleMatch = itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || itemXml.match(/<title>(.*?)<\/title>/);
-                    const descMatch = itemXml.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/) || itemXml.match(/<description>(.*?)<\/description>/);
-                    const linkMatch = itemXml.match(/<link>(.*?)<\/link>/);
-
-                    if (!titleMatch) continue;
-
-                    const title = titleMatch[1];
-                    const desc = descMatch ? descMatch[1] : '';
-                    const link = linkMatch ? linkMatch[1] : '';
-
-                    // Cross-reference with our DB
-                    const matchedPol = (activePoliticians as any[]).find(p => title.includes(p.name) || desc.includes(p.name));
-                    
-                    if (matchedPol) {
-                        // Is it classified as a lie by the syndicate?
-                        if (title.toLowerCase().includes('false') || title.toLowerCase().includes('pants on fire')) {
-                            const rating = title.toLowerCase().includes('pants on fire') ? 'pants_on_fire' : 'mostly_false';
-                            console.log(`[Truth Engine] Syndicate match found for ${matchedPol.name}: ${title}`);
-                            
-                            // Send to Matrix
-                            await this.executeDoubleVerificationMatrix(env, matchedPol, desc.substring(0, 200) + '...', rating, "Syndicate Verdict Audit", link);
-                        }
-                    }
-                }
-
-            } catch (e: any) {
-                console.error(`[Truth Engine] External RSS fetch failed:`, e.message);
-            }
-        }
-    },
-
-    // =========================================================================================
-    // 3. HISTORICAL ARCHIVES (Wikipedia Extraction)
-    // =========================================================================================
-    async syncHistoricalArchives(env: Env) {
-        console.log(`[Truth Engine] Querying historical archives for past presidents...`);
-        
-        // Grab one historical politician (or any politician) at random to prevent rate limit blows
-        const { results: target } = await env.DB.prepare(`SELECT slug, name, party FROM politicians ORDER BY RANDOM() LIMIT 1`).all();
-        if (!target || target.length === 0) return;
-        const pol = (target as any[])[0];
-
-        try {
-            const wikiTitle = encodeURIComponent(pol.name.replace(/ /g, '_'));
-            // Use Wikipedia extracts API to grab sections (specifically looking for controversies or criticisms)
-            const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=false&explaintext=true&titles=${wikiTitle}&format=json`;
-            const wikiRes = await fetch(wikiUrl);
-            const wikiData: any = await wikiRes.json();
-            
-            const pages = wikiData?.query?.pages;
-            if (!pages) return;
-            const pageId = Object.keys(pages)[0];
-            if (pageId === "-1") return;
-
-            const fullText = (pages[pageId].extract || "");
-            
-            // Extract the "Controversies" or "Public Image" segments if they exist, or just sample the text
-            const controversyIndex = fullText.toLowerCase().indexOf('controversi');
-            const sampleText = controversyIndex > -1 ? fullText.substring(controversyIndex, controversyIndex + 1500) : fullText.substring(0, 1500);
-
-            const extracted = await this.extractClaimWithAI(env, pol, sampleText);
-            if (extracted && extracted.statement) {
-                 await this.executeDoubleVerificationMatrix(env, pol, extracted.statement, extracted.rating, "Historical Archives Audit", `https://en.wikipedia.org/wiki/${wikiTitle}`);
-            }
-
-        } catch (e: any) {
-            console.error(`[Truth Engine] History sync failed for ${pol.name}:`, e.message);
-        }
-    },
-
-    // =========================================================================================
-    // 4. THE DOUBLE-VERIFICATION MATRIX
-    // =========================================================================================
-    async executeDoubleVerificationMatrix(env: Env, pol: any, statement: string, proposedRating: string, analysisContext: string, sourceUrl: string) {
-        console.log(`[Truth Matrix] Entering Double-Verification for ${pol.name}: "${statement.substring(0, 30)}..."`);
-        
-        // CHECK 1: Independent Search Presence 
-        // We ping a search engine (like DuckDuckGo HTML) to see if the quote physically exists in general internet indexing.
-        try {
-            const query = encodeURIComponent(`"${statement.substring(0, 50)}"`);
-            const ddgRes = await fetch(`https://html.duckduckgo.com/html/?q=${query}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-            if (ddgRes.ok) {
-                const html = await ddgRes.text();
-                if (html.includes('No results found for')) {
-                    console.log(`[Truth Matrix] Check 1 FAILED. Source uncorroborated by independent index.`);
-                    return; // Fail Check 1
-                }
-            }
-        } catch (e) {
-            console.warn(`[Truth Matrix] Check 1 DDG fetch skipped due to block, relying on AI.`);
-            // If the search blocks us, we fall back to the AI verification purely so the system doesn't permanently stall
-        }
-
-        console.log(`[Truth Matrix] Check 1 PASSED. Statement is indexed.`);
-
-        // CHECK 2: Objective AI Corroboration
-        // We strip the media's bias out and ask the model to cleanly verify the factual accuracy of the statement.
-        const verifyPrompt = `
-You are an objective auditor. A third party claims ${pol.name} said: "${statement}".
-They claim this statement is false.
-Using your historical knowledge base, is this statement objectively, factually false?
-Consider context, hyperbole, and verifiable data.
-Respond with EXACTLY ONE WORD first: YES (if it is a lie) or NO (if it is true or an opinion).
-Then provide a 1-sentence objective explanation.
-        `;
-
-        try {
-            const aiRes = await env.AI.run('@cf/meta/llama-3-8b-instruct', { messages: [{ role: 'user', content: verifyPrompt }] });
-            const aiVerdict = (aiRes.response || aiRes).toUpperCase();
-
-            if (aiVerdict.startsWith('YES')) {
-                console.log(`[Truth Matrix] Check 2 PASSED. Truth Engine confirms falsehood.`);
-                
-                // Explanatory breakdown
-                const aiExplanation = aiVerdict.split('\n')[1] || analysisContext;
-
-                // COMMIT TO DATABASE
-                await env.DB.prepare(`
-                    INSERT INTO fact_checks (id, politician_slug, statement, rating, analysis_text, source_url, date)
-                    VALUES (?, ?, ?, ?, ?, ?, date('now'))
-                `).bind(
-                    crypto.randomUUID(),
-                    pol.slug,
-                    statement,
-                    proposedRating,
-                    aiExplanation,
-                    sourceUrl
-                ).run();
-                console.log(`[Truth Matrix] SAVED.`);
-            } else {
-                 console.log(`[Truth Matrix] Check 2 FAILED. Truth Engine ruled statement is not an objective lie.`);
-            }
-
-        } catch(e: any) {
-            console.error(`[Truth Matrix] Check 2 error:`, e.message);
-        }
-    }
-}
+};

@@ -1,17 +1,23 @@
 {
+    // sentinel-engine: hourly maintenance (coverage check, free image repair, daily pruning).
+    // Account: Pressroom@dailyborg.com. Database: dailyborg-db (the one production D1).
+    // Secret needed: UNSPLASH_ACCESS_KEY (wrangler secret put UNSPLASH_ACCESS_KEY). Optional; image repair is skipped without it.
     "name": "sentinel-engine",
     "main": "src/index.ts",
-    "compatibility_date": "2023-10-25",
-    "triggers": {
-        "crons": [
-            "*/15 * * * *"
-        ]
-    },
+    "compatibility_date": "2026-03-05",
+    "compatibility_flags": ["nodejs_compat"],
     "d1_databases": [
         {
             "binding": "DB",
             "database_name": "dailyborg-db",
             "database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3"
         }
-    ]
+    ],
+    "services": [
+        { "binding": "SCRAPER", "service": "dailyborg-scraper" }
+    ],
+    "triggers": {
+        "crons": ["20 * * * *"]
+    },
+    "observability": { "enabled": true }
 }

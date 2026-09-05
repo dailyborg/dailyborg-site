@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS site_visits (
 
 CREATE INDEX IF NOT EXISTS idx_site_visits_ip_date ON site_visits(ip_hash, created_at);
 
--- Down
-DROP TABLE IF EXISTS site_visits;
+-- (The original file had a '-- Down' section here that dropped the table it had just created.
+--  It was removed on 2026-09-05 because wrangler runs the whole file.)

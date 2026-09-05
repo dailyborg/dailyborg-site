@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { extractClaimsFromText, detectStanceChange } from "@/lib/gemini";
 
 import { getRequestContext } from '@cloudflare/next-on-pages';
+import { requireAdmin } from '@/lib/admin-auth';
 export const runtime = "edge";
 
 interface IngestPayload {
@@ -15,6 +16,8 @@ interface IngestPayload {
 }
 
 export async function POST(req: NextRequest) {
+    const denied = await requireAdmin(req);
+    if (denied) return denied;
     try {
         const body: IngestPayload = await req.json();
 
@@ -34,10 +37,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: "No relevant claims found in the provided text." }, { status: 200 });
         }
 
-        const { env } = getRequestContext();
-        const d1 = env.DB as unknown as D1Database | undefined;
-        const vectorize = env.VECTORIZE as unknown as VectorizeIndex | undefined;
-        const ai = env.AI as unknown as any | undefined;
+        const env = getRequestContext().env as Record<string, unknown>;
+        const d1 = env.DB as D1Database | undefined;
+        const vectorize = env.VECTORIZE as VectorizeIndex | undefined;
+        const ai = env.AI as any | undefined;
 
         if (!d1 || !vectorize) {
             console.error("D1 or Vectorize bindings missing");

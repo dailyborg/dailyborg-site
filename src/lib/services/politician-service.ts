@@ -1,13 +1,15 @@
 // src/lib/services/politician-service.ts
-import { getDbBinding } from '../db';
+// Every read here is index backed (migration 0010) and cached at the edge (src/lib/cache.ts).
+import { getDbBinding } from "../db";
+import { cachedJson } from "../cache";
 
-// Strict Stance Taxonomy Values (for mathematical derivation)
+// Strict stance taxonomy values (for the consistency score)
 export const STANCE_WEIGHTS = {
     "Strongly Support": 2,
     "Support": 1,
     "Neutral": 0,
     "Oppose": -1,
-    "Strongly Oppose": -2
+    "Strongly Oppose": -2,
 } as const;
 
 export type StanceTaxonomy = keyof typeof STANCE_WEIGHTS;
@@ -30,23 +32,76 @@ export interface ShiftEvent {
     shift_type: "Contradicted" | "Evolved";
 }
 
-export class PoliticianService {
+export interface PoliticianCard {
+    id: string;
+    slug: string;
+    name: string;
+    office_held: string;
+    party: string;
+    district_state: string;
+    state: string | null;
+    region_level: string;
+    candidate_status: string;
+    photo_url: string | null;
+    trustworthiness_score: number | null;
+    popularity_score: number;
+    promises_kept: number;
+    promises_broken: number;
+    promises_total: number;
+}
 
-    /**
-     * Sorts raw position statements, detects intensity changes (Evolutions) vs 
-     * directional changes (Contradictions).
-     */
-    static calculateConsistency(positions: PositionEvent[]): {
-        score: number | null;
-        totalEligibleTopics: number;
-        contradictions: number;
-        shiftEvents: ShiftEvent[];
-    } {
+export interface FactCheck {
+    id: string;
+    statement: string;
+    rating: string;
+    analysis_text: string | null;
+    source_url: string | null;
+    date: string;
+}
+
+export const DIRECTORY_COLUMNS =
+    "id, slug, name, office_held, party, district_state, state, region_level, candidate_status, photo_url, trustworthiness_score, popularity_score, promises_kept, promises_broken, promises_total";
+
+export const LEVELS = ["Federal", "State", "Local"] as const;
+export type Level = (typeof LEVELS)[number];
+
+export const US_STATE_CODES = [
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS",
+    "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY",
+    "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC", "PR",
+];
+
+// How much each PolitiFact ruling pulls a trust score down. Mirrors workers/truth-engine.
+const FALSENESS: Record<string, number> = { true: 0, mostly_true: 0.2, half_true: 0.5, mostly_false: 0.8, false: 1, pants_on_fire: 1 };
+export const MIN_RULINGS_FOR_TRUST = 3;
+
+function normalizeCard(p: any): PoliticianCard {
+    return {
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        office_held: p.office_held || "Public Official",
+        party: p.party || "Independent",
+        district_state: p.district_state || "--",
+        state: p.state || null,
+        region_level: p.region_level || "Federal",
+        candidate_status: p.candidate_status || "Active",
+        photo_url: p.photo_url || null,
+        trustworthiness_score: p.trustworthiness_score ?? null,
+        popularity_score: p.popularity_score ?? 0,
+        promises_kept: p.promises_kept ?? 0,
+        promises_broken: p.promises_broken ?? 0,
+        promises_total: p.promises_total ?? 0,
+    };
+}
+
+export class PoliticianService {
+    /** Sorts raw position statements and separates intensity changes (evolutions) from reversals (contradictions). */
+    static calculateConsistency(positions: PositionEvent[]): { score: number | null; totalEligibleTopics: number; contradictions: number; shiftEvents: ShiftEvent[] } {
         const events: ShiftEvent[] = [];
         let contradictions = 0;
         let eligibleTopics = 0;
 
-        // Group explicitly by topic
         const topicMap = new Map<string, PositionEvent[]>();
         for (const p of positions) {
             const list = topicMap.get(p.topic) || [];
@@ -54,82 +109,32 @@ export class PoliticianService {
             topicMap.set(p.topic, list);
         }
 
-        // Evaluate each topic
         for (const [topic, topicPositions] of topicMap.entries()) {
-            // Must have multiple statements to show a shift
             if (topicPositions.length < 2) continue;
-
             eligibleTopics++;
-
-            // Sort chronologically ascending
-            const chronological = topicPositions.sort(
-                (a, b) => new Date(a.statement_date).getTime() - new Date(b.statement_date).getTime()
-            );
-
-            // Compare sequentially
+            const chronological = topicPositions.sort((a, b) => new Date(a.statement_date).getTime() - new Date(b.statement_date).getTime());
             for (let i = 0; i < chronological.length - 1; i++) {
                 const prev = chronological[i];
                 const next = chronological[i + 1];
-
                 const prevWeight = STANCE_WEIGHTS[prev.stance] ?? 0;
                 const nextWeight = STANCE_WEIGHTS[next.stance] ?? 0;
-
-                // If it remained identical, skip checking
                 if (prevWeight === nextWeight) continue;
-
                 const distance = Math.abs(prevWeight - nextWeight);
-
-                // Definition: If it crosses 0, it's a directional shift. Or if distance >= 2.
-                // E.g. Support (1) -> Oppose (-1) = Distance 2. Contradiction.
-                // E.g. Support (1) -> Neutral (0) = Distance 1. Evolution.
                 const isContradiction = distance >= 2 || (Math.sign(prevWeight) !== Math.sign(nextWeight) && prevWeight !== 0 && nextWeight !== 0);
-
-                const shiftType = isContradiction ? "Contradicted" : "Evolved";
                 if (isContradiction) contradictions++;
-
-                events.push({
-                    topic,
-                    previous_stance: prev.stance,
-                    previous_date: prev.statement_date,
-                    new_stance: next.stance,
-                    new_date: next.statement_date,
-                    shift_type: shiftType
-                });
+                events.push({ topic, previous_stance: prev.stance, previous_date: prev.statement_date, new_stance: next.stance, new_date: next.statement_date, shift_type: isContradiction ? "Contradicted" : "Evolved" });
             }
         }
 
-        // Methodological Constraint: 
-        // Need at least 2 topics with multiple points to provide a statistically fair score
         if (eligibleTopics < 2) {
-            return {
-                score: null,
-                totalEligibleTopics: eligibleTopics,
-                contradictions,
-                shiftEvents: events.reverse() // Newest first
-            };
+            return { score: null, totalEligibleTopics: eligibleTopics, contradictions, shiftEvents: events.reverse() };
         }
-
-        // Formula Calculation
-        const penaltyPerContradiction = 15;
-        const totalPenalty = (contradictions * penaltyPerContradiction) / eligibleTopics;
-        const score = Math.max(0, 100 - totalPenalty);
-
-        return {
-            score: Math.round(score),
-            totalEligibleTopics: eligibleTopics,
-            contradictions,
-            shiftEvents: events.reverse()
-        };
+        const totalPenalty = (contradictions * 15) / eligibleTopics;
+        return { score: Math.round(Math.max(0, 100 - totalPenalty)), totalEligibleTopics: eligibleTopics, contradictions, shiftEvents: events.reverse() };
     }
 
-    /**
-     * Calculates the Promise Keeps Rate reliably
-     */
-    static calculatePromises(promises: any[]): {
-        rate: number | null;
-        totalTracked: number;
-        breakdown: { fulfilled: number, broken: number, reversed: number, inProgress: number };
-    } {
+    /** Promise keep rate; "In Progress" promises are excluded from the denominator. */
+    static calculatePromises(promises: any[]): { rate: number | null; totalTracked: number; breakdown: { fulfilled: number; broken: number; reversed: number; inProgress: number } } {
         const breakdown = { fulfilled: 0, broken: 0, reversed: 0, inProgress: 0 };
         for (const p of promises) {
             if (p.status === "Fulfilled") breakdown.fulfilled++;
@@ -137,199 +142,179 @@ export class PoliticianService {
             if (p.status === "Reversed") breakdown.reversed++;
             if (p.status === "In Progress") breakdown.inProgress++;
         }
-
-        // Denominator excludes In Progress
         const denominator = breakdown.fulfilled + breakdown.broken + breakdown.reversed;
+        if (denominator === 0) return { rate: null, totalTracked: promises.length, breakdown };
+        return { rate: Math.round((breakdown.fulfilled / denominator) * 100), totalTracked: promises.length, breakdown };
+    }
 
-        if (denominator === 0) {
-            return { rate: null, totalTracked: promises.length, breakdown };
+    /** Trust score from published fact-check rulings. Null until there are at least MIN_RULINGS_FOR_TRUST rulings. */
+    static calculateTrust(factChecks: FactCheck[]): { score: number | null; rulings: number; falseRulings: number; breakdown: Record<string, number> } {
+        const breakdown: Record<string, number> = {};
+        let sum = 0, counted = 0, falseRulings = 0;
+        for (const fc of factChecks) {
+            const w = FALSENESS[fc.rating];
+            if (w === undefined) continue;
+            counted++;
+            sum += w;
+            breakdown[fc.rating] = (breakdown[fc.rating] || 0) + 1;
+            if (w >= 0.8) falseRulings++;
         }
-
-        const rate = (breakdown.fulfilled / denominator) * 100;
-        return { rate: Math.round(rate), totalTracked: promises.length, breakdown };
+        if (counted < MIN_RULINGS_FOR_TRUST) return { score: null, rulings: counted, falseRulings, breakdown };
+        return { score: Math.round(100 - (sum / counted) * 100), rulings: counted, falseRulings, breakdown };
     }
 
     /**
-     * Primary batched entrypoint for the dynamic UI
+     * Directory slice for the Borg Record page. Federal is the default view (about 540 rows).
+     * State views require a state; without one we show a small national sample by popularity.
      */
-    static async getProfile(slug: string) {
-        if (slug === 'sample-slug') {
-            return {
-                politician: {
-                    id: 'pol_mock', slug: 'sample-slug', name: 'Eleanor Vance', office_held: 'U.S. Senate', party: 'Democrat', district_state: 'OH', time_in_office: '4 Years, 2 Months', country: 'US', region_level: 'Federal',
-                    trustworthiness_score: 72, promises_kept: 1, promises_broken: 1, promises_total: 3, popularity_score: 45
-                },
-                promises: [
-                    { promise_text: 'Codify metadata guidelines into federal law', date_said: '2022-10-14', issue_area: 'Tech Policy', status: 'In Progress' },
-                    { promise_text: 'Lower corporate tax rates for syndicates', date_said: '2023-01-11', issue_area: 'Economy', status: 'Broken' },
-                    { promise_text: 'Increase funding for national algorithmic deployments', date_said: '2023-04-05', issue_area: 'Infrastructure', status: 'Fulfilled' }
-                ],
-                positions: [],
-                trustHistory: [
-                    { scored_at: '2025-06-01', score: 65, promises_kept: 0, promises_broken: 0 },
-                    { scored_at: '2025-09-01', score: 70, promises_kept: 1, promises_broken: 0 },
-                    { scored_at: '2026-01-01', score: 72, promises_kept: 1, promises_broken: 1 },
-                ],
-                recentVotes: [
-                    { id: 'v_1', title: 'H.R. 842 - Protecting the Right to Organize Act', vote_date: '2023-03-09', position: 'Yea', rationale: 'Strong support for union organizing rights.' },
-                    { id: 'v_2', title: 'S. 1 - For the People Act', vote_date: '2023-06-22', position: 'Nay', rationale: 'Concerns about federal overreach in state election laws.' },
-                    { id: 'v_3', title: 'H.R. 3684 - Infrastructure Investment and Jobs Act', vote_date: '2023-11-05', position: 'Yea', rationale: 'Critical funding for state broadband and roads.' },
-                ],
-                factChecks: [
-                    { id: 'fc_mock1', statement: 'I never voted for the tax cuts.', rating: 'pants_on_fire', analysis_text: 'Voting record shows yea on H.R. 1', date: '2024-01-01' }
-                ],
-                methodology: { version_name: 'v1.4 - Baseline', description: 'Standard algorithmic ingestion weightings for positional contradiction detection.', formula: 'Score = MAX(0, 100 - ((Contradictions * 15) / Eligible Topics))' },
-                derivedScores: {
-                    promiseKeepsRate: 33,
-                    promiseBreakdown: { fulfilled: 1, broken: 1, reversed: 0, inProgress: 1 },
-                    consistencyScore: 85,
-                    consistencyBreakdown: {
-                        eligibleTopics: 2,
-                        contradictions: 1,
-                        shiftEvents: [
-                            { topic: 'Digital Privacy Expansion', previous_stance: 'Support', previous_date: '2021-11-04', new_stance: 'Strongly Oppose', new_date: '2024-02-15', shift_type: 'Contradicted' },
-                            { topic: 'Defense Spending Reduction', previous_stance: 'Neutral', previous_date: '2022-05-10', new_stance: 'Support', new_date: '2023-09-22', shift_type: 'Evolved' }
-                        ] as ShiftEvent[]
-                    }
-                }
-            };
-        }
-
-        const db = await getDbBinding();
-
-        // Execute queries sequentially for local SQLite compatibility under OpenNext
-        const politicianRes = await db.prepare(`SELECT * FROM politicians WHERE slug = ? AND country = 'US'`).bind(slug).all();
-        const promisesRes = await db.prepare(`SELECT * FROM promises WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY date_said DESC`).bind(slug).all();
-        const positionsRes = await db.prepare(`SELECT * FROM positions WHERE politician_id = (SELECT id FROM politicians WHERE slug = ? AND country = 'US') ORDER BY topic ASC, statement_date DESC`).bind(slug).all();
-        
-        let activeMethodology = null;
-        try {
-            const methodologyRes = await db.prepare(`SELECT * FROM methodology_versions LIMIT 1`).all();
-            activeMethodology = methodologyRes?.results?.[0] || methodologyRes?.[0]?.results?.[0] || null;
-        } catch (e) {
-            // Ignore if table doesn't exist
-        }
-
-        const politician = politicianRes?.results?.[0] || politicianRes?.[0]?.results?.[0]; // Handle varying return shapes between D1 / BetterSQLite
-        if (!politician) return null;
-
-        const promises = promisesRes?.results || promisesRes?.[0]?.results || [];
-        const positions = (positionsRes?.results as PositionEvent[]) || (positionsRes?.[0]?.results as PositionEvent[]) || [];
-
-        // Fetch new Verification Engine items
-        let rawClaims: any[] = [];
-        try {
-            const rawClaimsRes = await db.prepare(`SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20`).bind(politician.id).all();
-            rawClaims = rawClaimsRes?.results || rawClaimsRes?.[0]?.results || [];
-        } catch (e) {
-            // claims table may not exist or no data
-        }
-
-        let evidenceMap: Record<string, any[]> = {};
-        if (rawClaims.length > 0) {
+    static async listDirectory(level: Level, state: string | null, includeFormer: boolean): Promise<PoliticianCard[]> {
+        const key = `dir:${level}:${state || "all"}:${includeFormer ? 1 : 0}`;
+        return cachedJson(key, 600, async () => {
+            const db = await getDbBinding();
+            const statusClause = includeFormer ? "" : " AND candidate_status <> 'Former'";
+            let sql: string;
+            const binds: any[] = [];
+            if (level === "Federal") {
+                sql = `SELECT ${DIRECTORY_COLUMNS} FROM politicians WHERE region_level = 'Federal'${statusClause} ORDER BY name ASC LIMIT 800`;
+            } else if (state) {
+                sql = `SELECT ${DIRECTORY_COLUMNS} FROM politicians WHERE state = ? AND region_level = ?${statusClause} ORDER BY name ASC LIMIT 600`;
+                binds.push(state, level);
+            } else {
+                sql = `SELECT ${DIRECTORY_COLUMNS} FROM politicians WHERE region_level = ?${statusClause} ORDER BY popularity_score DESC, name ASC LIMIT 60`;
+                binds.push(level);
+            }
             try {
-                const claimIds = rawClaims.map((c: any) => `'${c.id}'`).join(',');
-                const evidenceQuery = `SELECT * FROM evidence WHERE claim_id IN (${claimIds})`;
-                const evRes = await db.prepare(evidenceQuery).all();
-                const allEvidence = evRes?.results || [];
-
-                allEvidence.forEach((ev: any) => {
-                    if (!evidenceMap[ev.claim_id]) evidenceMap[ev.claim_id] = [];
-                    evidenceMap[ev.claim_id].push(ev);
-                });
+                const res = await db.prepare(sql).bind(...binds).all();
+                return (res?.results || []).map(normalizeCard);
             } catch (e) {
-                // evidence table may not have data
+                console.error("[politicians] directory query failed", e);
+                return [];
             }
-        }
+        });
+    }
 
-        let rawStanceChanges: any[] = [];
-        try {
-            const stanceChangesRes = await db.prepare(`
-               SELECT sc.*, 
-                      oc.content as old_content, oc.date as old_date, oc.context as old_context,
-                      nc.content as new_content, nc.date as new_date, nc.context as new_context
-               FROM stance_changes sc
-               JOIN claims oc ON sc.old_claim_id = oc.id
-               JOIN claims nc ON sc.new_claim_id = nc.id
-               WHERE sc.politician_id = ? 
-               ORDER BY sc.created_at DESC LIMIT 10
-            `).bind(politician.id).all();
-            rawStanceChanges = stanceChangesRes?.results || stanceChangesRes?.[0]?.results || [];
-        } catch (e) {
-            // stance_changes table may not have data
-        }
+    /** Prefix search on the indexed name column, used by the directory search box and the subscribe page. */
+    static async search(query: string): Promise<PoliticianCard[]> {
+        const q = query.trim().replace(/[%_]/g, "").slice(0, 60);
+        if (q.length < 2) return [];
+        return cachedJson(`search:${q.toLowerCase()}`, 600, async () => {
+            const db = await getDbBinding();
+            try {
+                // Two indexed prefix probes (first name, then anywhere) so "Sanders" and "Bernie" both work.
+                const res = await db.prepare(
+                    `SELECT ${DIRECTORY_COLUMNS} FROM politicians WHERE name LIKE ? OR name LIKE ? ORDER BY candidate_status ASC, popularity_score DESC, name ASC LIMIT 25`
+                ).bind(`${q}%`, `% ${q}%`).all();
+                return (res?.results || []).map(normalizeCard);
+            } catch (e) {
+                console.error("[politicians] search failed", e);
+                return [];
+            }
+        });
+    }
 
-        const stanceChangesFormatted = rawStanceChanges.map((sc: any) => ({
-            id: sc.id,
-            topic: sc.topic,
-            shift_description: sc.shift_description,
-            dateOfChange: sc.new_date,
-            old_claim: { content: sc.old_content, date: sc.old_date, context: sc.old_context },
-            new_claim: { content: sc.new_content, date: sc.new_date, context: sc.new_context }
-        }));
+    /** Officials worth featuring on the home page and the compare picker: active, federal, most viewed. */
+    static async featured(limit = 24): Promise<PoliticianCard[]> {
+        return cachedJson(`featured:${limit}`, 900, async () => {
+            const db = await getDbBinding();
+            try {
+                const res = await db.prepare(
+                    `SELECT ${DIRECTORY_COLUMNS} FROM politicians WHERE region_level = 'Federal' AND candidate_status = 'Active' ORDER BY popularity_score DESC, name ASC LIMIT ?`
+                ).bind(limit).all();
+                return (res?.results || []).map(normalizeCard);
+            } catch { return []; }
+        });
+    }
 
-        const promiseMetrics = this.calculatePromises(promises);
-        const consistencyMetrics = this.calculateConsistency(positions);
+    /** Latest published rulings across all officials, for the home page sidebar. */
+    static async latestRulings(limit = 4): Promise<Array<FactCheck & { politician_name: string; politician_slug: string }>> {
+        return cachedJson(`rulings:${limit}`, 600, async () => {
+            const db = await getDbBinding();
+            try {
+                const res = await db.prepare(
+                    `SELECT fc.id, fc.statement, fc.rating, fc.analysis_text, fc.source_url, fc.date, p.name AS politician_name, p.slug AS politician_slug
+                     FROM fact_checks fc JOIN politicians p ON p.slug = fc.politician_slug
+                     ORDER BY fc.created_at DESC LIMIT ?`
+                ).bind(limit).all();
+                return (res?.results || []) as any[];
+            } catch { return []; }
+        });
+    }
 
-        // Fetch trustworthiness history for time-series chart
-        let trustHistory: any[] = [];
-        try {
-            const trustHistRes = await db.prepare(
-                `SELECT score, promises_kept, promises_broken, scored_at FROM trustworthiness_history WHERE politician_id = ? ORDER BY scored_at ASC LIMIT 30`
-            ).bind(politician.id).all();
-            trustHistory = trustHistRes?.results || trustHistRes?.[0]?.results || [];
-        } catch (e) {
-            // Table may not exist yet in local dev
-        }
+    /** Full profile for /borg-record/politicians/[slug]. Cached for five minutes per official. */
+    static async getProfile(slug: string) {
+        const safeSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 120);
+        if (!safeSlug) return null;
+        return cachedJson(`profile:${safeSlug}`, 300, async () => {
+            const db = await getDbBinding();
+            const politician = await db.prepare("SELECT * FROM politicians WHERE slug = ?").bind(safeSlug).first();
+            if (!politician) return null;
+            const id = (politician as any).id as string;
 
-        // Fetch recent legislative votes
-        let recentVotes: any[] = [];
-        try {
-            const votesRes = await db.prepare(
-                `SELECT v.id, v.title, v.vote_date, pv.position, pv.rationale 
-                 FROM votes v 
-                 JOIN politician_votes pv ON v.id = pv.vote_id 
-                 WHERE pv.politician_id = ? 
-                 ORDER BY v.vote_date DESC LIMIT 10`
-            ).bind(politician.id).all();
-            recentVotes = votesRes?.results || votesRes?.[0]?.results || [];
-        } catch (e) {
-            // Fallback if table doesn't exist locally
-            recentVotes = [];
-        }
+            const [promisesRes, positionsRes, claimsRes, stanceRes, trustHistRes, votesRes, fcRes, methodologyRes] = await Promise.all([
+                db.prepare("SELECT * FROM promises WHERE politician_id = ? ORDER BY date_said DESC LIMIT 50").bind(id).all(),
+                db.prepare("SELECT * FROM positions WHERE politician_id = ? ORDER BY topic ASC, statement_date DESC LIMIT 100").bind(id).all(),
+                db.prepare("SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20").bind(id).all(),
+                db.prepare(`SELECT sc.*, oc.content AS old_content, oc.date AS old_date, oc.context AS old_context,
+                                   nc.content AS new_content, nc.date AS new_date, nc.context AS new_context
+                            FROM stance_changes sc JOIN claims oc ON sc.old_claim_id = oc.id JOIN claims nc ON sc.new_claim_id = nc.id
+                            WHERE sc.politician_id = ? ORDER BY sc.created_at DESC LIMIT 10`).bind(id).all(),
+                db.prepare("SELECT score, promises_kept, promises_broken, scored_at FROM trustworthiness_history WHERE politician_id = ? ORDER BY scored_at ASC LIMIT 30").bind(id).all(),
+                db.prepare(`SELECT v.id, v.title, v.vote_date, v.url, pv.position, pv.rationale FROM votes v JOIN politician_votes pv ON v.id = pv.vote_id
+                            WHERE pv.politician_id = ? ORDER BY v.vote_date DESC LIMIT 10`).bind(id).all(),
+                db.prepare("SELECT id, statement, rating, analysis_text, source_url, date FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 25").bind(safeSlug).all(),
+                db.prepare("SELECT version_name, description, formula FROM methodology_versions ORDER BY is_active DESC, created_at DESC LIMIT 1").all(),
+            ]);
 
-        // Fetch Fact Checks
-        let factChecks: any[] = [];
-        try {
-            const fcRes = await db.prepare(
-                `SELECT * FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 5`
-            ).bind(slug).all();
-            factChecks = fcRes?.results || fcRes?.[0]?.results || [];
-        } catch (e) {
-            factChecks = [];
-        }
+            const promises = (promisesRes?.results || []) as any[];
+            const positions = (positionsRes?.results || []) as PositionEvent[];
+            const rawClaims = (claimsRes?.results || []) as any[];
+            const factChecks = (fcRes?.results || []) as FactCheck[];
 
-        return {
-            politician,
-            promises,
-            positions,
-            claims: rawClaims,
-            evidenceMap,
-            aiStanceChanges: stanceChangesFormatted,
-            trustHistory,
-            recentVotes,
-            factChecks,
-            methodology: activeMethodology,
-            derivedScores: {
-                promiseKeepsRate: promiseMetrics.rate,
-                promiseBreakdown: promiseMetrics.breakdown,
-                consistencyScore: consistencyMetrics.score,
-                consistencyBreakdown: {
-                    eligibleTopics: consistencyMetrics.totalEligibleTopics,
-                    contradictions: consistencyMetrics.contradictions,
-                    shiftEvents: consistencyMetrics.shiftEvents
+            let evidenceMap: Record<string, any[]> = {};
+            if (rawClaims.length > 0) {
+                const placeholders = rawClaims.map(() => "?").join(",");
+                const evRes = await db.prepare(`SELECT * FROM evidence WHERE claim_id IN (${placeholders})`).bind(...rawClaims.map(c => c.id)).all();
+                for (const ev of (evRes?.results || []) as any[]) {
+                    (evidenceMap[ev.claim_id] ||= []).push(ev);
                 }
             }
-        };
+
+            const aiStanceChanges = ((stanceRes?.results || []) as any[]).map(sc => ({
+                id: sc.id, topic: sc.topic, shift_description: sc.shift_description, dateOfChange: sc.new_date,
+                old_claim: { content: sc.old_content, date: sc.old_date, context: sc.old_context },
+                new_claim: { content: sc.new_content, date: sc.new_date, context: sc.new_context },
+            }));
+
+            const promiseMetrics = this.calculatePromises(promises);
+            const consistencyMetrics = this.calculateConsistency(positions);
+            const trust = this.calculateTrust(factChecks);
+
+            return {
+                politician: politician as any,
+                promises,
+                positions,
+                claims: rawClaims,
+                evidenceMap,
+                aiStanceChanges,
+                trustHistory: (trustHistRes?.results || []) as any[],
+                recentVotes: (votesRes?.results || []) as any[],
+                factChecks,
+                methodology: (methodologyRes?.results?.[0] as any) || null,
+                derivedScores: {
+                    trustScore: (politician as any).trustworthiness_score ?? trust.score,
+                    trustRulings: trust.rulings,
+                    trustFalseRulings: trust.falseRulings,
+                    trustBreakdown: trust.breakdown,
+                    promiseKeepsRate: promiseMetrics.rate,
+                    promiseBreakdown: promiseMetrics.breakdown,
+                    consistencyScore: consistencyMetrics.score,
+                    consistencyBreakdown: {
+                        eligibleTopics: consistencyMetrics.totalEligibleTopics,
+                        contradictions: consistencyMetrics.contradictions,
+                        shiftEvents: consistencyMetrics.shiftEvents,
+                    },
+                },
+            };
+        });
     }
 }

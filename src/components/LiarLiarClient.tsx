@@ -5,6 +5,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { Flame, ShieldAlert, XCircle, Search } from 'lucide-react';
 import Link from 'next/link';
 
+const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC','PR'];
+
 export function LiarLiarClient() {
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
     const [factChecks, setFactChecks] = useState<any[]>([]);
@@ -112,7 +114,7 @@ export function LiarLiarClient() {
                     >
                         <option value="all">Any Office</option>
                         <option value="President">President</option>
-                        <option value="Senate">Senate</option>
+                        <option value="Senator">Senator</option>
                         <option value="Representative">Representative</option>
                     </select>
 
@@ -122,11 +124,7 @@ export function LiarLiarClient() {
                         className="bg-[#23262c] text-[#f6f6fc] border border-[#46484d] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#ff906d] transition-colors appearance-none"
                     >
                         <option value="all">Any State</option>
-                        <option value="NY">NY</option>
-                        <option value="CA">CA</option>
-                        <option value="TX">TX</option>
-                        <option value="FL">FL</option>
-                        {/* More states can be added dynamically */}
+                        {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                 </div>
 
@@ -204,14 +202,14 @@ export function LiarLiarClient() {
                                     </blockquote>
                                     
                                     <div className="bg-[#111318] p-3 rounded-lg border border-[#46484d]/30">
-                                        <p className="text-xs uppercase text-[#81ecff] font-semibold mb-1 tracking-wider">AI Audit Analysis</p>
+                                        <p className="text-xs uppercase text-[#81ecff] font-semibold mb-1 tracking-wider">Ruling summary</p>
                                         <p className="text-sm text-[#aaabb0]">{fc.analysis_text}</p>
                                     </div>
 
                                     {fc.source_url && (
                                         <div className="mt-4">
                                             <a href={fc.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-[#ff906d] hover:text-[#ffc697] transition-colors uppercase font-semibold">
-                                                Verify Source Document &rarr;
+                                                Read the PolitiFact ruling &rarr;
                                             </a>
                                         </div>
                                     )}

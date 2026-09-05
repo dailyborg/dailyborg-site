@@ -124,7 +124,7 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        from: 'The Daily Borg <notifications@thedailyborg.com>',
+                        from: 'The Daily Borg <notifications@dailyborg.com>',
                         to: [sub.email],
                         subject: `Your ${frequencyTarget === 'daily' ? 'Daily' : 'Weekly'} Intelligence Brief`,
                         html: htmlContent
@@ -197,7 +197,7 @@ function buildEmailHtml(articles: any[], alerts: any, isPaid: boolean, frequency
                     <strong style="color: #7f1d1d; font-size: 14px; text-transform: uppercase;">STANCE SHIFT DETECTED: ${stance.politician_name}</strong>
                     <p style="margin: 5px 0 0 0; color: #991b1b; font-weight: bold;">Topic: ${stance.topic}</p>
                     <p style="margin: 5px 0 0 0; color: #b91c1c; font-size: 14px;">${stance.shift_description || 'A notable contradiction or evolution was logged in the public record.'}</p>
-                    <a href="https://thedailyborg.com/borg-record/politicians/${stance.politician_slug}" style="color: #ef4444; font-size: 12px; font-weight: bold; text-decoration: none; margin-top: 8px; display: inline-block;">VIEW THE MATRIX &rarr;</a>
+                    <a href="https://dailyborg.com/borg-record/politicians/${stance.politician_slug}" style="color: #ef4444; font-size: 12px; font-weight: bold; text-decoration: none; margin-top: 8px; display: inline-block;">VIEW THE MATRIX &rarr;</a>
                 </div>
             `;
         });
@@ -207,7 +207,7 @@ function buildEmailHtml(articles: any[], alerts: any, isPaid: boolean, frequency
                 <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #fca5a5;">
                     <strong style="color: #7f1d1d; font-size: 14px; text-transform: uppercase;">BROKEN PROMISE: ${promise.politician_name}</strong>
                     <p style="margin: 5px 0 0 0; color: #b91c1c; font-size: 14px;">"${promise.promise_text}"</p>
-                    <a href="https://thedailyborg.com/borg-record/politicians/${promise.politician_slug}" style="color: #ef4444; font-size: 12px; font-weight: bold; text-decoration: none; margin-top: 8px; display: inline-block;">VIEW THE MATRIX &rarr;</a>
+                    <a href="https://dailyborg.com/borg-record/politicians/${promise.politician_slug}" style="color: #ef4444; font-size: 12px; font-weight: bold; text-decoration: none; margin-top: 8px; display: inline-block;">VIEW THE MATRIX &rarr;</a>
                 </div>
             `;
         });
@@ -230,7 +230,7 @@ function buildEmailHtml(articles: any[], alerts: any, isPaid: boolean, frequency
                       `
                 : `
                         <p style="color: #475569; font-size: 16px; line-height: 1.5;">${art.excerpt}</p>
-                        <a href="https://thedailyborg.com/${urlPath}/${art.slug}" style="display: inline-block; background-color: #1a2b4c; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; font-size: 13px; margin-top: 10px; text-transform: uppercase; letter-spacing: 0.05em;">Access Full Intelligence</a>
+                        <a href="https://dailyborg.com/${urlPath}/${art.slug}" style="display: inline-block; background-color: #1a2b4c; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; font-size: 13px; margin-top: 10px; text-transform: uppercase; letter-spacing: 0.05em;">Access Full Intelligence</a>
                       `
             }
             </div>
@@ -257,12 +257,12 @@ function buildWhatsAppMarkdown(articles: any[], alerts: any, isPaid: boolean): s
             output += `*STANCE SHIFT: ${stance.politician_name}*\n`;
             output += `Topic: ${stance.topic}\n`;
             output += `_${stance.shift_description || 'A notable change was logged.'}_\n`;
-            output += `Matrix: https://thedailyborg.com/borg-record/politicians/${stance.politician_slug}\n\n`;
+            output += `Matrix: https://dailyborg.com/borg-record/politicians/${stance.politician_slug}\n\n`;
         });
         alerts.promises.forEach((promise: any) => {
             output += `*BROKEN PROMISE: ${promise.politician_name}*\n`;
             output += `_${promise.promise_text}_\n`;
-            output += `Matrix: https://thedailyborg.com/borg-record/politicians/${promise.politician_slug}\n\n`;
+            output += `Matrix: https://dailyborg.com/borg-record/politicians/${promise.politician_slug}\n\n`;
         });
         output += `---\n\n`;
     }
@@ -276,7 +276,7 @@ function buildWhatsAppMarkdown(articles: any[], alerts: any, isPaid: boolean): s
             output += `${rawBody}\n\n`;
         } else {
             output += `_${art.excerpt}_\n\n`;
-            output += `Read more: https://thedailyborg.com/${urlPath}/${art.slug}\n\n`;
+            output += `Read more: https://dailyborg.com/${urlPath}/${art.slug}\n\n`;
         }
     });
 
