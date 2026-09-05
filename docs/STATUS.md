@@ -2,7 +2,7 @@
 
 ## Where things stand
 
-The Antigravity build was audited end to end (site, workers, database, config, git) and rebuilt in place in this folder. Code is ready. Nothing has been deployed yet because this machine has no Cloudflare login for the Pressroom account (`npx wrangler whoami` says "Not logged in"). GitHub push works.
+The Antigravity build was audited end to end (site, workers, database, config, git) and rebuilt in place in this folder. Code is ready and pushed to GitHub. Nothing has been deployed yet because this machine has no Cloudflare login for the Pressroom account (`npx wrangler whoami` says "Not logged in").
 
 **The two problems Dr. Cato reported, root causes found:**
 
@@ -59,7 +59,6 @@ Known small items: PolitiFact publishes some rulings in English and Spanish as s
 1. Cloudflare API token for the Pressroom account (save as `_credentials/cloudflare-api-token.txt` on the Drive). Then run `docs/DEPLOY-RUNBOOK.md` top to bottom.
 2. Set `ADMIN_PASSPHRASE` in the Pages project environment variables (admin login will not work until then).
 3. Rotate `UNSPLASH_ACCESS_KEY` and revoke `GOOGLE_CIVIC_API_KEY` (both were committed to GitHub by the old build).
-4. Decide on a dedicated GitHub sign-in for this project: pushes currently authenticate with an SSH key that belongs to the `borgmobile` GitHub account.
 
 ## Next
 

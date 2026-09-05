@@ -18,7 +18,7 @@ Dr. Cato's process rules for every project live on the Drive at `claude\PROJECT-
 | Queue | `ingest-queue` (scraper produces, ingest consumes) |
 | Workers (5 crons total, the Free plan limit) | `dailyborg-discovery` (hourly), `sentinel-engine` (hourly), `dailyborg-scraper` (every 2h), `dailyborg-ingest` (daily 08:00 UTC), `dailyborg-truth` (every 6h) |
 | Domain | dailyborg.com (also dailyborg-site.pages.dev) |
-| GitHub | `dailyborg/dailyborg-site`, remote over SSH. Git identity: dailyborg / pressroom@dailyborg.com |
+| GitHub | `dailyborg/dailyborg-site` over SSH with the project's own key `~/.ssh/github_new_project` (comment pressroom@dailyborg.com). Git identity: dailyborg / pressroom@dailyborg.com |
 | Secrets | ONLY on the tsyborgrunnings Google Drive: `claude\code\dailyborg\_credentials\` (see `SECRETS.md` there). Never in this folder, never in git. |
 
 Before any `wrangler` command that changes something: run `npx wrangler whoami`, confirm the Pressroom account, and confirm the config file names this project.
@@ -26,6 +26,7 @@ Before any `wrangler` command that changes something: run `npx wrangler whoami`,
 ## How this project travels (desktop and laptop)
 
 - Code: this folder is a clone of the GitHub repo. Sit down: `git pull`. Finish: `git push`.
+- After a fresh clone on any machine, point git at the project's own SSH key (a per-repo setting that clones do not carry): `git config core.sshcommand "ssh -i ~/.ssh/github_new_project -F /dev/null"` plus `git config user.name dailyborg` and `git config user.email pressroom@dailyborg.com`. The key pair is mirrored on the Drive at `_credentials/ssh/`; copy it into `~/.ssh/` on the laptop.
 - Memory: `memory/` (gitignored) is mirrored to the Drive at `claude\code\dailyborg\memory\`. After editing memory, copy it back to the Drive. After a fresh clone, restore it from the Drive.
 - Secrets: read from the Drive when needed. `.dev.vars` files for local dev are copied from `_credentials` on the Drive at that moment and are gitignored.
 - Deploys: need `CLOUDFLARE_API_TOKEN` from the Drive (`_credentials/cloudflare-api-token.txt`). As of 2026-09-05 that token does not exist yet; `docs/DEPLOY-RUNBOOK.md` lists exactly what to run once it does.
