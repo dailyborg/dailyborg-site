@@ -1,6 +1,6 @@
 # Cloudflare settings (account Pressroom@dailyborg.com, zone dailyborg.com)
 
-Status 2026-09-05 (evening, Eastern): applied through the dashboard in the Pressroom Chrome profile. Each item says what is set and why; items still open are marked TODO.
+Status 2026-09-05 (morning, Eastern): applied through the dashboard in the Pressroom Chrome profile. Each item says what is set and why; items still open are marked TODO.
 
 ## Resources that must exist (verify, do not recreate)
 

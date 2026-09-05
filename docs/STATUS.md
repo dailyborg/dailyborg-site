@@ -1,8 +1,8 @@
-# Status (updated 2026-09-05 evening, takeover session)
+# Status (updated 2026-09-05 mid-morning Eastern, takeover session)
 
 ## Where things stand
 
-DEPLOYED 2026-09-05 (afternoon, Eastern). Wrangler is logged in on this desktop through OAuth as pressroom@dailyborg.com (no token file; on the laptop run `npx wrangler login` once and click Authorize in the Pressroom Chrome profile).
+DEPLOYED 2026-09-05 (morning, Eastern; the D1 read counter resets at 00:00 UTC, which is 8 PM Eastern the same evening). Wrangler is logged in on this desktop through OAuth as pressroom@dailyborg.com (no token file; on the laptop run `npx wrangler login` once and click Authorize in the Pressroom Chrome profile).
 
 - Migration 0010 applied to production (72 statements; the demo rows, random scores and mock votes are gone; all indexes exist).
 - Five workers live on their new schedules: discovery :05 hourly, sentinel :20 hourly, scraper :50 every 2h, truth :40 every 6h, ingest 08:00 UTC daily. The old image-medic worker was deleted; the old discovery Durable Object class was removed with a delete-class migration. The publisher, social-publisher, delivery, draft-engine and feeder workers had never actually been deployed.
@@ -11,7 +11,7 @@ DEPLOYED 2026-09-05 (afternoon, Eastern). Wrangler is logged in on this desktop 
 
 **Today only:** the account had already used its 5,000,000 daily D1 reads by 13:00 UTC (the old workers were still running until the new ones replaced them). Until 00:00 UTC every database read fails, so the live site shows empty states and the roster priming could not finish (Alabama's 140 legislators did load). The hourly crons will prime everything themselves after the reset: federal roster and President/VP at 00:05 UTC, PolitiFact rulings at 00:40 UTC, then one state per hour. If anything looks empty the next morning, run the `?action=` calls in DEPLOY-RUNBOOK step 5 by hand.
 
-**Cloudflare dashboard, done 2026-09-05 evening (Pressroom Chrome profile, full detail in docs/CLOUDFLARE-SETTINGS.md):**
+**Cloudflare dashboard, done 2026-09-05 morning (Pressroom Chrome profile, full detail in docs/CLOUDFLARE-SETTINGS.md):**
 
 - Cache Rule "Cache public API responses that send Cache-Control" is live; `/api/headlines` now answers `cf-cache-status: HIT` on repeat requests, so the ticker and live strip no longer touch D1 between refreshes.
 - SSL/TLS: Full (strict), Always Use HTTPS on, Minimum TLS 1.2, TLS 1.3 on, Automatic HTTPS Rewrites on. HSTS left off on purpose.
