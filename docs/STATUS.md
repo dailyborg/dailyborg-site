@@ -1,8 +1,26 @@
-# Status (updated 2026-09-05, takeover session)
+# Status (updated 2026-09-05 evening, takeover session)
 
 ## Where things stand
 
-The Antigravity build was audited end to end (site, workers, database, config, git) and rebuilt in place in this folder. Code is ready and pushed to GitHub. Nothing has been deployed yet because this machine has no Cloudflare login for the Pressroom account (`npx wrangler whoami` says "Not logged in").
+DEPLOYED 2026-09-05 (afternoon, Eastern). Wrangler is logged in on this desktop through OAuth as pressroom@dailyborg.com (no token file; on the laptop run `npx wrangler login` once and click Authorize in the Pressroom Chrome profile).
+
+- Migration 0010 applied to production (72 statements; the demo rows, random scores and mock votes are gone; all indexes exist).
+- Five workers live on their new schedules: discovery :05 hourly, sentinel :20 hourly, scraper :50 every 2h, truth :40 every 6h, ingest 08:00 UTC daily. The old image-medic worker was deleted; the old discovery Durable Object class was removed with a delete-class migration. The publisher, social-publisher, delivery, draft-engine and feeder workers had never actually been deployed.
+- The Pages project is Git-connected: every push to main builds and deploys the site automatically. ADMIN_PASSPHRASE is set on the project (value in `_credentials/admin-passphrase.txt` on the Drive) and takes effect from the build of commit 3bf8780 onward.
+- Full database backup taken before the migration: `claude/code/dailyborg/backups/dailyborg-db-before-takeover-2026-09-05.sql` on the Drive (58 MB, contains subscriber emails, keep private).
+
+**Today only:** the account had already used its 5,000,000 daily D1 reads by 13:00 UTC (the old workers were still running until the new ones replaced them). Until 00:00 UTC every database read fails, so the live site shows empty states and the roster priming could not finish (Alabama's 140 legislators did load). The hourly crons will prime everything themselves after the reset: federal roster and President/VP at 00:05 UTC, PolitiFact rulings at 00:40 UTC, then one state per hour. If anything looks empty the next morning, run the `?action=` calls in DEPLOY-RUNBOOK step 5 by hand.
+
+**Cloudflare dashboard, done 2026-09-05 evening (Pressroom Chrome profile, full detail in docs/CLOUDFLARE-SETTINGS.md):**
+
+- Cache Rule "Cache public API responses that send Cache-Control" is live; `/api/headlines` now answers `cf-cache-status: HIT` on repeat requests, so the ticker and live strip no longer touch D1 between refreshes.
+- SSL/TLS: Full (strict), Always Use HTTPS on, Minimum TLS 1.2, TLS 1.3 on, Automatic HTTPS Rewrites on. HSTS left off on purpose.
+- Speed: Smart Tiered Cache already active, Early Hints turned on, Brotli confirmed. 0-RTT left off (toggle would not take; negligible).
+- Security: Bot Fight Mode and Browser Integrity Check on; AI crawlers set to "allowed" so answer engines can cite the site.
+- www.dailyborg.com now exists: proxied CNAME to dailyborg-site.pages.dev, registered as a Pages custom domain (active), and a redirect rule sends https://www.* to https://dailyborg.com/* with a 301 and the query string kept. Before today there was no www record at all.
+- Web Analytics was already active for the zone.
+- Secrets confirmed on dailyborg-ingest: AIML_API_KEY, RESEND_API_KEY, UNSPLASH_ACCESS_KEY (plus three unused TWILIO_* leftovers). sentinel-engine has UNSPLASH_ACCESS_KEY.
+- Not done: a rate limiting rule for the POST API routes. The Free plan allows one such rule and Cloudflare's default "Leaked credential check" already uses it (see questions below).
 
 **The two problems Dr. Cato reported, root causes found:**
 
@@ -54,23 +72,26 @@ The Antigravity build was audited end to end (site, workers, database, config, g
 
 Known small items: PolitiFact publishes some rulings in English and Spanish as separate items, so a bilingual ruling can be stored twice (two source links). Scores will look harsh at first because PolitiFact mostly checks doubtful claims; the profile page explains the formula.
 
-## Blocked on Dr. Cato
+## Questions for Dr. Cato (saved for the end, as asked)
 
-1. Cloudflare API token for the Pressroom account (save as `_credentials/cloudflare-api-token.txt` on the Drive). Then run `docs/DEPLOY-RUNBOOK.md` top to bottom.
-2. Set `ADMIN_PASSPHRASE` in the Pages project environment variables (admin login will not work until then).
-3. Rotate `UNSPLASH_ACCESS_KEY` and revoke `GOOGLE_CIVIC_API_KEY` (both were committed to GitHub by the old build).
+1. Unsplash and Google Civic keys were committed to GitHub by the old build. Rotating them needs the Unsplash and Google Cloud logins for this venture; which Chrome profile holds them? (Until then the exposed Unsplash key keeps working but anyone who read the old repo can burn its quota.)
+2. Rate limit on the POST API routes: the Free plan allows one rate limiting rule and Cloudflare's default "Leaked credential check" occupies it. Replace it with an API rate limit, or leave as is? (Leaving it is fine; every POST route validates and dedupes in code.)
+3. The three unused TWILIO_* secrets on dailyborg-ingest: delete them, or keep for a future WhatsApp edition?
+4. The old folder `Desktop/antigravity-files/dailyborg` is untouched. Archive it to the Drive and delete, or keep?
+5. Design pass (PROJECT-START section 2): send design references and a yes on direction before any visual rework.
+6. Real roll-call votes need a free congress.gov API key (request at api.congress.gov/sign-up with pressroom@dailyborg.com).
 
 ## To-do list (Dr. Cato, 2026-09-05: "put the optional stuff on the to-do list")
 
 - [ ] Rotate `UNSPLASH_ACCESS_KEY` in the Unsplash developer dashboard (old value was committed to GitHub), then `wrangler secret put UNSPLASH_ACCESS_KEY` in workers/ingest and workers/sentinel, and update `_credentials/ingest.dev.vars` on the Drive.
 - [ ] Revoke `GOOGLE_CIVIC_API_KEY` in the Google Cloud console (exposed, and the API it served is shut down).
-- [ ] Confirm `AIML_API_KEY` and `RESEND_API_KEY` exist on dailyborg-ingest (`wrangler secret list`); if not, copy them from the AI/ML API and Resend dashboards.
-- [ ] Resend: verify the dailyborg.com sending domain (SPF and DKIM records) for notifications@ and edition@.
-- [ ] Google Search Console and Bing Webmaster Tools: verify the domain and submit /news-sitemap.xml.
+- [x] Confirm `AIML_API_KEY` and `RESEND_API_KEY` exist on dailyborg-ingest. Done 2026-09-05: both present (so are UNSPLASH_ACCESS_KEY and three unused TWILIO_* secrets).
+- [ ] Resend: the DNS side is already there (resend._domainkey TXT plus send.dailyborg.com MX and SPF were found in the zone). Open the Resend dashboard once to confirm the domain shows Verified. Needs the Resend login.
+- [ ] Google Search Console and Bing Webmaster Tools: verify the domain and submit /news-sitemap.xml. Needs a Google and a Microsoft login for this venture; add a DNS TXT record when they ask for one.
 - [ ] Optional: congress.gov API key for real roll-call votes (Phase 2).
 
 ## Next
 
-- Deploy (runbook), then watch the D1 usage graph for 48 hours. Expected: under 500,000 rows read per day.
+- Deployed. Watch the D1 usage graph (Workers & Pages > D1 > dailyborg-db > Metrics) for 48 hours after the 00:00 UTC reset. Expected: under 500,000 rows read per day. Then open /borg-record, one profile, /liar-liar, /borg-record/compare and /admin (passphrase on the Drive) and confirm the roster and rulings filled in.
 - Design pass per PROJECT-START section 2 (needs Dr. Cato's design references and a yes on direction).
 - Phase 2 candidates: real vote records (congress.gov API needs a free key), local officials source, comparison page rebuilt on real data, blog/SEO pipeline from PROJECT-START section 6.

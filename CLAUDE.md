@@ -29,7 +29,7 @@ Before any `wrangler` command that changes something: run `npx wrangler whoami`,
 - After a fresh clone on any machine, point git at the project's own SSH key (a per-repo setting that clones do not carry): `git config core.sshcommand "ssh -i ~/.ssh/github_new_project -F /dev/null"` plus `git config user.name dailyborg` and `git config user.email pressroom@dailyborg.com`. The key pair is mirrored on the Drive at `_credentials/ssh/`; copy it into `~/.ssh/` on the laptop.
 - Memory: `memory/` (gitignored) is mirrored to the Drive at `claude\code\dailyborg\memory\`. After editing memory, copy it back to the Drive. After a fresh clone, restore it from the Drive.
 - Secrets: read from the Drive when needed. `.dev.vars` files for local dev are copied from `_credentials` on the Drive at that moment and are gitignored.
-- Deploys: need `CLOUDFLARE_API_TOKEN` from the Drive (`_credentials/cloudflare-api-token.txt`). As of 2026-09-05 that token does not exist yet; `docs/DEPLOY-RUNBOOK.md` lists exactly what to run once it does.
+- Deploys: Wrangler uses an OAuth login per machine (`npx wrangler login`, approve in the Chrome profile signed in as pressroom@dailyborg.com). No token file is stored. The site itself deploys automatically from GitHub pushes to main; workers deploy with `npx wrangler deploy` inside their folders. `docs/DEPLOY-RUNBOOK.md` has the full order.
 
 ## Folder map
 
