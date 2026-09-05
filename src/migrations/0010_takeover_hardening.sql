@@ -180,8 +180,9 @@ CREATE TABLE IF NOT EXISTS subscriber_politicians (
     PRIMARY KEY (subscriber_id, politician_id)
 );
 
-INSERT OR IGNORE INTO methodology_versions (id, version_name, description, formula, is_active)
-VALUES ('mv_2026_09', 'v2.0 Public Record', 'Trust from published PolitiFact rulings; consistency from dated position statements. No model-generated scores.', 'Trust = 100 - 100 * mean(falseness); Consistency = MAX(0, 100 - (Contradictions * 15) / Eligible Topics)', 1);
+-- (production's methodology_versions table has no is_active column, so it is not referenced here)
+INSERT OR IGNORE INTO methodology_versions (id, version_name, description, formula)
+VALUES ('mv_2026_09', 'v2.0 Public Record', 'Trust from published PolitiFact rulings; consistency from dated position statements. No model-generated scores.', 'Trust = 100 - 100 * mean(falseness); Consistency = MAX(0, 100 - (Contradictions * 15) / Eligible Topics)');
 
 -- ---------------------------------------------------------------
 -- 1. Identity and provenance columns

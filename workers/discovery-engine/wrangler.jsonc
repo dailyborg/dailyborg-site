@@ -12,6 +12,11 @@
 			"database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3"
 		}
 	],
+	// The old worker defined a Durable Object class PoliticianAgent (mock vote storage). v2 deletes it.
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["PoliticianAgent"] },
+		{ "tag": "v2", "deleted_classes": ["PoliticianAgent"] }
+	],
 	"triggers": {
 		"crons": ["5 * * * *"]
 	},

@@ -262,7 +262,7 @@ export class PoliticianService {
                 db.prepare(`SELECT v.id, v.title, v.vote_date, v.url, pv.position, pv.rationale FROM votes v JOIN politician_votes pv ON v.id = pv.vote_id
                             WHERE pv.politician_id = ? ORDER BY v.vote_date DESC LIMIT 10`).bind(id).all(),
                 db.prepare("SELECT id, statement, rating, analysis_text, source_url, date FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 25").bind(safeSlug).all(),
-                db.prepare("SELECT version_name, description, formula FROM methodology_versions ORDER BY is_active DESC, created_at DESC LIMIT 1").all(),
+                db.prepare("SELECT version_name, description, formula FROM methodology_versions ORDER BY created_at DESC LIMIT 1").all(),
             ]);
 
             const promises = (promisesRes?.results || []) as any[];
