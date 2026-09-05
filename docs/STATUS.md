@@ -60,6 +60,15 @@ Known small items: PolitiFact publishes some rulings in English and Spanish as s
 2. Set `ADMIN_PASSPHRASE` in the Pages project environment variables (admin login will not work until then).
 3. Rotate `UNSPLASH_ACCESS_KEY` and revoke `GOOGLE_CIVIC_API_KEY` (both were committed to GitHub by the old build).
 
+## To-do list (Dr. Cato, 2026-09-05: "put the optional stuff on the to-do list")
+
+- [ ] Rotate `UNSPLASH_ACCESS_KEY` in the Unsplash developer dashboard (old value was committed to GitHub), then `wrangler secret put UNSPLASH_ACCESS_KEY` in workers/ingest and workers/sentinel, and update `_credentials/ingest.dev.vars` on the Drive.
+- [ ] Revoke `GOOGLE_CIVIC_API_KEY` in the Google Cloud console (exposed, and the API it served is shut down).
+- [ ] Confirm `AIML_API_KEY` and `RESEND_API_KEY` exist on dailyborg-ingest (`wrangler secret list`); if not, copy them from the AI/ML API and Resend dashboards.
+- [ ] Resend: verify the dailyborg.com sending domain (SPF and DKIM records) for notifications@ and edition@.
+- [ ] Google Search Console and Bing Webmaster Tools: verify the domain and submit /news-sitemap.xml.
+- [ ] Optional: congress.gov API key for real roll-call votes (Phase 2).
+
 ## Next
 
 - Deploy (runbook), then watch the D1 usage graph for 48 hours. Expected: under 500,000 rows read per day.
