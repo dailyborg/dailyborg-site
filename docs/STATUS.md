@@ -101,6 +101,7 @@ Known small items: PolitiFact publishes some rulings in English and Spanish as s
 
 ## Next
 
+- First check after the 00:00 UTC reset (8 PM Eastern, 2026-09-05): open a senator profile such as /borg-record/politicians/tammy-baldwin. During the read block every profile page answered 500 on all four deployments of the day (checked 15:30 UTC on the preview URLs of commits 8612f7c, e0abeef, 5e8a3ff, 573e426), so the 500 is the D1 block, not the votes change; a slug that does not exist answers 404 because that lookup reads zero rows. If profiles still fail after the reset, that is a real bug to chase first.
 - Deployed. Watch the D1 usage graph (Workers & Pages > D1 > dailyborg-db > Metrics) for 48 hours after the 00:00 UTC reset. Expected: under 500,000 rows read per day. Then open /borg-record, one profile, /liar-liar, /borg-record/compare and /admin (passphrase on the Drive) and confirm the roster and rulings filled in.
 - Design pass per PROJECT-START section 2 (needs Dr. Cato's design references and a yes on direction).
 - Phase 2 candidates: local officials source, comparison page on vote agreement (data now exists), blog/SEO pipeline from PROJECT-START section 6. Real vote records shipped 2026-09-05.
