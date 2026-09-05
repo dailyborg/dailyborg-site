@@ -26,7 +26,7 @@
 
 **Kept the Next.js 14 + next-on-pages stack.** Cloudflare now recommends OpenNext for new Next.js projects, but a framework migration is not what was asked, and the existing stack builds. Revisit when the design pass happens.
 
-**Windows note for local builds.** `npx @cloudflare/next-on-pages` fails on Windows with "spawn npx ENOENT" because it launches `npx vercel build` without a shell. Locally run `npx vercel build --yes` first and then `npx @cloudflare/next-on-pages --skip-build`. Cloudflare's own build runs on Linux and does not have this problem.
+**Windows note for local builds.** `npx @cloudflare/next-on-pages` cannot complete on this Windows desktop: it spawns `npx vercel build` without a shell ("spawn npx ENOENT"), and running `vercel build` by hand then fails creating symlinks ("EPERM ... symlink"), which Windows only allows in Developer Mode or under WSL. `next build` itself passes, and every dynamic route declares the edge runtime, which is what the adapter enforces. Cloudflare's own Pages build runs on Linux and is unaffected. To rehearse the adapter locally, enable Developer Mode in Windows Settings (Privacy and security > For developers) or use WSL.
 
 **Fact-check based scores lean negative.** PolitiFact checks claims that are in doubt, so an official with three rulings will usually score low. That is the honest reading of the data we hold, and the page says exactly how the number is made. Widening the evidence base (more fact-check publishers, vote records) is the way to soften it, not adjusting the formula.
 

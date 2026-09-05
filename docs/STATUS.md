@@ -45,6 +45,7 @@ The Antigravity build was audited end to end (site, workers, database, config, g
 | `npm run check` (site TypeScript) | pass |
 | `npm run check:workers` (five workers) | pass |
 | `next build` | pass (all dynamic routes on the edge runtime) |
+| `@cloudflare/next-on-pages` locally | not runnable on this Windows machine (Vercel CLI symlink permission); Cloudflare's Linux build runs it. See DECISIONS. |
 | `wrangler deploy --dry-run` for every worker | bundles cleanly (ingest 310 KB gzipped, others under 12 KB) |
 | Migration rehearsal on a local D1 (schema, legacy migrations, 0010, 0011) | pass: 38 indexes, new columns, 25 authors |
 | Discovery worker against real data (local D1) | 539 legislators, President and VP, Alabama and Alaska legislatures, popularity, photos; Hank Johnson GA-4 Democrat and Mike Johnson LA-4 Republican both correct; no duplicate names |

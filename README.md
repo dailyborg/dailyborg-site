@@ -43,7 +43,7 @@ npx wrangler whoami                                   # must show Pressroom@dail
 npx wrangler d1 execute dailyborg-db --remote --file=src/migrations/0010_takeover_hardening.sql
 for w in discovery-engine sentinel scraper truth-engine ingest; do (cd workers/$w && npx wrangler deploy); done
 npm run deploy                                        # builds with next-on-pages and deploys the Pages project
-# On Windows, if next-on-pages fails with 'spawn npx ENOENT': npx vercel build --yes && npx @cloudflare/next-on-pages --skip-build
+# On Windows the next-on-pages step needs Developer Mode (symlinks) or WSL; see docs/DECISIONS.md. Cloudflare's own build is unaffected.
 ```
 
 ## Where things live
