@@ -148,6 +148,12 @@ export class PoliticianService {
     }
 
     /** Trust score from published fact-check rulings. Null until there are at least MIN_RULINGS_FOR_TRUST rulings. */
+    /** Roll-call attendance from stored, source-verified votes. Null until the official has at least 10 recorded votes. */
+    static calculateAttendance(row: { total?: number; missed?: number; yeas?: number; nays?: number } | null): { total: number; missed: number; yeas: number; nays: number; attendanceRate: number | null } {
+        const total = Number(row?.total || 0), missed = Number(row?.missed || 0), yeas = Number(row?.yeas || 0), nays = Number(row?.nays || 0);
+        return { total, missed, yeas, nays, attendanceRate: total >= 10 ? Math.round(((total - missed) / total) * 1000) / 10 : null };
+    }
+
     static calculateTrust(factChecks: FactCheck[]): { score: number | null; rulings: number; falseRulings: number; breakdown: Record<string, number> } {
         const breakdown: Record<string, number> = {};
         let sum = 0, counted = 0, falseRulings = 0;
@@ -250,7 +256,7 @@ export class PoliticianService {
             if (!politician) return null;
             const id = (politician as any).id as string;
 
-            const [promisesRes, positionsRes, claimsRes, stanceRes, trustHistRes, votesRes, fcRes, methodologyRes] = await Promise.all([
+            const [promisesRes, positionsRes, claimsRes, stanceRes, trustHistRes, votesRes, voteStatsRes, fcRes, methodologyRes] = await Promise.all([
                 db.prepare("SELECT * FROM promises WHERE politician_id = ? ORDER BY date_said DESC LIMIT 50").bind(id).all(),
                 db.prepare("SELECT * FROM positions WHERE politician_id = ? ORDER BY topic ASC, statement_date DESC LIMIT 100").bind(id).all(),
                 db.prepare("SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20").bind(id).all(),
@@ -259,8 +265,12 @@ export class PoliticianService {
                             FROM stance_changes sc JOIN claims oc ON sc.old_claim_id = oc.id JOIN claims nc ON sc.new_claim_id = nc.id
                             WHERE sc.politician_id = ? ORDER BY sc.created_at DESC LIMIT 10`).bind(id).all(),
                 db.prepare("SELECT score, promises_kept, promises_broken, scored_at FROM trustworthiness_history WHERE politician_id = ? ORDER BY scored_at ASC LIMIT 30").bind(id).all(),
-                db.prepare(`SELECT v.id, v.title, v.vote_date, v.url, pv.position, pv.rationale FROM votes v JOIN politician_votes pv ON v.id = pv.vote_id
-                            WHERE pv.politician_id = ? ORDER BY v.vote_date DESC LIMIT 10`).bind(id).all(),
+                // v.* keeps this query valid before and after migration 0012 (which adds chamber, question, tallies, verification).
+                db.prepare(`SELECT v.*, pv.position, pv.rationale FROM politician_votes pv JOIN votes v ON v.id = pv.vote_id
+                            WHERE pv.politician_id = ? ORDER BY v.vote_date DESC LIMIT 12`).bind(id).all(),
+                db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN position = 'Not Voting' THEN 1 ELSE 0 END) AS missed,
+                                   SUM(CASE WHEN position = 'Yea' THEN 1 ELSE 0 END) AS yeas, SUM(CASE WHEN position = 'Nay' THEN 1 ELSE 0 END) AS nays
+                            FROM politician_votes WHERE politician_id = ?`).bind(id).all(),
                 db.prepare("SELECT id, statement, rating, analysis_text, source_url, date FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 25").bind(safeSlug).all(),
                 db.prepare("SELECT version_name, description, formula FROM methodology_versions ORDER BY created_at DESC LIMIT 1").all(),
             ]);
@@ -298,6 +308,7 @@ export class PoliticianService {
                 aiStanceChanges,
                 trustHistory: (trustHistRes?.results || []) as any[],
                 recentVotes: (votesRes?.results || []) as any[],
+                voteStats: this.calculateAttendance((voteStatsRes?.results?.[0] as any) || null),
                 factChecks,
                 methodology: (methodologyRes?.results?.[0] as any) || null,
                 derivedScores: {

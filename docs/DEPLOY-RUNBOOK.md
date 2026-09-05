@@ -73,3 +73,10 @@ Dashboard > Workers & Pages > D1 > dailyborg-db > Metrics. Rows read per day sho
 ## 8. Dashboard settings to apply (see docs/CLOUDFLARE-SETTINGS.md)
 
 Cache Rule for HTML, Bot Fight Mode, Browser Integrity Check, Email Routing check for pressroom@ and notifications@dailyborg.com (Resend sender domain must be verified for `notifications@dailyborg.com` and `edition@dailyborg.com`).
+
+## Added 2026-09-05: roll-call votes
+
+1. Apply migration 0012 once: `npx wrangler d1 execute dailyborg-db --remote --file src/migrations/0012_roll_call_votes.sql` (from the project root, Pressroom account). If D1 answers "exceeded daily row read limit", wait for 00:00 UTC and run it again.
+2. Deploy the discovery worker: `cd workers/discovery-engine && npx wrangler deploy`. The secret `CONGRESS_API_KEY` is already set; on a new account run `wrangler secret put CONGRESS_API_KEY` with the value from `_credentials/congress_api.txt`.
+3. Prime: `curl "https://dailyborg-discovery.pressroom.workers.dev/?action=federal"` (stores senators' LIS ids), then `?action=votes` a few times or just let the hourly cron catch up (3 House and 3 Senate roll calls per hour).
+4. Check: `curl "https://dailyborg-discovery.pressroom.workers.dev/"` shows `votes.house_cursor` and `votes.senate_cursor`; a profile such as /borg-record/politicians/<senator-slug> shows the Roll-Call Votes section.

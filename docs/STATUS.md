@@ -22,6 +22,14 @@ DEPLOYED 2026-09-05 (morning, Eastern; the D1 read counter resets at 00:00 UTC, 
 - Secrets confirmed on dailyborg-ingest: AIML_API_KEY, RESEND_API_KEY, UNSPLASH_ACCESS_KEY (plus three unused TWILIO_* leftovers). sentinel-engine has UNSPLASH_ACCESS_KEY.
 - Not done: a rate limiting rule for the POST API routes. The Free plan allows one such rule and Cloudflare's default "Leaked credential check" already uses it (see questions below).
 
+**Roll-call votes shipped 2026-09-05 (Phase 2 item, built the same day Dr. Cato obtained the congress.gov key):**
+
+- New `workers/discovery-engine/src/votes.ts`, run as the last step of the hourly discovery cron and by hand with `?action=votes`. House votes: House Clerk XML is the document of record, congress.gov API v3 is the second source; a vote is published only when the result and every member position agree in both. Senate votes: senate.gov per-vote XML checked against the Senate vote menu tallies and result (congress.gov has no Senate vote endpoint). Disagreements are stored as `mismatch` with no member rows and logged. At most 3 new roll calls per chamber per hour, so the 2026 backlog fills in over a few days.
+- Migration `0012_roll_call_votes.sql`: vote metadata and verification columns, `politicians.lis_id` (senators appear under their LIS id in Senate XML; the federal roster sync now stores it).
+- Profile page: "Roll-Call Votes" section with tallies, result, position, verification label and both source links, plus an attendance line once 10 votes exist. Query uses `v.*` so it works before and after the migration.
+- Local rehearsal 2026-09-05 against the live feeds: House 2026 rolls 1-6 verified (427 members each matched, 4 members not in the current roster), Senate 119-2 votes 1-6 checked (98 senators matched).
+- `CONGRESS_API_KEY` is set on dailyborg-discovery (value in `_credentials/congress_api.txt` on the Drive).
+
 **The two problems Dr. Cato reported, root causes found:**
 
 1. D1 "rows_read limit exceeded" (5,000,000 per day on the free plan).
@@ -94,4 +102,4 @@ Known small items: PolitiFact publishes some rulings in English and Spanish as s
 
 - Deployed. Watch the D1 usage graph (Workers & Pages > D1 > dailyborg-db > Metrics) for 48 hours after the 00:00 UTC reset. Expected: under 500,000 rows read per day. Then open /borg-record, one profile, /liar-liar, /borg-record/compare and /admin (passphrase on the Drive) and confirm the roster and rulings filled in.
 - Design pass per PROJECT-START section 2 (needs Dr. Cato's design references and a yes on direction).
-- Phase 2 candidates: real vote records (congress.gov API needs a free key), local officials source, comparison page rebuilt on real data, blog/SEO pipeline from PROJECT-START section 6.
+- Phase 2 candidates: local officials source, comparison page on vote agreement (data now exists), blog/SEO pipeline from PROJECT-START section 6. Real vote records shipped 2026-09-05.

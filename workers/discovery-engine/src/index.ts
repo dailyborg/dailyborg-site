@@ -10,17 +10,17 @@
  *   State legislators ...... OpenStates bulk CSV (data.openstates.org/people/current/<st>.csv), keyed by OpenStates id
  *   Reader requests ........ verified against Wikidata "position held" (P39) structured claims
  *   Popularity ............. Wikipedia pageviews API (external, zero D1 reads) plus last-7-day headline mentions
+ *   Roll-call votes ........ House Clerk XML cross-checked with congress.gov; Senate XML cross-checked with the Senate vote menu (votes.ts)
  *
  * Runs on ONE hourly cron. Every hourly run does a small, bounded amount of work so the
  * worker stays inside the Cloudflare free tier (CPU per invocation, D1 rows read per day).
  *
- * Manual triggers (GET/POST):  ?action=federal | executive | state | requests | popularity | photos | all
+ * Manual triggers (GET/POST):  ?action=federal | executive | state | requests | popularity | photos | votes | all
  */
 
-export interface Env {
-    DB: D1Database;
-    RESEND_API_KEY?: string;
-}
+import { Env, USER_AGENT, kvGet, kvSet, isDue, runBatches, log } from "./shared";
+import { syncVotes, votesStatus } from "./votes";
+export type { Env } from "./shared";
 
 // ------------------------------------------------------------------
 // Constants
@@ -29,7 +29,6 @@ const CONGRESS_CSV = "https://unitedstates.github.io/congress-legislators/legisl
 const EXECUTIVE_JSON = "https://unitedstates.github.io/congress-legislators/executive.json";
 const CONGRESS_PHOTO = (bioguide: string) => `https://unitedstates.github.io/images/congress/450x550/${bioguide}.jpg`;
 const OPENSTATES_CSV = (st: string) => `https://data.openstates.org/people/current/${st}.csv`;
-const USER_AGENT = "DailyBorg/2.0 (https://dailyborg.com; pressroom@dailyborg.com)";
 
 const US_STATES = [
     "al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl", "ga", "hi", "id", "il", "in", "ia", "ks",
@@ -107,28 +106,6 @@ export function parseCsv(text: string): Record<string, string>[] {
     });
 }
 
-async function kvGet(env: Env, key: string): Promise<string | null> {
-    const v = await env.DB.prepare("SELECT value FROM kv_store WHERE key = ?").bind(key).first<{ value: string }>();
-    return v?.value ?? null;
-}
-
-async function kvSet(env: Env, key: string, value: string): Promise<void> {
-    await env.DB.prepare("INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP").bind(key, value).run();
-}
-
-async function isDue(env: Env, key: string, hours: number): Promise<boolean> {
-    const last = await kvGet(env, key);
-    if (!last) return true;
-    const t = Date.parse(last);
-    return isNaN(t) || (Date.now() - t) > hours * 3600 * 1000;
-}
-
-async function runBatches(env: Env, stmts: D1PreparedStatement[], size = 40): Promise<void> {
-    for (let i = 0; i < stmts.length; i += size) {
-        await env.DB.batch(stmts.slice(i, i + size));
-    }
-}
-
 function newId(): string {
     return `pol_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
 }
@@ -139,13 +116,6 @@ function cascadeDelete(env: Env, id: string): D1PreparedStatement[] {
     const stmts = tables.map(t => env.DB.prepare(`DELETE FROM ${t} WHERE politician_id = ?`).bind(id));
     stmts.push(env.DB.prepare("DELETE FROM politicians WHERE id = ?").bind(id));
     return stmts;
-}
-
-async function log(env: Env, status: string, message: string): Promise<void> {
-    try {
-        await env.DB.prepare("INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, 'discovery', ?, ?)")
-            .bind(crypto.randomUUID(), status, message.slice(0, 500)).run();
-    } catch { /* logging must never break the run */ }
 }
 
 interface ExistingRow { id: string; slug: string; name: string; bioguide_id: string | null; openstates_id: string | null; source: string | null; office_held: string | null; }
@@ -203,25 +173,25 @@ async function syncFederalRoster(env: Env): Promise<string> {
             claimedRowIds.add(match.id);
             stmts.push(env.DB.prepare(`
                 UPDATE politicians SET
-                    bioguide_id = ?, name = ?, office_held = ?, party = ?, district_state = ?, state = ?,
+                    bioguide_id = ?, lis_id = ?, name = ?, office_held = ?, party = ?, district_state = ?, state = ?,
                     region_level = 'Federal', candidate_status = 'Active', source = 'congress-legislators',
                     wikipedia_title = COALESCE(?, wikipedia_title), photo_url = ?, photo_source = 'unitedstates',
                     time_in_office = 'Serving', country = 'US', latest_sync_timestamp = CURRENT_TIMESTAMP
-                WHERE id = ?`).bind(bioguide, displayName, office, party, districtLabel, r.state, wikipediaTitle, photo, match.id));
+                WHERE id = ?`).bind(bioguide, r.lis_id || null, displayName, office, party, districtLabel, r.state, wikipediaTitle, photo, match.id));
             updated++;
         } else {
             // Slug must be unique. If the plain slug is taken by a non-federal row, suffix the state.
             let slug = slugify(displayName);
             stmts.push(env.DB.prepare(`
                 INSERT INTO politicians (id, slug, name, office_held, party, district_state, state, country, region_level,
-                    candidate_status, time_in_office, photo_url, photo_source, bioguide_id, wikipedia_title, source, latest_sync_timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'US', 'Federal', 'Active', 'Serving', ?, 'unitedstates', ?, ?, 'congress-legislators', CURRENT_TIMESTAMP)
+                    candidate_status, time_in_office, photo_url, photo_source, bioguide_id, lis_id, wikipedia_title, source, latest_sync_timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'US', 'Federal', 'Active', 'Serving', ?, 'unitedstates', ?, ?, ?, 'congress-legislators', CURRENT_TIMESTAMP)
                 ON CONFLICT(slug) DO UPDATE SET
-                    bioguide_id = excluded.bioguide_id, office_held = excluded.office_held, party = excluded.party,
+                    bioguide_id = excluded.bioguide_id, lis_id = excluded.lis_id, office_held = excluded.office_held, party = excluded.party,
                     district_state = excluded.district_state, state = excluded.state, region_level = 'Federal',
                     candidate_status = 'Active', source = 'congress-legislators', photo_url = excluded.photo_url,
                     photo_source = 'unitedstates', wikipedia_title = excluded.wikipedia_title, latest_sync_timestamp = CURRENT_TIMESTAMP`)
-                .bind(newId(), slug, displayName, office, party, districtLabel, r.state, photo, bioguide, wikipediaTitle));
+                .bind(newId(), slug, displayName, office, party, districtLabel, r.state, photo, bioguide, r.lis_id || null, wikipediaTitle));
             inserted++;
         }
     }
@@ -690,6 +660,7 @@ async function hourly(env: Env): Promise<string[]> {
     await step("state", () => syncNextState(env));
     await step("popularity", () => scorePopularity(env));
     await step("photos", () => refreshPhotos(env));
+    await step("votes", () => syncVotes(env));
     return out;
 }
 
@@ -709,12 +680,13 @@ export default {
             else if (action === "requests") lines = [await processRequests(env)];
             else if (action === "popularity") lines = [await scorePopularity(env)];
             else if (action === "photos") lines = [await refreshPhotos(env)];
+            else if (action === "votes") lines = [await syncVotes(env)];
             else if (action === "all") lines = await hourly(env);
             else {
                 const fed = await kvGet(env, "federal_roster_synced_at");
                 const exec = await kvGet(env, "executive_synced_at");
                 const cursor = await kvGet(env, "state_cursor");
-                return Response.json({ worker: "dailyborg-discovery", federal_roster_synced_at: fed, executive_synced_at: exec, state_cursor: cursor, actions: ["federal", "executive", "state", "requests", "popularity", "photos", "all"] });
+                return Response.json({ worker: "dailyborg-discovery", federal_roster_synced_at: fed, executive_synced_at: exec, state_cursor: cursor, votes: await votesStatus(env), actions: ["federal", "executive", "state", "requests", "popularity", "photos", "votes", "all"] });
             }
             return Response.json({ ok: true, action, result: lines });
         } catch (e: any) {

@@ -49,7 +49,7 @@ logo/                     brand source images
 ## Working rules that apply here
 
 - Cloudflare free tier only. The D1 free tier is 5,000,000 rows read per day; this project exceeded it in September 2026 because of unindexed scans in the old workers. Every new query must use an index (see migration 0010) and every hot read on the site goes through `src/lib/cache.ts`.
-- No language model decides facts about real people. Politician identities come from congress-legislators, executive.json, OpenStates and Wikidata. Fact-check rulings come only from PolitiFact with a source link. Trust scores are computed from stored rulings, never invented.
+- No language model decides facts about real people. Politician identities come from congress-legislators, executive.json, OpenStates and Wikidata. Fact-check rulings come only from PolitiFact with a source link. Roll-call votes come from the House Clerk and senate.gov and are published only after a second source agrees (congress.gov for the House, the Senate vote menu for the Senate). Trust scores are computed from stored rulings, never invented.
 - No em dashes anywhere (chat, code, copy, commits). All assets self-hosted where possible; Unsplash and Wikipedia images are the two approved exceptions.
 - Never delete data, change DNS, send email, or spend money without Dr. Cato's yes in chat.
 - Commit after each completed task with a clear message, then push. Update `docs/STATUS.md` at the end of every session.

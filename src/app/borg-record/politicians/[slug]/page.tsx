@@ -40,7 +40,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
     const profile = await PoliticianService.getProfile(slug);
     if (!profile) return notFound();
 
-    const { politician, promises, methodology, derivedScores, claims, evidenceMap, aiStanceChanges, trustHistory, recentVotes, factChecks } = profile;
+    const { politician, promises, methodology, derivedScores, claims, evidenceMap, aiStanceChanges, trustHistory, recentVotes, voteStats, factChecks } = profile;
     const trustScore = derivedScores.trustScore as number | null;
     const falseRulings = derivedScores.trustFalseRulings as number;
 
@@ -197,24 +197,43 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                     </section>
 
                     <section>
-                        <h2 className="font-serif text-3xl md:text-4xl font-black uppercase tracking-tighter border-b-[3px] border-foreground pb-3 mb-8">Recent Legislative Votes</h2>
+                        <h2 className="font-serif text-3xl md:text-4xl font-black uppercase tracking-tighter border-b-[3px] border-foreground pb-3 mb-8">Roll-Call Votes</h2>
+                        {voteStats && voteStats.total > 0 && (
+                            <p className="text-sm text-muted-foreground font-serif mb-6">
+                                {voteStats.total} recorded roll-call vote{voteStats.total === 1 ? "" : "s"} on file: {voteStats.yeas} Yea, {voteStats.nays} Nay, {voteStats.missed} not voting.
+                                {voteStats.attendanceRate !== null && <> Attendance {voteStats.attendanceRate}%.</>}
+                            </p>
+                        )}
                         {(!recentVotes || recentVotes.length === 0) ? (
                             <div className="p-8 border border-border bg-muted/10 text-center">
-                                <p className="text-muted-foreground font-serif italic text-lg opacity-80">No roll-call votes are recorded for this official yet.</p>
+                                <p className="text-muted-foreground font-serif italic text-lg opacity-80">No roll-call votes are recorded for this official yet. Federal votes are collected hourly from the House Clerk and the Senate and cross-checked before they appear here.</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {recentVotes.map((vote: any, i: number) => (
-                                    <div key={i} className="p-5 border border-border bg-background flex flex-col md:flex-row gap-4 justify-between items-start md:items-center hover:border-foreground/30 transition-colors">
-                                        <div className="space-y-1 flex-1">
-                                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">{vote.vote_date}</p>
-                                            <h3 className="font-serif font-bold text-xl">{vote.title}</h3>
-                                            {vote.rationale && <p className="text-sm text-foreground/80 font-serif italic pt-1">{vote.rationale}</p>}
-                                            {vote.url && <a href={vote.url} target="_blank" rel="noopener noreferrer" className="text-[10px] uppercase tracking-widest text-accent hover:underline">Source</a>}
+                                {recentVotes.map((vote: any, i: number) => {
+                                    const badge = vote.verification === "verified" ? "Verified: House Clerk and congress.gov agree"
+                                        : vote.verification === "senate_xml" ? "Checked: senate.gov document and vote menu agree"
+                                        : vote.verification ? `Verification: ${vote.verification}` : null;
+                                    return (
+                                        <div key={vote.id || i} className="p-5 border border-border bg-background flex flex-col md:flex-row gap-4 justify-between items-start md:items-center hover:border-foreground/30 transition-colors">
+                                            <div className="space-y-1 flex-1 min-w-0">
+                                                <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">
+                                                    {vote.vote_date}{vote.chamber ? ` · ${vote.chamber}` : ""}{vote.roll_number ? ` · Roll ${vote.roll_number}` : ""}{vote.bill_label ? ` · ${vote.bill_label}` : ""}
+                                                </p>
+                                                <h3 className="font-serif font-bold text-xl">{vote.question ? `${vote.question}: ` : ""}{vote.title}</h3>
+                                                <p className="text-sm text-foreground/80 font-serif">
+                                                    {vote.result}{typeof vote.yeas === "number" ? ` (${vote.yeas} to ${vote.nays}${vote.not_voting ? `, ${vote.not_voting} not voting` : ""})` : ""}
+                                                </p>
+                                                {badge && <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{badge}</p>}
+                                                <p className="text-[10px] uppercase tracking-widest space-x-3">
+                                                    {vote.url && <a href={vote.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{vote.chamber === "Senate" ? "senate.gov" : "House Clerk"}</a>}
+                                                    {vote.source_url_secondary && <a href={vote.source_url_secondary} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{vote.chamber === "Senate" ? "Vote menu" : "congress.gov"}</a>}
+                                                </p>
+                                            </div>
+                                            <div className={`px-4 py-2 border font-black uppercase tracking-[0.15em] text-sm shrink-0 ${vote.position === "Yea" ? "bg-success/10 text-success border-success/30" : vote.position === "Nay" ? "bg-destructive/10 text-destructive border-destructive/30" : "bg-muted text-muted-foreground border-border"}`}>{vote.position}</div>
                                         </div>
-                                        <div className={`px-4 py-2 border font-black uppercase tracking-[0.15em] text-sm shrink-0 ${vote.position === "Yea" ? "bg-success/10 text-success border-success/30" : vote.position === "Nay" ? "bg-destructive/10 text-destructive border-destructive/30" : "bg-muted text-muted-foreground border-border"}`}>{vote.position}</div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </section>
@@ -291,6 +310,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                         </div>
                         <div className="space-y-4 text-sm text-foreground/80 leading-relaxed max-w-3xl">
                             <p><strong className="text-foreground">Identity and office:</strong> {SOURCE_LABEL[politician.source as string] || "Public roster data"}. Rosters are re-checked every day (federal) or every week (state).</p>
+                            <p><strong className="text-foreground">Roll-call votes:</strong> House votes are read from the House Clerk&apos;s XML and published only when congress.gov reports the same result and the same position for every member. Senate votes are read from senate.gov and published only when the vote document and the Senate&apos;s vote menu agree on the tally and result. Disagreements are logged, never shown. No model touches vote data.</p>
                             <p><strong className="text-foreground">Trust score:</strong> 100 minus the average falseness of the official&apos;s PolitiFact rulings (True 0, Mostly True 0.2, Half True 0.5, Mostly False 0.8, False and Pants on Fire 1). Shown once at least {MIN_RULINGS_FOR_TRUST} rulings exist. Every ruling links to PolitiFact.</p>
                             <p><strong className="text-foreground">Consistency score:</strong> {methodology?.formula || "100 minus 15 points per contradiction, divided by the number of topics with multiple statements"}. Needs at least two topics with multiple dated statements.</p>
                             <p><strong className="text-foreground">Public attention:</strong> Wikipedia views over the last 30 days plus recent Daily Borg headline mentions, scaled 0 to 100.</p>
