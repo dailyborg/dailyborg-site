@@ -29,6 +29,7 @@ DEPLOYED 2026-09-05 (morning, Eastern; the D1 read counter resets at 00:00 UTC, 
 - Profile page: "Roll-Call Votes" section with tallies, result, position, verification label and both source links, plus an attendance line once 10 votes exist. Query uses `v.*` so it works before and after the migration.
 - Local rehearsal 2026-09-05 against the live feeds: House 2026 rolls 1-6 verified (427 members each matched, 4 members not in the current roster), Senate 119-2 votes 1-6 checked (98 senators matched).
 - `CONGRESS_API_KEY` is set on dailyborg-discovery (value in `_credentials/congress_api.txt` on the Drive).
+- Production state at 15:10 UTC 2026-09-05: migration 0012 applied (rows_written 24), worker version with the votes step deployed, secret set, site build triggered by commit 5e8a3ff. Worker-side D1 reads were still refused (daily read limit from the old workers), so priming waits for the 00:00 UTC reset: the 00:05 UTC cron runs the federal roster (stores LIS ids) and the first votes pass by itself. Then 3 House and 3 Senate roll calls land every hour until the 2026 backlog (about 250 House, 230 Senate) is in, roughly four days.
 
 **The two problems Dr. Cato reported, root causes found:**
 
