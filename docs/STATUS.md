@@ -2,7 +2,7 @@
 
 ## Resume here (next session, any machine)
 
-Everything is committed and pushed (last commit 93c9fd6); nothing is half done. Fresh machine: follow "How this project travels" in the root CLAUDE.md (clone, SSH key and memory from the Drive, `npm install`, `npx wrangler login`), then do these in order:
+Everything is committed and pushed (`git log -1` shows the last commit); nothing is half done. Fresh machine: follow "How this project travels" in the root CLAUDE.md (clone, SSH key and memory from the Drive, `npm install`, `npx wrangler login`), then do these in order:
 
 1. **Confirm the D1 reset worked** (any time after 00:00 UTC 2026-09-06, which is 8 PM Eastern on 2026-09-05): open https://dailyborg.com/borg-record/politicians/tammy-baldwin. Expect a full profile. A 500 after the reset is a real bug: run `npm run check`, then read `src/lib/services/politician-service.ts` getProfile and the profile page.
 2. **Confirm the crons primed the data:** `curl "https://dailyborg-discovery.pressroom.workers.dev/"` should show `federal_roster_synced_at` after the reset and `votes.house_cursor` / `votes.senate_cursor` above 0. If not, run `?action=federal` then `?action=votes` by hand (runbook, last section).
