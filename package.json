@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "check": "tsc --noEmit",
-    "check:workers": "for w in discovery-engine sentinel scraper truth-engine ingest; do (cd workers/$w && npx tsc --noEmit -p tsconfig.json) || exit 1; done",
+    "check:workers": "tsc --noEmit -p workers/discovery-engine && tsc --noEmit -p workers/sentinel && tsc --noEmit -p workers/scraper && tsc --noEmit -p workers/truth-engine && tsc --noEmit -p workers/ingest",
     "pages:build": "npx @cloudflare/next-on-pages",
     "pages:preview": "wrangler pages dev .vercel/output/static --compatibility-flags=nodejs_compat",
     "deploy": "npm run pages:build && wrangler pages deploy .vercel/output/static --project-name dailyborg-site",
