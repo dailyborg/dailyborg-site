@@ -1,118 +1,65 @@
-# Status (updated 2026-09-05, 15:45 UTC, takeover session)
+# Status (updated 2026-09-08, 04:30 UTC, limits and stalled newsroom session)
 
 ## Resume here (next session, any machine)
 
-Everything is committed and pushed (`git log -1` shows the last commit); nothing is half done. Fresh machine: follow "How this project travels" in the root CLAUDE.md (clone, SSH key and memory from the Drive, `npm install`, `npx wrangler login`), then do these in order:
+Everything is committed and pushed. Read this block, then `memory/MEMORY.md`.
 
-1. **Confirm the D1 reset worked** (any time after 00:00 UTC 2026-09-06, which is 8 PM Eastern on 2026-09-05): open https://dailyborg.com/borg-record/politicians/tammy-baldwin. Expect a full profile. A 500 after the reset is a real bug: run `npm run check`, then read `src/lib/services/politician-service.ts` getProfile and the profile page.
-2. **Confirm the crons primed the data:** `curl "https://dailyborg-discovery.pressroom.workers.dev/"` should show `federal_roster_synced_at` after the reset and `votes.house_cursor` / `votes.senate_cursor` above 0. If not, run `?action=federal` then `?action=votes` by hand (runbook, last section).
-3. **Check the roster and rulings pages:** /borg-record (federal list with photos), one representative profile, /borg-record/liar-liar, /borg-record/compare. Then /admin with the passphrase from `_credentials/admin-passphrase.txt` on the Drive.
-4. **Watch the D1 usage graph** (Cloudflare dashboard > Workers & Pages > D1 > dailyborg-db > Metrics) for two days. Target: under 500,000 rows read per day. The old build read 8,000,000.
-5. Then continue with the to-do list and the questions at the bottom of this file. Dr. Cato's answers so far: Google Civic key deleted (done), congress.gov key obtained and installed (votes shipped), old Antigravity folder may be deleted (archived on the Drive), roll-call votes must always use two sources (done).
-
+1. **First check, every session:** the newest approved article must be under 24 hours old.
+   `npx wrangler d1 execute dailyborg-db --remote --command "SELECT MAX(publish_date) FROM articles WHERE approval_status='approved'"`
+   If it is older than a day, read the last 20 rows of `ingestion_logs` (same command with `SELECT created_at, status, substr(message,1,120) FROM ingestion_logs ORDER BY created_at DESC LIMIT 20`) and fix the cause before anything else.
+2. **Were the five workers deployed?** `npx wrangler deployments list` inside each worker folder must show a deployment dated 2026-09-08 or later. If it still shows 2026-09-05, the deploy commands in `docs/DEPLOY-RUNBOOK.md` ("Added 2026-09-08") have not been run yet. Claude cannot run them in auto mode (the permission classifier blocks `wrangler deploy`); Dr. Cato clicks Run on them, or grants the permission rule once.
+3. **Budgets:** `wrangler d1 insights dailyborg-db --timePeriod 1d --sort-by writes` should show politician_votes around 1,300 rows an hour at most; the Cloudflare KV graph should be flat at zero; the D1 rows written graph should stay under 60,000 a day.
+4. **Pages:** `npx wrangler pages deployment list --project-name dailyborg-site` shows the site build for the latest commit; open https://dailyborg.com/, /politics, one article, /borg-record, /borg-record/politicians/bernie-sanders, /admin.
+5. Then the questions and the to-do list at the bottom of this file.
 
 ## Where things stand
 
-DEPLOYED 2026-09-05 (morning, Eastern; the D1 read counter resets at 00:00 UTC, which is 8 PM Eastern the same evening). Wrangler is logged in on this desktop through OAuth as pressroom@dailyborg.com (no token file; on the laptop run `npx wrangler login` once and click Authorize in the Pressroom Chrome profile).
+**Three Cloudflare Free plan limits had been hit, and the newsroom had been silent since 2026-06-12.** All causes are found and fixed in code; migrations 0013 and 0014 are applied to production; the site is deployed from Git; the worker deploys are the one step waiting on Dr. Cato (see Resume here, item 2).
 
-- Migration 0010 applied to production (72 statements; the demo rows, random scores and mock votes are gone; all indexes exist).
-- Five workers live on their new schedules: discovery :05 hourly, sentinel :20 hourly, scraper :50 every 2h, truth :40 every 6h, ingest 08:00 UTC daily. The old image-medic worker was deleted; the old discovery Durable Object class was removed with a delete-class migration. The publisher, social-publisher, delivery, draft-engine and feeder workers had never actually been deployed.
-- The Pages project is Git-connected: every push to main builds and deploys the site automatically. ADMIN_PASSPHRASE is set on the project (value in `_credentials/admin-passphrase.txt` on the Drive) and takes effect from the build of commit 3bf8780 onward.
-- Full database backup taken before the migration: `claude/code/dailyborg/backups/dailyborg-db-before-takeover-2026-09-05.sql` on the Drive (58 MB, contains subscriber emails, keep private).
+| Problem | Cause | Fix (all in the repo) |
+|---|---|---|
+| KV daily limit alerts (50 percent, 75 percent) on 2026-09-06 | The scraper wrote one KV key per queued link (about 370 a day in the old build). After the takeover, sentinel saw no article newer than 24 hours and told the scraper to run in deep mode every hour, and deep mode ignored the dedup cache: 908 writes on 2026-09-06 against a limit of 1,000. | KV is removed from the project. Dedup lives in the D1 table `seen_links`, the scraper never queues more than the daily article cap, sentinel triggers it at most every six hours and never in deep mode. |
+| D1 "row write limit exceeded" from about 17:00 UTC on 2026-09-06 and 2026-09-07 (every write on the site failed until midnight) | The roll-call vote backfill stored three House roll calls an hour, about 435 member rows each, and every member row also wrote four index rows: about 84,000 of the 100,000 daily rows. State legislator inserts (10 rows each) and the daily federal roster rewrite added the rest. | Migration 0013 dropped four write-only indexes (a House vote now costs about 1,300 rows, not 2,200). Votes store one roll call per chamber per hour inside a 30,000 rows a day counter. Roster syncs only write rows whose values changed. |
+| No new articles since 2026-06-12 | `system_settings.ai_provider` is `cloudflare`, and the ingest worker called `@cf/meta/llama-3.1-8b-instruct`, which Cloudflare deprecated on 2026-05-30. Every story failed with error 5028, two log rows each. The paid path (AI/ML API) is also dead: "You've run out of funds". | Model ladder on Workers AI: gpt-oss-120b first, Llama 4 Scout second, both tested live on 2026-09-08 with the real article prompt (about 100 to 120 free neurons per article, 10,000 a day free). A failing model drops to the next; if all fail, one log row says so and sentinel raises a daily "Newsroom stalled" error the admin panel shows as Degraded. |
+| Senate votes never started ("Senate vote menu 403" every hour) | senate.gov blocks some Cloudflare egress paths and not others (a manual run succeeded). | Browser headers, one retry, then a quiet skip with one warning a day. Senate votes 1 to 3 are already stored from the manual run. |
 
-**Today only:** the account had already used its 5,000,000 daily D1 reads by 13:00 UTC (the old workers were still running until the new ones replaced them). Until 00:00 UTC every database read fails, so the live site shows empty states and the roster priming could not finish (Alabama's 140 legislators did load). The hourly crons will prime everything themselves after the reset: federal roster and President/VP at 00:05 UTC, PolitiFact rulings at 00:40 UTC, then one state per hour. If anything looks empty the next morning, run the `?action=` calls in DEPLOY-RUNBOOK step 5 by hand.
+**Site audit (two read-only auditors, then four fix workers).** Blockers closed: anyone could mark themselves a paying subscriber; the visit tracker was an open D1 write endpoint; comment identity was a raw subscriber id that anyone knowing an email could reuse; the D1 layer reported success when the binding was missing; the subscribe route was an open email relay; dark mode was broken both ways; every page shared one generic title; `prose` styling was never installed; the admin editorial queue could white-screen on one bad row; desk pages filed real stories under invented section labels; the masthead date was a day off. Full lists with file and line are in the two auditor reports summarized in `docs/DECISIONS.md` (2026-09-08).
 
-**Cloudflare dashboard, done 2026-09-05 morning (Pressroom Chrome profile, full detail in docs/CLOUDFLARE-SETTINGS.md):**
+**Verified locally on 2026-09-08:** `npm run check:workers` clean, `npx tsc --noEmit` clean, `npm run build` (Next.js) clean with every route, local D1 rehearsals of the scraper budget, the discovery unchanged-row skip, the votes budget counter, the UNION search plan (both new indexes used, "sand" finds Bernie Sanders), the comment token round trip, and the model replies for the two Workers AI models.
 
-- Cache Rule "Cache public API responses that send Cache-Control" is live; `/api/headlines` now answers `cf-cache-status: HIT` on repeat requests, so the ticker and live strip no longer touch D1 between refreshes.
-- SSL/TLS: Full (strict), Always Use HTTPS on, Minimum TLS 1.2, TLS 1.3 on, Automatic HTTPS Rewrites on. HSTS left off on purpose.
-- Speed: Smart Tiered Cache already active, Early Hints turned on, Brotli confirmed. 0-RTT left off (toggle would not take; negligible).
-- Security: Bot Fight Mode and Browser Integrity Check on; AI crawlers set to "allowed" so answer engines can cite the site.
-- www.dailyborg.com now exists: proxied CNAME to dailyborg-site.pages.dev, registered as a Pages custom domain (active), and a redirect rule sends https://www.* to https://dailyborg.com/* with a 301 and the query string kept. Before today there was no www record at all.
-- Web Analytics was already active for the zone.
-- Secrets confirmed on dailyborg-ingest: AIML_API_KEY, RESEND_API_KEY, UNSPLASH_ACCESS_KEY (plus three unused TWILIO_* leftovers). sentinel-engine has UNSPLASH_ACCESS_KEY.
-- Not done: a rate limiting rule for the POST API routes. The Free plan allows one such rule and Cloudflare's default "Leaked credential check" already uses it (see questions below).
+**Production changes made this session:** migration 0013 (seen_links, four indexes dropped) and 0014 (unsubscribe_token, two search indexes) applied; two commits pushed (7a192f8 workers and docs, then the site commit); nothing deleted.
 
-**Roll-call votes shipped 2026-09-05 (Phase 2 item, built the same day Dr. Cato obtained the congress.gov key):**
+## What needs Dr. Cato (batched)
 
-- New `workers/discovery-engine/src/votes.ts`, run as the last step of the hourly discovery cron and by hand with `?action=votes`. House votes: House Clerk XML is the document of record, congress.gov API v3 is the second source; a vote is published only when the result and every member position agree in both. Senate votes: senate.gov per-vote XML checked against the Senate vote menu tallies and result (congress.gov has no Senate vote endpoint). Disagreements are stored as `mismatch` with no member rows and logged. At most 3 new roll calls per chamber per hour, so the 2026 backlog fills in over a few days.
-- Migration `0012_roll_call_votes.sql`: vote metadata and verification columns, `politicians.lis_id` (senators appear under their LIS id in Senate XML; the federal roster sync now stores it).
-- Profile page: "Roll-Call Votes" section with tallies, result, position, verification label and both source links, plus an attendance line once 10 votes exist. Query uses `v.*` so it works before and after the migration.
-- Local rehearsal 2026-09-05 against the live feeds: House 2026 rolls 1-6 verified (427 members each matched, 4 members not in the current roster), Senate 119-2 votes 1-6 checked (98 senators matched).
-- `CONGRESS_API_KEY` is set on dailyborg-discovery (value in `_credentials/congress_api.txt` on the Drive).
-- Production state at 15:10 UTC 2026-09-05: migration 0012 applied (rows_written 24), worker version with the votes step deployed, secret set, site build triggered by commit 5e8a3ff. Worker-side D1 reads were still refused (daily read limit from the old workers), so priming waits for the 00:00 UTC reset: the 00:05 UTC cron runs the federal roster (stores LIS ids) and the first votes pass by itself. Then 3 House and 3 Senate roll calls land every hour until the 2026 backlog (about 250 House, 230 Senate) is in, roughly four days.
+1. **Deploy the five workers** (the runbook has one Run button per worker). Until then the old code keeps running: articles keep failing, and the D1 write limit will be hit again around 12:00 UTC each day.
+2. **Yes or no to deleting the KV namespace** `dailyborg-scraper-SENTINEL_CACHE` in the dashboard (Workers and Pages, KV). Nothing uses it now; leaving it costs nothing.
+3. **Yes or no to deleting one duplicate ruling row:** Byron Donalds, 2026-08-27, rating false, the Spanish edition (`sarampion-brote-inmigracion-vacuna-florida`). It double counts in his score until removed. New Spanish editions are now skipped automatically.
+4. **AI/ML API:** the account has no funds. It is not needed (Workers AI is free and working). Top it up only if the Gemini writing quality is wanted back; then set `ai_provider` to `aiml` in the admin panel.
+5. **robots.txt AI policy:** Cloudflare's managed robots.txt currently blocks GPTBot, ClaudeBot, CCBot, Google-Extended and others, which contradicts the "answer engines may cite the site" decision of 2026-09-05. It is a dashboard toggle (AI Crawl Control). Decide, and it is a two-minute change in the Pressroom profile.
+6. **Zone cache rule Browser TTL:** the rule added on 2026-09-05 sets a four-hour browser TTL on API responses, so a returning reader can see four-hour-old headlines. Set Browser TTL to "respect origin" in the same rule (dashboard).
+7. **Permission for future deploys:** either keep clicking Run, or tell Claude to add a settings rule allowing `npx wrangler deploy` in this project.
 
-**The two problems Dr. Cato reported, root causes found:**
+## To-do list (carried forward)
 
-1. D1 "rows_read limit exceeded" (5,000,000 per day on the free plan).
-   - `sentinel-engine` ran every 15 minutes and did about eleven full scans of the `articles` table each time (per-desk COUNTs, two `LIKE '2026-04-0x%'` scans, `MAX(publish_date)`, plus a `COUNT(DISTINCT office_held)` over all politicians). That alone was on the order of a thousand full scans per day.
-   - `dailyborg-discovery` scored "popularity" hourly with `SELECT COUNT(*) FROM articles WHERE title LIKE ? OR content_html LIKE ?` for 20 politicians, twenty more full scans per hour, always the same 20 people.
-   - The Borg Record page loaded up to 1,000 politician rows on every single visit with no cache; the home page, desk pages and headline ticker scanned `articles` with no index on `(approval_status, publish_date)`; the ticker was polled every 60 seconds by every open browser tab.
-   - Nothing was ever pruned: `ingestion_logs` got a row every 15 minutes, `trustworthiness_history` got about 900 rows a day, `site_visits` grew forever.
-2. Wrong politicians / wrong details.
-   - The Congress intake matched people by LAST NAME (`WHERE name LIKE '%Johnson'`) and then overwrote that row's office, party and district with the new person's. Hank Johnson became a Louisiana Republican, and so on.
-   - Every article's AI-extracted "mentioned names" were pushed into the request queue, where an 8B model "verified" them and invented offices. Two workers (discovery and draft-engine) raced on that same queue; draft-engine retried forever on duplicate slugs, burning AIML calls every 15 minutes.
-   - Trust scores were `Math.random() * 20 + 70`. Votes were mock rows with random Yea/Nay. The truth engine attributed AI-generated "lies" to whoever shared a last name with a word in an article.
-   - The compare page, the profile sidebar and the home page sidebar showed hard-coded fake people, fake votes and fake percentages.
+- [ ] Rotate `UNSPLASH_ACCESS_KEY` (old value is in GitHub history). Steps in the 2026-09-05 notes below.
+- [ ] Revoke `GOOGLE_CIVIC_API_KEY` in Google Cloud (harmless while exposed; the API is dead).
+- [ ] Resend: confirm the sending domain shows Verified in the Resend dashboard, and whether `RESEND_API_KEY` is set on the Pages project (welcome emails and unsubscribe links need it on the site side).
+- [ ] Google Search Console property for dailyborg.com, then submit /sitemap.xml and /news-sitemap.xml.
+- [ ] A shared secret between the site, sentinel and the scraper so the scraper's public URL cannot be poked by strangers (bounded today by its daily budget and ten-minute lock).
+- [ ] Senate votes through a second source (GovTrack API, keyed by govtrack id) if senate.gov keeps answering 403 to the cron for a week; needs Dr. Cato's yes under the two-source rule.
+- [ ] Design pass per PROJECT-START section 2 (needs Dr. Cato's references and a yes on direction).
+- [ ] WhatsApp delivery is hidden everywhere until it exists (Twilio secrets are on the ingest worker but nothing sends).
+- [ ] Referrer tracking (site_visits has no referrer column) if wanted.
 
-## What was done this session
+## History: 2026-09-05 takeover session (kept for reference)
 
-- New home: `C:\Users\mrcat\OneDrive\Desktop\new claude\dailyborg` (git clone of the repo, history kept). Secrets moved to the Drive (`claude\code\dailyborg\_credentials`). 10,000+ committed `node_modules` files, three committed `.dev.vars` secret files, and 50+ junk log files removed from the repo.
-- Migration `src/migrations/0010_takeover_hardening.sql`: identity columns (bioguide_id, openstates_id, wikidata_id, state, source), all missing indexes, the `fact_checks` and `system_settings` tables, deletion of fabricated data (random scores, mock votes, demo politicians, auto-generated requests).
-- `workers/discovery-engine`: rewritten. Federal roster from congress-legislators keyed by bioguide id, President/VP from executive.json, state legislators from OpenStates one state per hour, reader requests verified through Wikidata "position held" claims, popularity from Wikipedia pageviews. No AI. One hourly cron.
-- `workers/sentinel`: rewritten. One hourly maintenance pass with index-backed queries, free Unsplash image repair (5 per run), daily pruning, scraper triggered through a service binding at most once per hour.
-- `workers/truth-engine`: rewritten. Reads PolitiFact's feed, matches speakers by PolitiFact's own slug, stores every ruling with its source link, derives trust scores from stored rulings (minimum 3).
-- `workers/ingest`: no longer feeds AI-spotted names into the roster; hard daily article cap (default 40, admin adjustable as `daily_article_cap`); one cron (Friday run is the weekly edition); domain fixed to dailyborg.com.
-- `workers/scraper`: every 2 hours, 3 per feed, manual triggers rate limited to one per 10 minutes.
-- Retired and removed from the repo: draft-engine, publisher, social-publisher, delivery (duplicate of ingest's delivery, wrong database id), image-medic (folded into sentinel), feeder-worker and src/workers/feeder.ts (inserted claims without a politician, so every insert failed and retried forever). They must also be deleted in the Cloudflare dashboard (see DEPLOY-RUNBOOK).
-- Site: see the sections below and `docs/DECISIONS.md`.
+DEPLOYED 2026-09-05 (morning, Eastern). Wrangler is logged in on this desktop through OAuth as pressroom@dailyborg.com (no token file; on the laptop run `npx wrangler login` once and click Authorize in the Pressroom Chrome profile).
 
-## Site changes (src/)
-
-- `src/lib/cache.ts`: edge cache helper (Cache API, no binding needed). Home, desk pages, Borg Record directory, politician profiles, headlines, politicians list and fact-check leaderboard all read through it.
-- Borg Record directory is now filtered on the server by level and state (`?level=State&state=NY`) instead of shipping 1,000 rows to the browser.
-- All fake data removed: profile sidebar votes, compare page defaults/percentages/charts/"connected races", home page sidebar, admin "+12%", directory fallback person, sample-slug mock profile.
-- Security: admin routes require `ADMIN_PASSPHRASE` (no hard-coded default), constant-time compare; `/api/admin/seed` and `/api/admin/debug` and `/debug` deleted; SQL injection in admin comments fixed; `/api/ingest` now requires admin auth; Stripe returns "not configured" instead of faking success.
-- Polling reduced: live strip every 5 minutes, ticker every 10 minutes, admin strip every 2 minutes.
-- Google Civic "address PING" removed from the UI (Google shut that API down in April 2025); replaced with a plain note.
-
-## Verified locally this session (2026-09-05)
-
-| Check | Result |
-|---|---|
-| `npm run check` (site TypeScript) | pass |
-| `npm run check:workers` (five workers) | pass |
-| `next build` | pass (all dynamic routes on the edge runtime) |
-| `@cloudflare/next-on-pages` locally | not runnable on this Windows machine (Vercel CLI symlink permission); Cloudflare's Linux build runs it. See DECISIONS. |
-| `wrangler deploy --dry-run` for every worker | bundles cleanly (ingest 310 KB gzipped, others under 12 KB) |
-| Migration rehearsal on a local D1 (schema, legacy migrations, 0010, 0011) | pass: 38 indexes, new columns, 25 authors |
-| Discovery worker against real data (local D1) | 539 legislators, President and VP, Alabama and Alaska legislatures, popularity, photos; Hank Johnson GA-4 Democrat and Mike Johnson LA-4 Republican both correct; no duplicate names |
-| Reader request path | "Gavin Newsom" verified as Governor of California via Wikidata; "Taylor Swift" rejected; existing member recognized |
-| Truth engine against the live PolitiFact feed | 18 rulings read, 6 matched, 10 stored with source links; trust scores derived |
-
-Known small items: PolitiFact publishes some rulings in English and Spanish as separate items, so a bilingual ruling can be stored twice (two source links). Scores will look harsh at first because PolitiFact mostly checks doubtful claims; the profile page explains the formula.
-
-## Questions for Dr. Cato (saved for the end, as asked)
-
-1. Unsplash and Google Civic keys were committed to GitHub by the old build. Rotating them needs the Unsplash and Google Cloud logins for this venture; which Chrome profile holds them? (Until then the exposed Unsplash key keeps working but anyone who read the old repo can burn its quota.)
-2. Rate limit on the POST API routes: the Free plan allows one rate limiting rule and Cloudflare's default "Leaked credential check" occupies it. Replace it with an API rate limit, or leave as is? (Leaving it is fine; every POST route validates and dedupes in code.)
-3. The three unused TWILIO_* secrets on dailyborg-ingest: delete them, or keep for a future WhatsApp edition?
-4. The old folder `Desktop/antigravity-files/dailyborg` can be deleted. Checked 2026-09-05: its last commit (d5c7d03) is in the new repo's history, it had no uncommitted changes, its three .dev.vars secret files were already copied to the Drive, and the only non-code leftovers (Stitch design exports, the Antigravity .agent skills folder, its task plan and rules file) are archived at `claude/code/dailyborg/archive/antigravity-leftovers/` on the Drive. Everything else there is build output, logs, one-off scripts and node_modules.
-5. Design pass (PROJECT-START section 2): send design references and a yes on direction before any visual rework.
-6. DECIDED 2026-09-05: roll-call votes will use both sources, the congress.gov API as primary and the official House/Senate XML as a second source of truth, cross-checked before anything is shown (see DECISIONS.md). Dr. Cato is requesting the congress.gov key; when it lands in `_credentials` on the Drive, Claude installs it as a worker secret and builds the votes feature. Background on the two routes: (a) No key at all: the House Clerk (clerk.house.gov/Votes) and the Senate (senate.gov roll call vote XML) publish every roll call as XML, and each row already carries the member's bioguide id, which the roster now stores. Claude can build the votes feature from those feeds alone. (b) The congress.gov API adds bill titles and summaries in one place; its free key is a one-minute form at https://api.congress.gov/sign-up/ (name plus email, the key arrives by email within a few minutes; use pressroom@dailyborg.com and save the key in `_credentials` on the Drive). Recommendation: start with (a), add (b) later for bill titles.
-
-## To-do list (Dr. Cato, 2026-09-05: "put the optional stuff on the to-do list")
-
-- [ ] Rotate `UNSPLASH_ACCESS_KEY` (old value was committed to GitHub). Why the site needs Unsplash at all: sentinel-engine fills in a free stock photo for any approved article that has no hero image, and ingest uses it as the fallback when AI image generation fails. Unsplash keys cannot be regenerated, so rotation means: sign in at unsplash.com/login (the account details are in the Drive registry), open unsplash.com/oauth/applications, create a new application, copy its Access Key into `_credentials/ingest.dev.vars` on the Drive, then Claude runs `wrangler secret put UNSPLASH_ACCESS_KEY` in workers/ingest and workers/sentinel and the old application gets deleted.
-- [ ] Revoke `GOOGLE_CIVIC_API_KEY`. Located 2026-09-05: Google Cloud project DailyBorg (id `dailyborg`), page APIs & Services > Credentials, the only key there, restricted to the shut-down Civic Information API (so it is harmless even while exposed). Claude's browser automation is not allowed to select or delete API keys, so this is a 30-second manual step: tick the key's row, press Delete at the top, confirm. Which Google account owns the project is recorded in the Drive registry.
-- [x] Confirm `AIML_API_KEY` and `RESEND_API_KEY` exist on dailyborg-ingest. Done 2026-09-05: both present (so are UNSPLASH_ACCESS_KEY and three unused TWILIO_* secrets).
-- [ ] Resend: the DNS side is already there (resend._domainkey TXT plus send.dailyborg.com MX and SPF were found in the zone). Open the Resend dashboard once to confirm the domain shows Verified. Needs the Resend login.
-- [ ] Google Search Console: dailyborg.com is not a property yet under the venture's Google account (checked 2026-09-05; the account already has other sites verified). The Search Console pages ignored automated clicks, so this is manual for now: search.google.com/search-console > Add property > Domain > dailyborg.com > copy the TXT record Google shows; Claude then adds that TXT record in Cloudflare DNS and submits https://dailyborg.com/news-sitemap.xml. Bing Webmaster Tools can import from Search Console afterwards (needs a Microsoft login).
-- [ ] Optional: congress.gov API key for real roll-call votes (Phase 2).
-
-## Next
-
-- First check after the 00:00 UTC reset (8 PM Eastern, 2026-09-05): open a senator profile such as /borg-record/politicians/tammy-baldwin. During the read block every profile page answered 500 on all four deployments of the day (checked 15:30 UTC on the preview URLs of commits 8612f7c, e0abeef, 5e8a3ff, 573e426), so the 500 is the D1 block, not the votes change; a slug that does not exist answers 404 because that lookup reads zero rows. If profiles still fail after the reset, that is a real bug to chase first.
-- Deployed. Watch the D1 usage graph (Workers & Pages > D1 > dailyborg-db > Metrics) for 48 hours after the 00:00 UTC reset. Expected: under 500,000 rows read per day. Then open /borg-record, one profile, /liar-liar, /borg-record/compare and /admin (passphrase on the Drive) and confirm the roster and rulings filled in.
-- Design pass per PROJECT-START section 2 (needs Dr. Cato's design references and a yes on direction).
-- Phase 2 candidates: local officials source, comparison page on vote agreement (data now exists), blog/SEO pipeline from PROJECT-START section 6. Real vote records shipped 2026-09-05.
+- Migration 0010 applied to production (demo rows, random scores and mock votes gone; all indexes exist). Migration 0011 seeds the 25 author bylines. Migration 0012 added the roll-call vote columns and `politicians.lis_id`.
+- Five workers on their schedules: discovery :05 hourly, sentinel :20 hourly, scraper :50 every 2h, truth :40 every 6h, ingest 08:00 UTC daily. The old image-medic worker was deleted; the old discovery Durable Object class removed. The publisher, social-publisher, delivery, draft-engine and feeder workers had never been deployed.
+- The Pages project is Git-connected: every push to main builds and deploys the site. ADMIN_PASSPHRASE is set on the project (value in `_credentials/admin-passphrase.txt` on the Drive).
+- Full database backup before the migration: `claude/code/dailyborg/backups/dailyborg-db-before-takeover-2026-09-05.sql` on the Drive (58 MB, contains subscriber emails, keep private).
+- Cloudflare dashboard (Pressroom Chrome profile, detail in docs/CLOUDFLARE-SETTINGS.md): cache rule for public API responses (HIT confirmed), SSL Full (strict), Always Use HTTPS, Minimum TLS 1.2, Early Hints, Bot Fight Mode, Browser Integrity Check, www.dailyborg.com redirecting 301 to the apex, Web Analytics on. No rate limiting rule (the Free plan slot is taken by the default leaked-credential rule).
+- Secrets confirmed on dailyborg-ingest: AIML_API_KEY, RESEND_API_KEY, UNSPLASH_ACCESS_KEY (plus three unused TWILIO_* leftovers). sentinel-engine has UNSPLASH_ACCESS_KEY. dailyborg-discovery has CONGRESS_API_KEY.
+- Root causes found that day: D1 rows read exhausted by the old workers' full scans every 15 minutes; wrong politicians from last-name matching and an 8B model inventing offices, random trust scores, mock votes. All replaced by structured sources (congress-legislators, executive.json, OpenStates, Wikidata, PolitiFact, House Clerk and Senate XML cross-checked with congress.gov and the Senate vote menu).
+- Unsplash key rotation steps: sign in at unsplash.com/login (account details in the Drive registry), open unsplash.com/oauth/applications, create a new application, copy its Access Key into `_credentials/ingest.dev.vars` on the Drive, then Claude runs `wrangler secret put UNSPLASH_ACCESS_KEY` in workers/ingest and workers/sentinel and the old application gets deleted.
