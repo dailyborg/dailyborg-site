@@ -118,7 +118,29 @@ function cascadeDelete(env: Env, id: string): D1PreparedStatement[] {
     return stmts;
 }
 
-interface ExistingRow { id: string; slug: string; name: string; bioguide_id: string | null; openstates_id: string | null; source: string | null; office_held: string | null; }
+/**
+ * Every column the roster UPDATE statements can set, so a sync can compare before it writes. D1 charges one
+ * written row per table row plus one per index the write touches, so an UPDATE that changes nothing still costs
+ * the full price. The roster syncs therefore load these columns and skip rows that already match.
+ */
+interface ExistingRow {
+    id: string; slug: string; name: string; bioguide_id: string | null; openstates_id: string | null;
+    source: string | null; office_held: string | null; party: string | null; district_state: string | null;
+    state: string | null; region_level: string | null; candidate_status: string | null; photo_url: string | null;
+    photo_source: string | null; wikipedia_title: string | null; wikidata_id: string | null; lis_id: string | null;
+    time_in_office: string | null; country: string | null;
+}
+
+/** The columns above, in one place, so the two roster SELECTs and the interface cannot drift apart. */
+const EXISTING_COLUMNS = "id, slug, name, bioguide_id, openstates_id, source, office_held, party, district_state, state, region_level, candidate_status, photo_url, photo_source, wikipedia_title, wikidata_id, lis_id, time_in_office, country";
+
+/** NULL, undefined and the empty string all count as "no value". Everything else compares as text. */
+function sameValue(a: unknown, b: unknown): boolean {
+    const emptyA = a === null || a === undefined || a === "";
+    const emptyB = b === null || b === undefined || b === "";
+    if (emptyA || emptyB) return emptyA && emptyB;
+    return String(a) === String(b);
+}
 
 // ------------------------------------------------------------------
 // 1. Federal legislators (Senate + House) from congress-legislators
@@ -130,7 +152,7 @@ async function syncFederalRoster(env: Env): Promise<string> {
     if (rows.length < 400) throw new Error(`congress-legislators returned only ${rows.length} rows, refusing to sync`);
 
     const { results } = await env.DB.prepare(
-        "SELECT id, slug, name, bioguide_id, openstates_id, source, office_held FROM politicians WHERE region_level = 'Federal'"
+        `SELECT ${EXISTING_COLUMNS} FROM politicians WHERE region_level = 'Federal'`
     ).all<ExistingRow>();
     const existing = results || [];
     const byBioguide = new Map<string, ExistingRow>();
@@ -146,7 +168,7 @@ async function syncFederalRoster(env: Env): Promise<string> {
     const seenBioguide = new Set<string>();
     const claimedRowIds = new Set<string>();
     const rosterNameKeys = new Set<string>();
-    let inserted = 0, updated = 0;
+    let inserted = 0, updated = 0, unchanged = 0;
 
     for (const r of rows) {
         const bioguide = r.bioguide_id;
@@ -171,6 +193,23 @@ async function syncFederalRoster(env: Env): Promise<string> {
 
         if (match) {
             claimedRowIds.add(match.id);
+            // COALESCE(?, wikipedia_title): a null incoming title leaves the stored one alone, so it never counts as a change.
+            const changed = !sameValue(match.bioguide_id, bioguide)
+                || !sameValue(match.lis_id, r.lis_id || null)
+                || !sameValue(match.name, displayName)
+                || !sameValue(match.office_held, office)
+                || !sameValue(match.party, party)
+                || !sameValue(match.district_state, districtLabel)
+                || !sameValue(match.state, r.state)
+                || !sameValue(match.region_level, "Federal")
+                || !sameValue(match.candidate_status, "Active")
+                || !sameValue(match.source, "congress-legislators")
+                || !sameValue(match.wikipedia_title, wikipediaTitle ?? match.wikipedia_title)
+                || !sameValue(match.photo_url, photo)
+                || !sameValue(match.photo_source, "unitedstates")
+                || !sameValue(match.time_in_office, "Serving")
+                || !sameValue(match.country, "US");
+            if (!changed) { unchanged++; continue; }
             stmts.push(env.DB.prepare(`
                 UPDATE politicians SET
                     bioguide_id = ?, lis_id = ?, name = ?, office_held = ?, party = ?, district_state = ?, state = ?,
@@ -217,7 +256,7 @@ async function syncFederalRoster(env: Env): Promise<string> {
 
     await runBatches(env, stmts);
     await kvSet(env, "federal_roster_synced_at", new Date().toISOString());
-    const msg = `Federal roster synced: ${rows.length} legislators, ${inserted} inserted, ${updated} updated`;
+    const msg = `Federal roster synced: ${rows.length} legislators, ${inserted} inserted, ${updated} updated, ${unchanged} unchanged`;
     await log(env, "healthy", msg);
     return msg;
 }
@@ -331,7 +370,7 @@ async function syncNextState(env: Env, force = false): Promise<string> {
 
     const ST = st.toUpperCase();
     const { results } = await env.DB.prepare(
-        "SELECT id, slug, name, bioguide_id, openstates_id, source, office_held FROM politicians WHERE region_level = 'State' AND state = ?"
+        `SELECT ${EXISTING_COLUMNS} FROM politicians WHERE region_level = 'State' AND state = ?`
     ).bind(ST).all<ExistingRow>();
     const existing = results || [];
     const byOs = new Map<string, ExistingRow>();
@@ -344,7 +383,7 @@ async function syncNextState(env: Env, force = false): Promise<string> {
     const stmts: D1PreparedStatement[] = [];
     const seen = new Set<string>();
     const claimed = new Set<string>();
-    let inserted = 0, updated = 0;
+    let inserted = 0, updated = 0, unchanged = 0;
 
     for (const r of rows) {
         const osId = r.id;
@@ -368,6 +407,22 @@ async function syncNextState(env: Env, force = false): Promise<string> {
 
         if (match) {
             claimed.add(match.id);
+            // A null incoming photo leaves photo_url and photo_source alone; a null wikidata id leaves wikidata_id alone.
+            const changed = !sameValue(match.openstates_id, osId)
+                || !sameValue(match.name, name)
+                || !sameValue(match.office_held, office)
+                || !sameValue(match.party, party)
+                || !sameValue(match.district_state, districtLabel)
+                || !sameValue(match.state, ST)
+                || !sameValue(match.region_level, "State")
+                || !sameValue(match.candidate_status, "Active")
+                || !sameValue(match.source, "openstates")
+                || !sameValue(match.photo_url, photo ?? match.photo_url)
+                || !sameValue(match.photo_source, photo !== null ? "openstates" : match.photo_source)
+                || !sameValue(match.wikidata_id, wikidata ?? match.wikidata_id)
+                || !sameValue(match.time_in_office, "Serving")
+                || !sameValue(match.country, "US");
+            if (!changed) { unchanged++; continue; }
             stmts.push(env.DB.prepare(`
                 UPDATE politicians SET openstates_id = ?, name = ?, office_held = ?, party = ?, district_state = ?, state = ?, region_level = 'State',
                     candidate_status = 'Active', source = 'openstates', photo_url = COALESCE(?, photo_url),
@@ -399,7 +454,7 @@ async function syncNextState(env: Env, force = false): Promise<string> {
 
     await runBatches(env, stmts);
     await kvSet(env, `state_synced_${st}`, new Date().toISOString());
-    const msg = `State ${ST} synced: ${rows.length} legislators, ${inserted} inserted, ${updated} updated`;
+    const msg = `State ${ST} synced: ${rows.length} legislators, ${inserted} inserted, ${updated} updated, ${unchanged} unchanged`;
     await log(env, "healthy", msg);
     return msg;
 }

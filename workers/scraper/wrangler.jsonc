@@ -1,6 +1,7 @@
 {
     // dailyborg-scraper: reads the RSS feeds and queues new stories for dailyborg-ingest.
-    // Account: Pressroom@dailyborg.com. Uses KV (SENTINEL_CACHE) for 24h dedup, no D1. No secrets.
+    // Account: Pressroom@dailyborg.com. Uses D1 only (seen_links for link dedup, kv_store for the manual
+    // trigger lock, system_settings for the daily cap, ingestion_logs for the run log). No KV. No secrets.
     "$schema": "../../node_modules/wrangler/config-schema.json",
     "name": "dailyborg-scraper",
     "main": "src/index.ts",
@@ -13,10 +14,11 @@
             }
         ]
     },
-    "kv_namespaces": [
+    "d1_databases": [
         {
-            "binding": "SENTINEL_CACHE",
-            "id": "5a2f3f363bce4eceb61dd765686b2dc4"
+            "binding": "DB",
+            "database_name": "dailyborg-db",
+            "database_id": "c412efcd-54d8-47a6-9ca5-8522417992c3"
         }
     ],
     "triggers": {

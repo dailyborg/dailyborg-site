@@ -18,6 +18,19 @@ export async function kvSet(env: Env, key: string, value: string): Promise<void>
     await env.DB.prepare("INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP").bind(key, value).run();
 }
 
+/** Rows written so far today against a named budget counter kept in kv_store. Missing counter means 0. */
+export async function budgetUsed(env: Env, key: string): Promise<number> {
+    const raw = await kvGet(env, key);
+    const n = parseInt(raw || "0", 10);
+    return isNaN(n) ? 0 : n;
+}
+
+/** Adds an estimated row count to a budget counter. */
+export async function budgetAdd(env: Env, key: string, rows: number): Promise<void> {
+    const used = await budgetUsed(env, key);
+    await kvSet(env, key, String(used + rows));
+}
+
 export async function isDue(env: Env, key: string, hours: number): Promise<boolean> {
     const last = await kvGet(env, key);
     if (!last) return true;

@@ -11,7 +11,7 @@ Read `CLAUDE.md` first (accounts, rules, folder map), then `docs/STATUS.md`.
 - Site: Next.js 14 (App Router, edge runtime) on Cloudflare Pages through `@cloudflare/next-on-pages`. Project `dailyborg-site`.
 - Data: one Cloudflare D1 database `dailyborg-db`. Schema baseline in `src/schema.sql`, changes in `src/migrations/`.
 - Workers (`workers/`): `discovery-engine` (roster sync), `sentinel` (maintenance), `scraper` (RSS to queue), `ingest` (AI writing + briefings), `truth-engine` (PolitiFact rulings).
-- Images: R2 bucket `borg-images`; scraper dedup in KV `SENTINEL_CACHE`; `ingest-queue` between scraper and ingest.
+- Images: R2 bucket `borg-images`; scraper dedup in the D1 table `seen_links` (Workers KV is no longer used); `ingest-queue` between scraper and ingest.
 
 ## Run locally
 

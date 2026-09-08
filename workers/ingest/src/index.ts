@@ -18,7 +18,128 @@ interface Env {
 }
 
 // ============================================================
-// [AGENTS WEEK 2026] Topic Memory Agent — DO Facet with SQLite
+// Workers AI model ladder for the 'cloudflare' provider.
+// Tried in order, first valid article wins.
+//   1. gpt-oss-120b speaks the Responses API shape.
+//   2. llama-4-scout speaks chat completions with a JSON schema.
+// The old @cf/meta/llama-3.1-8b-instruct was deprecated by
+// Cloudflare on 2026-05-30 and now fails every request (5028).
+// ============================================================
+const CLOUDFLARE_MODELS = [
+    { id: "@cf/openai/gpt-oss-120b", api: "responses" },
+    { id: "@cf/meta/llama-4-scout-17b-16e-instruct", api: "chat" },
+] as const;
+
+const VALID_DESKS: string[] = ['Politics','Crime','Business','Entertainment','Sports','Science','Education'];
+
+const DESK_MAP: Record<string, string> = {
+    politics: 'Politics', crime: 'Crime', business: 'Business',
+    entertainment: 'Entertainment', sports: 'Sports',
+    science: 'Science', education: 'Education', standard: 'Politics'
+};
+
+const SYSTEM_PROMPT = "You are an AI journalist reporting on the news. Write like a seasoned human journalist to present the news in an interesting and engaging way. Use a dash of metaphor or figurative language one or two times in the article where warranted. You must return ONLY absolute valid JSON matching the exact schema.";
+
+const FORMAT_NOTE = "\nCRITICAL FORMATTING INSTRUCTION: Each paragraph in contentHtml MUST contain at least 4-6 sentences to form rich, dense journalistic columns. DO NOT produce listicles or single-sentence paragraphs. Output ONLY pure valid JSON, no markdown.";
+
+// Structured output contract handed to models that support json_schema.
+const ARTICLE_SCHEMA = {
+    type: "object",
+    properties: {
+        canonical_event_slug: { type: "string" },
+        title: { type: "string" },
+        excerpt: { type: "string" },
+        contentHtml: { type: "string" },
+        keyTakeaways: { type: "array", items: { type: "string" } },
+        confidenceScore: { type: "number" },
+        suggestedHeroImagePrompt: { type: "string" },
+        desk: { type: "string", enum: VALID_DESKS },
+        sources: {
+            type: "array",
+            items: {
+                type: "object",
+                properties: {
+                    source_name: { type: "string" },
+                    source_url: { type: "string" },
+                    source_type: { type: "string" }
+                },
+                required: ["source_name"]
+            }
+        },
+        mentioned_candidates: { type: "array", items: { type: "string" } }
+    },
+    required: ["canonical_event_slug", "title", "excerpt", "contentHtml", "desk", "sources", "confidenceScore"]
+};
+
+// ============================================================
+// Model reply helpers. Pure functions, no bindings, exported so
+// they can be unit tested outside the Workers runtime.
+// ============================================================
+
+// Every Workers AI family returns its text somewhere different.
+// Chat models use `response` or `choices`, the Responses API uses
+// an `output` array whose "message" items hold the content parts.
+export function extractModelText(result: any): string {
+    if (typeof result === "string") return result;
+    if (!result) return "";
+
+    if (typeof result.response === "string") return result.response;
+    if (result.response && typeof result.response === "object") {
+        try {
+            return JSON.stringify(result.response);
+        } catch (e) {
+            return "";
+        }
+    }
+
+    if (typeof result.output_text === "string") return result.output_text;
+
+    if (Array.isArray(result.output)) {
+        let collected = "";
+        for (const item of result.output) {
+            if (!item || item.type !== "message" || !Array.isArray(item.content)) continue;
+            for (const part of item.content) {
+                if (part && typeof part.text === "string") collected += part.text;
+            }
+        }
+        if (collected) return collected;
+    }
+
+    const choice = result.choices && result.choices[0] && result.choices[0].message
+        ? result.choices[0].message.content
+        : undefined;
+    if (typeof choice === "string") return choice;
+
+    return "";
+}
+
+// Pulls the first JSON object out of a model reply. Tolerates code
+// fences, leading chatter, and raw control characters that models
+// sometimes leave inside string values.
+export function extractJsonObject(text: string): any | null {
+    if (!text || typeof text !== "string") return null;
+
+    let candidate = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const firstBrace = candidate.indexOf("{");
+    const lastBrace = candidate.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
+    candidate = candidate.substring(firstBrace, lastBrace + 1);
+
+    try {
+        return JSON.parse(candidate);
+    } catch (e) {
+        // Raw control characters inside a string value are illegal JSON.
+        // Strip them, keeping newline and tab, then try once more.
+        try {
+            return JSON.parse(candidate.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ""));
+        } catch (e2) {
+            return null;
+        }
+    }
+}
+
+// ============================================================
+// [AGENTS WEEK 2026] Topic Memory Agent: DO Facet with SQLite
 // Each editorial desk (Politics, Crime, Business, etc.) gets its
 // own persistent, isolated SQLite database at the edge.
 // This acts as the AIML model's "local memory" so we can:
@@ -52,7 +173,7 @@ export class TopicMemoryAgent {
     async fetch(request: Request): Promise<Response> {
         const url = new URL(request.url);
 
-        // GET /recent — Return compressed recent coverage for prompt injection
+        // GET /recent: Return compressed recent coverage for prompt injection
         if (url.pathname === '/recent' && request.method === 'GET') {
             const rows = this.state.storage.sql.exec(
                 "SELECT title, excerpt FROM recent_articles ORDER BY created_at DESC LIMIT 5"
@@ -63,7 +184,7 @@ export class TopicMemoryAgent {
             });
         }
 
-        // POST /store — Store a compressed article summary after ingestion
+        // POST /store: Store a compressed article summary after ingestion
         if (url.pathname === '/store' && request.method === 'POST') {
             const body: any = await request.json().catch(() => ({}));
             if (body.id && body.title) {
@@ -86,13 +207,15 @@ export class TopicMemoryAgent {
 // ============================================================
 // Cloudflare Agent: IngestCoordinator
 // A persistent, stateful agent that processes incoming article
-// payloads. Uses AIML API (Gemini 3 Flash) for text enrichment
-// and Unsplash / Nano Banana 2 for images.
+// payloads. Text enrichment follows system_settings.ai_provider:
+// 'cloudflare' walks the Workers AI ladder (gpt-oss-120b, then
+// llama-4-scout), 'aiml' calls Gemini through the AI/ML API.
+// Images come from Wikimedia, Unsplash, then Nano Banana 2.
 // ============================================================
 export class IngestCoordinator extends Agent<Env> {
 
     // ==========================================================
-    // [AGENTS WEEK 2026] Secure AIML Fetch — Zero-Trust Proxy
+    // [AGENTS WEEK 2026] Secure AIML Fetch: Zero-Trust Proxy
     // Centralizes all AIML API credential injection in one place.
     // The raw AIML_API_KEY is never scattered across ad-hoc calls.
     // ==========================================================
@@ -123,6 +246,10 @@ export class IngestCoordinator extends Agent<Env> {
         const existing = await this.env.DB.prepare("SELECT id FROM articles WHERE slug = ?").bind(slug).first();
         if (existing) {
             console.log(`Article with slug '${slug}' already exists. Skipping.`);
+            try {
+                await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                    .bind(crypto.randomUUID(), title.substring(0, 50), 'duplicate', `Skipped: an article with slug '${slug}' already exists`).run();
+            } catch { /* logging must never fail the run */ }
             return { status: "skipped", reason: "duplicate" };
         }
 
@@ -157,7 +284,7 @@ export class IngestCoordinator extends Agent<Env> {
         `;
 
         // =======================================================
-        // [AGENTS WEEK 2026] Topic Memory — Differential Context
+        // [AGENTS WEEK 2026] Topic Memory: Differential Context
         // Query the TopicMemoryAgent DO for recent coverage on this
         // desk to prevent duplicate articles and save AIML tokens.
         // =======================================================
@@ -209,50 +336,69 @@ export class IngestCoordinator extends Agent<Env> {
         }
 
         // =======================================================
-        // AI ENRICHMENT (Llama 3 or Gemini)
+        // AI ENRICHMENT
+        // Provider 'cloudflare': Workers AI ladder, gpt-oss-120b
+        // first, llama-4-scout as the fallback.
+        // Provider 'aiml': Gemini through the AI/ML API.
         // =======================================================
+        const modelAttempts: string[] = [];
+
         if (aiProvider === 'cloudflare') {
-            try {
-                const cloudflarePrompt = finalEnrichmentPrompt + "\nCRITICAL FORMATTING INSTRUCTION: Each paragraph in contentHtml MUST contain at least 4-6 sentences to form rich, dense journalistic columns. DO NOT produce listicles or single-sentence paragraphs. Output ONLY pure valid JSON, no markdown.";
-                
-                const aiResponse = await this.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-                    messages: [
-                        { role: "system", content: "You are an AI journalist reporting on the news. Write like a seasoned human journalist to present the news in an interesting and engaging way. Use a dash of metaphor or figurative language one or two times in the article where warranted. You must return ONLY absolute valid JSON matching the exact schema." },
-                        { role: "user", content: cloudflarePrompt }
-                    ],
-                    max_tokens: 2500
-                });
-                let rawText = (aiResponse as any).response;
-                rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-                
-                // Extract just the JSON object
-                const firstBrace = rawText.indexOf('{');
-                const lastBrace = rawText.lastIndexOf('}');
-                if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-                    rawText = rawText.substring(firstBrace, lastBrace + 1);
-                }
+            const cloudflarePrompt = finalEnrichmentPrompt + FORMAT_NOTE;
 
+            for (const model of CLOUDFLARE_MODELS) {
+                let reason = "";
                 try {
-                    articleObject = JSON.parse(rawText);
-                } catch (e) {
-                    // Fallback to strip problematic control characters if JSON.parse fails
-                    try {
-                        const safeText = rawText.replace(/[\n\r\t\\]/g, '');
-                        articleObject = JSON.parse(safeText);
-                    } catch (e2) {
-                        console.error("Llama-3 JSON format irrevocably broken or empty.", rawText.substring(0, 100));
-                        articleObject = null;
+                    const aiResponse = model.api === "responses"
+                        ? await this.env.AI.run(model.id, {
+                            instructions: SYSTEM_PROMPT,
+                            input: cloudflarePrompt,
+                            reasoning: { effort: "low" },
+                            max_output_tokens: 2000
+                        })
+                        : await this.env.AI.run(model.id, {
+                            messages: [
+                                { role: "system", content: SYSTEM_PROMPT },
+                                { role: "user", content: cloudflarePrompt }
+                            ],
+                            max_tokens: 2000,
+                            response_format: { type: "json_schema", json_schema: ARTICLE_SCHEMA }
+                        });
+
+                    const rawText = extractModelText(aiResponse);
+                    const parsed = rawText ? extractJsonObject(rawText) : null;
+
+                    if (!rawText) {
+                        reason = "model returned no text";
+                    } else if (!parsed) {
+                        reason = `no JSON object in reply: ${rawText}`;
+                    } else if (!parsed.title || !parsed.contentHtml) {
+                        reason = "parsed JSON has no title or no contentHtml";
+                    } else {
+                        articleObject = parsed;
                     }
+                } catch (e: any) {
+                    reason = `AI.run threw: ${(e && e.message) ? e.message : String(e)}`;
                 }
 
-                const validDesks = ['Politics','Crime','Business','Entertainment','Sports','Science','Education'];
-                if (articleObject.desk && !validDesks.includes(articleObject.desk)) {
-                    articleObject.desk = 'Politics';
+                if (articleObject) {
+                    console.log(`[Ingest] Article written by ${model.id}.`);
+                    break;
                 }
-            } catch (e: any) {
-                console.error("Cloudflare AI Fetch Failure:", e.message);
-                await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
-                    .bind(crypto.randomUUID(), title.substring(0, 50), 'fetch_failure', `Cloudflare Net Error: ${e.message}`).run();
+
+                // No D1 row per attempt. Only the final failure is logged.
+                modelAttempts.push(`${model.id}: ${reason.substring(0, 160)}`);
+                console.warn(`[Ingest] ${model.id} failed: ${reason.substring(0, 160)}`);
+            }
+
+            if (articleObject) {
+                // Normalize AI desk to valid categories only
+                if (articleObject.desk && !VALID_DESKS.includes(articleObject.desk)) {
+                    articleObject.desk = DESK_MAP[(type || '').toLowerCase()] || 'Politics';
+                    console.log(`[Ingest] AI returned invalid desk, normalized to: ${articleObject.desk}`);
+                }
+            } else {
+                console.error(`Cloudflare AI Failure on every model: ${modelAttempts.join('; ')}`);
             }
         } else if (this.env.AIML_API_KEY && this.env.AIML_API_KEY.length > 5 && this.env.AIML_API_KEY !== 'mock') {
             try {
@@ -266,8 +412,13 @@ export class IngestCoordinator extends Agent<Env> {
                 if (aiResponse.status === 401 || aiResponse.status === 403) {
                     const errBody = await aiResponse.text().catch(() => 'no body');
                     console.error(`ERR_AUTH: AI Authentication failed. Status: ${aiResponse.status}. Body: ${errBody.substring(0, 200)}`);
+                    // A 403 saying the balance is gone is a billing problem, not a bad key.
+                    // Say so plainly so the admin panel is actionable.
+                    const authMessage = /run out of funds/i.test(errBody)
+                        ? `AI/ML API account has no funds: ${errBody.substring(0, 100)}`
+                        : `AI Authentication Failed (401/403): ${errBody.substring(0, 100)}`;
                     await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
-                        .bind(crypto.randomUUID(), title.substring(0, 50), 'auth_error', `AI Authentication Failed (401/403): ${errBody.substring(0, 100)}`).run();
+                        .bind(crypto.randomUUID(), title.substring(0, 50), 'auth_error', authMessage).run();
                 } else if (aiResponse.status === 429) {
                     console.error("ERR_QUOTA: AI API Quota exceeded.");
                     await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
@@ -327,7 +478,7 @@ export class IngestCoordinator extends Agent<Env> {
                 
                 if (validationErrors.length > 0) {
                     console.warn(`[SandboxValidator] AIML output FAILED validation: ${validationErrors.join(', ')}`);
-                    // Don't abort entirely — log the warning but allow the article through
+                    // Don't abort entirely: log the warning but allow the article through
                     // The deterministic check flags bad data for human review
                     await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
                         .bind(crypto.randomUUID(), title.substring(0, 50), 'validation_warning', `Deterministic check: ${validationErrors.join('; ')}`).run();
@@ -343,9 +494,13 @@ export class IngestCoordinator extends Agent<Env> {
         // FALLBACK: Abort instead of creating clones
         // =======================================================
         if (!articleObject || !articleObject.title) {
-            console.error("AI Parsing Failed. Aborting ingestion of mock clones.");
+            // Exactly one row per failed story. The per-model detail lives in this message.
+            const failureMessage = modelAttempts.length > 0
+                ? `AI failed on every model: ${modelAttempts.join('; ')}`
+                : `AI Parser returned empty result`;
+            console.error(`AI enrichment produced no article. ${failureMessage}`);
             await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
-                .bind(crypto.randomUUID(), title.substring(0, 50), 'failed', `AI Parser returned empty result`).run();
+                .bind(crypto.randomUUID(), title.substring(0, 50), 'failed', failureMessage).run();
             return { status: "failed", reason: "missing_payload" };
         }
 
@@ -448,20 +603,53 @@ export class IngestCoordinator extends Agent<Env> {
         // =======================================================
         // DATABASE INSERTION
         // =======================================================
-        const finalArticleType = isDraft ? "draft" : (type || "standard");
+        // article_type is the shape of the row, not the category. delivery.ts and the
+        // breaking badge filter on article_type IN ('standard', 'breaking'); the desk
+        // column already carries the category.
+        const finalArticleType = isDraft ? "draft" : "standard";
         const approvalStatus = isDraft ? 'pending' : 'approved';
         const id = crypto.randomUUID();
 
+        // Reading time from the rendered word count, floor of 1 minute.
+        const readTimeText = (articleObject.contentHtml || '').replace(/<[^>]+>/g, '');
+        const readTimeWords = readTimeText.split(/\s+/).filter((w: string) => w.length > 0).length;
+        const readTime = Math.max(1, Math.ceil(readTimeWords / 200));
+
+        // articles.slug is UNIQUE, so an unsanitized or repeated slug throws and
+        // marks the story failed. Sanitize, then take a different slug on collision.
+        const buildSlug = (value: any): string => String(value || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9-]+/g, '-')
+            .replace(/(^-|-$)+/g, '')
+            .substring(0, 120)
+            .replace(/-+$/g, '');
+
+        let finalSlug = buildSlug(articleObject.canonical_event_slug);
+        if (!finalSlug) finalSlug = buildSlug(articleObject.title);
+
+        const slugTaken = await this.env.DB.prepare("SELECT id FROM articles WHERE slug = ?").bind(finalSlug).first();
+        if (slugTaken) {
+            // The model names the EVENT, not the source story, so a second story about the same event lands
+            // on the same slug. That is the dedup working: skip it instead of publishing the event twice.
+            console.log(`[Ingest] Slug "${finalSlug}" already exists. Skipping as a duplicate of the same event.`);
+            try {
+                await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
+                    .bind(crypto.randomUUID(), finalSlug.substring(0, 50), 'duplicate', `Skipped: an article about this event already exists at /${String(articleObject.desk || 'politics').toLowerCase()}/${finalSlug}`).run();
+            } catch { /* logging must never fail the run */ }
+            return { status: "skipped", reason: "duplicate_event" };
+        }
+
         await this.env.DB.prepare(`
-          INSERT INTO articles (id, slug, title, excerpt, content_html, author_id, article_type, confidence_score, desk, hero_image_url, approval_status)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO articles (id, slug, title, excerpt, content_html, author_id, read_time, article_type, confidence_score, desk, hero_image_url, approval_status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
             id,
-            articleObject.canonical_event_slug,
+            finalSlug,
             articleObject.title,
             articleObject.excerpt,
             articleObject.contentHtml,
             `auth_${String(Math.floor(Math.random() * 25) + 1).padStart(2, '0')}`,
+            readTime,
             finalArticleType,
             articleObject.confidenceScore,
             articleObject.desk || "Politics",
@@ -481,7 +669,7 @@ export class IngestCoordinator extends Agent<Env> {
         // The roster is built only from authoritative datasets (see workers/discovery-engine).
 
         await this.env.DB.prepare('INSERT INTO ingestion_logs (id, event_slug, status, message) VALUES (?, ?, ?, ?)')
-            .bind(crypto.randomUUID(), articleObject.canonical_event_slug, 'inserted', `Successfully inserted article id: ${id}`).run();
+            .bind(crypto.randomUUID(), finalSlug, 'inserted', `Successfully inserted article id: ${id}`).run();
 
         // =======================================================
         // [AGENTS WEEK 2026] Store in Topic Memory DO Facet

@@ -15,14 +15,23 @@
  *   menu tallies, the document tallies and the counted member rows all agree. Labelled 'senate_xml', not
  *   'verified', so the site can say exactly what was checked.
  *
- * Budget: at most MAX_PER_RUN new roll calls per chamber per hourly run (a House vote is about 435 rows), plus
- * up to MAX_REVERIFY re-checks of earlier 'unverified' House votes. Rows read per run: the federal roster
- * (about 540) and a handful of kv_store rows.
+ * Budget: the D1 Free plan allows 100,000 rows written per day across the whole account, and every index on a
+ * table adds one written row per insert. After migration 0013 a politician_votes insert costs 3 rows (table,
+ * primary key, idx_politician_votes_vote), so a House roll call of 435 members is about 1,305 rows. This step
+ * takes at most MAX_PER_RUN new roll calls per chamber per hourly run plus MAX_REVERIFY re-checks of earlier
+ * 'unverified' House votes, and stops storing entirely once VOTES_ROWS_PER_DAY estimated rows have been written
+ * on the current UTC day (the counter lives in kv_store under votes_rows_YYYY-MM-DD and resets at 00:00 UTC).
+ * Rows read per run: the federal roster (about 540) and a handful of kv_store rows.
  */
-import { Env, USER_AGENT, kvGet, kvSet, runBatches, log } from "./shared";
+import { Env, USER_AGENT, kvGet, kvSet, isDue, budgetUsed, budgetAdd, runBatches, log } from "./shared";
 
-const MAX_PER_RUN = 3;
-const MAX_REVERIFY = 2;
+const MAX_PER_RUN = 1;
+const MAX_REVERIFY = 1;
+/** Estimated D1 rows this step may write per UTC day. The rest of the site needs the remaining free-plan budget. */
+const VOTES_ROWS_PER_DAY = 30000;
+const rowsKey = () => "votes_rows_" + new Date().toISOString().slice(0, 10);
+/** senate.gov sits behind Akamai and answers 403 to some Cloudflare egress paths. A browser agent gets through. */
+const SENATE_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
 const API = "https://api.congress.gov/v3";
 const CLERK_XML = (year: number, roll: number) => `https://clerk.house.gov/evs/${year}/roll${String(roll).padStart(3, "0")}.xml`;
 const CLERK_PAGE = (year: number, roll: number) => `https://clerk.house.gov/Votes/${year}${roll}`;
@@ -245,6 +254,30 @@ export function compareHouse(clerk: ParsedVote, api: ApiHouseVote): string {
 }
 
 // ------------------------------------------------------------------
+// senate.gov fetching (Akamai answers 403 to some Cloudflare egress paths and not others)
+// ------------------------------------------------------------------
+async function fetchSenate(url: string): Promise<Response> {
+    const headers = { "User-Agent": SENATE_USER_AGENT, "Accept": "application/xml,text/xml;q=0.9,*/*;q=0.8" };
+    const res = await fetch(url, { headers });
+    if (res.status !== 403 && res.status !== 429) return res;
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    return fetch(url, { headers });
+}
+
+function senateBlocked(res: Response): boolean {
+    return res.status === 403 || res.status === 429;
+}
+
+/** A blocked run is normal here, so it is noted once a day rather than thrown once an hour. */
+async function noteSenateBlocked(env: Env, out: string[]): Promise<void> {
+    if (await isDue(env, "senate_blocked_logged_at", 24)) {
+        await log(env, "validation_warning", "Senate vote sync skipped: senate.gov answered 403 to this Worker (it allows some Cloudflare paths and not others). Retrying every hour.");
+        await kvSet(env, "senate_blocked_logged_at", new Date().toISOString());
+    }
+    out.push("Senate: senate.gov blocked this run (403)");
+}
+
+// ------------------------------------------------------------------
 // Storage
 // ------------------------------------------------------------------
 type Verification = "verified" | "senate_xml" | "mismatch" | "unverified";
@@ -302,6 +335,19 @@ function voteStatements(env: Env, v: ParsedVote, verification: Verification, not
     return { stmts, matched, unmatched };
 }
 
+/** Rows one stored roll call writes: the vote row plus its indexes, then three rows per member statement. */
+function estimateRows(stmts: D1PreparedStatement[]): number {
+    return 5 + stmts.length * 3;
+}
+
+/** True when storing this roll call would push the step past its share of the daily D1 write budget. */
+async function overBudget(env: Env, estimate: number, out: string[]): Promise<boolean> {
+    const used = await budgetUsed(env, rowsKey());
+    if (used + estimate <= VOTES_ROWS_PER_DAY) return false;
+    out.push(`votes: daily row budget used (${used} of ${VOTES_ROWS_PER_DAY}), resuming after 00:00 UTC`);
+    return true;
+}
+
 // ------------------------------------------------------------------
 // The hourly step
 // ------------------------------------------------------------------
@@ -337,7 +383,10 @@ async function syncHouse(env: Env, roster: Roster, out: string[]): Promise<void>
             }
         }
         const { stmts, matched, unmatched } = voteStatements(env, clerk, verification, note, secondary, roster);
+        const estimate = estimateRows(stmts);
+        if (await overBudget(env, estimate, out)) return;
         await runBatches(env, stmts);
+        await budgetAdd(env, rowsKey(), estimate);
         cursor = roll;
         await kvSet(env, cursorKey, String(cursor));
         out.push(`House ${year} roll ${roll}: ${verification}${verification === "verified" ? ` (${matched} members, ${unmatched} not in roster)` : ""}`);
@@ -362,7 +411,10 @@ async function reverifyHouse(env: Env, roster: Roster, out: string[]): Promise<v
         if (diff) await log(env, "provider_error", `House roll ${r.roll_number} (${year}) NOT published on re-check: ${diff}`);
         const secondary = api.billUrl || `${API}/house-vote/${clerk.congress}/${clerk.session}/${clerk.roll}`;
         const { stmts, matched } = voteStatements(env, clerk, verification, note, secondary, roster);
+        const estimate = estimateRows(stmts);
+        if (await overBudget(env, estimate, out)) return;
         await runBatches(env, stmts);
+        await budgetAdd(env, rowsKey(), estimate);
         out.push(`House ${year} roll ${r.roll_number} re-checked: ${verification}${verification === "verified" ? ` (${matched} members)` : ""}`);
     }
 }
@@ -371,7 +423,8 @@ async function syncSenate(env: Env, roster: Roster, out: string[]): Promise<void
     const { congress, session } = currentCongress();
     const cursorKey = `votes_senate_${congress}_${session}`;
     let cursor = parseInt((await kvGet(env, cursorKey)) || "0", 10) || 0;
-    const menuRes = await fetch(SENATE_MENU(congress, session), { headers: { "User-Agent": USER_AGENT } });
+    const menuRes = await fetchSenate(SENATE_MENU(congress, session));
+    if (senateBlocked(menuRes)) { await noteSenateBlocked(env, out); return; }
     if (menuRes.status === 404) { out.push(`Senate ${congress}-${session}: no vote menu yet`); return; }
     if (!menuRes.ok) throw new Error(`Senate vote menu ${menuRes.status}`);
     const menu = parseSenateMenu(await menuRes.text());
@@ -380,7 +433,8 @@ async function syncSenate(env: Env, roster: Roster, out: string[]): Promise<void
     for (let i = 0; i < MAX_PER_RUN && cursor < max; i++) {
         const n = cursor + 1;
         const entry = menu.get(n);
-        const res = await fetch(SENATE_XML(congress, session, n), { headers: { "User-Agent": USER_AGENT } });
+        const res = await fetchSenate(SENATE_XML(congress, session, n));
+        if (senateBlocked(res)) { await noteSenateBlocked(env, out); return; }
         if (res.status === 404) break;
         if (!res.ok) throw new Error(`Senate vote XML ${res.status} for ${n}`);
         const doc = parseSenateVote(await res.text());
@@ -404,7 +458,10 @@ async function syncSenate(env: Env, roster: Roster, out: string[]): Promise<void
             note = `senate.gov vote document and vote menu agree on the tally (${doc.yeas}-${doc.nays}) and result; ${doc.members.length} member positions counted`;
         }
         const { stmts, matched, unmatched } = voteStatements(env, doc, verification, note, SENATE_MENU(congress, session), roster);
+        const estimate = estimateRows(stmts);
+        if (await overBudget(env, estimate, out)) return;
         await runBatches(env, stmts);
+        await budgetAdd(env, rowsKey(), estimate);
         cursor = n;
         await kvSet(env, cursorKey, String(cursor));
         out.push(`Senate ${congress}-${session} vote ${n}: ${verification}${verification === "senate_xml" ? ` (${matched} senators, ${unmatched} not in roster)` : ""}`);
@@ -413,6 +470,9 @@ async function syncSenate(env: Env, roster: Roster, out: string[]): Promise<void
 
 export async function syncVotes(env: Env): Promise<string> {
     const out: string[] = [];
+    // Yesterday's budget counters are dead weight. Keep a week of them so the numbers can still be read back.
+    const cutoff = "votes_rows_" + new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    try { await env.DB.prepare("DELETE FROM kv_store WHERE key LIKE 'votes_rows_%' AND key < ?").bind(cutoff).run(); } catch { /* housekeeping only */ }
     const roster = await loadRoster(env);
     await syncHouse(env, roster, out);
     await reverifyHouse(env, roster, out);

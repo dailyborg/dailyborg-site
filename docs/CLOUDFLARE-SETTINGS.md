@@ -9,7 +9,7 @@ Status 2026-09-05 (morning, Eastern): applied through the dashboard in the Press
 | Pages project | dailyborg-site | the site |
 | D1 | dailyborg-db, c412efcd-54d8-47a6-9ca5-8522417992c3 | site + all workers |
 | R2 | borg-images | site image route |
-| KV | SENTINEL_CACHE, 5a2f3f363bce4eceb61dd765686b2dc4 | scraper dedup |
+| KV | dailyborg-scraper-SENTINEL_CACHE, 5a2f3f363bce4eceb61dd765686b2dc4 | unused since 2026-09-08 (dedup moved to the D1 table seen_links); delete once Dr. Cato agrees |
 | Queue | ingest-queue | scraper (producer), ingest (consumer) |
 | Workers | dailyborg-discovery, sentinel-engine, dailyborg-scraper, dailyborg-truth, dailyborg-ingest | five crons total |
 

@@ -8,9 +8,12 @@
  * every fifteen minutes, which by itself could exhaust the D1 free tier (5,000,000 rows read per day).
  *
  *   1. Coverage check: how many approved articles per desk in the last 12 hours, and how fresh is the newest.
- *      Triggers the scraper (through a service binding) at most once per hour when content is stale or a desk is empty.
+ *      Triggers the scraper (through a service binding) at most once every six hours when content is stale or a
+ *      desk is empty. If the newest approved article is more than 24 hours old the run also raises a stall alert,
+ *      at most once a day, and clears it with a "healed" row once articles start publishing again.
  *   2. Image repair: up to 5 recent articles with no hero image get a free Unsplash image. No paid generation here.
- *   3. Daily pruning: ingestion_logs older than 30 days, site_visits older than 90 days, trust history older than 1 year.
+ *   3. Daily pruning: ingestion_logs older than 30 days (failure rows after only 7), site_visits older than 90 days,
+ *      trust history older than 1 year, and the scraper's seen_links rows older than 30 days.
  *   4. Writes one log row per run only when it did something, plus one "healthy" heartbeat per day.
  */
 
@@ -69,16 +72,32 @@ async function coverageCheck(env: Env, actions: string[]): Promise<void> {
     const newestAgeHours = newest?.m ? (Date.now() - Date.parse(newest.m.replace(" ", "T") + (newest.m.endsWith("Z") ? "" : "Z"))) / 3600000 : 999;
 
     const stale = newestAgeHours > 24;
-    if ((stale || missing.length > 0) && await isDue(env, "scraper_triggered_at", 1)) {
+    // Six hours, not one. The scraper has its own daily budget, and an hourly trigger on a stalled
+    // newsroom is what exhausted the KV write allowance on 2026-09-06. Deep mode is never requested.
+    if ((stale || missing.length > 0) && await isDue(env, "scraper_triggered_at", 6)) {
         const ok = stale
-            ? await triggerScraper(env, { deep: true, category: "all", amount: 3 })
+            ? await triggerScraper(env, { deep: false, category: "all", amount: 2 })
             : await triggerScraper(env, { deep: false, category: missing.length === 1 ? missing[0].toLowerCase() : "all", amount: 2 });
         if (ok) {
             await kvSet(env, "scraper_triggered_at", new Date().toISOString());
-            actions.push(stale ? `scraper deep run (newest article ${newestAgeHours.toFixed(1)}h old)` : `scraper run for empty desks: ${missing.join(", ")}`);
+            actions.push(stale ? `scraper run (newest article ${newestAgeHours.toFixed(1)}h old)` : `scraper run for empty desks: ${missing.join(", ")}`);
         } else {
             actions.push("scraper trigger FAILED");
         }
+    }
+
+    // A stall means the pipeline itself is broken, not that the scraper is idle. Say so once a day,
+    // loudly, instead of quietly triggering the scraper over and over.
+    if (stale) {
+        if (await isDue(env, "stall_alerted_at", 24)) {
+            await log(env, "error", "Newsroom stalled: the newest approved article is " + newestAgeHours.toFixed(1) + " hours old. Check the dailyborg-ingest logs (AI provider) and the scraper.");
+            await kvSet(env, "stall_alerted_at", new Date().toISOString());
+            actions.push(`stall alert raised (newest article ${newestAgeHours.toFixed(1)}h old)`);
+        }
+    } else if (await kvGet(env, "stall_alerted_at")) {
+        await log(env, "healed", "Newsroom recovered: new articles are publishing again.");
+        await env.DB.prepare("DELETE FROM kv_store WHERE key = 'stall_alerted_at'").run();
+        actions.push("stall alert cleared");
     }
 }
 
@@ -117,6 +136,10 @@ async function dailyPruning(env: Env, actions: string[]): Promise<void> {
         env.DB.prepare("DELETE FROM site_visits WHERE created_at < datetime('now', '-90 days')"),
         env.DB.prepare("DELETE FROM trustworthiness_history WHERE scored_at < datetime('now', '-365 days')"),
         env.DB.prepare("DELETE FROM politician_requests WHERE status IN ('Rejected', 'Verified', 'Generated') AND created_at < datetime('now', '-90 days')"),
+        // The scraper's link dedup. 30 days is far longer than any RSS feed keeps an item.
+        env.DB.prepare("DELETE FROM seen_links WHERE queued_at < datetime('now', '-30 days')"),
+        // Failure rows are only useful while someone is still debugging the failure.
+        env.DB.prepare("DELETE FROM ingestion_logs WHERE status IN ('failed', 'fetch_failure', 'provider_error', 'validation_warning') AND created_at < datetime('now', '-7 days')"),
     ]);
     await kvSet(env, "pruned_at", new Date().toISOString());
     actions.push("daily pruning done");
