@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, ChevronRight, X, AlertCircle, CheckCircle2, ChevronDown, Award, Loader2 } from "lucide-react";
@@ -8,6 +8,14 @@ import { NewsGrid } from "./ui/grid";
 import type { PoliticianCard as Politician, Level } from "@/lib/services/politician-service";
 
 type SortOption = "name-asc" | "name-desc" | "trustworthy" | "popular";
+
+/** Cards rendered per page. 564 federal officials at once is more DOM than any browser needs. */
+const PAGE_SIZE = 60;
+
+/** Every directory column can come back null from D1, so read them through this before calling string methods. */
+function text(value: string | null | undefined): string {
+    return typeof value === "string" ? value : "";
+}
 
 const US_STATES = [
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS",
@@ -45,15 +53,20 @@ function getTrustBadge(score: number | null | undefined) {
 function PoliticianCard({ pol }: { pol: Politician }) {
     const trust = getTrustBadge(pol.trustworthiness_score);
     const [imgFailed, setImgFailed] = useState(false);
-    const initials = pol.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+    const name = text(pol.name) || "Name not on file";
+    const photoUrl = text(pol.photo_url);
+    const party = text(pol.party);
+    const office = text(pol.office_held);
+    const districtState = text(pol.district_state);
+    const initials = name.split(" ").map(n => n[0] || "").join("").substring(0, 2).toUpperCase();
 
     return (
         <Link href={`/borg-record/politicians/${pol.slug}`} className="col-span-1 md:col-span-2 lg:col-span-3 bg-background border border-border group hover:border-accent hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] duration-500 transition-all block relative overflow-hidden rounded-sm">
             <div className="aspect-[4/5] relative bg-muted/20 overflow-hidden">
-                {pol.photo_url && !imgFailed ? (
+                {photoUrl && !imgFailed ? (
                     <img
-                        src={pol.photo_url}
-                        alt={pol.name}
+                        src={photoUrl}
+                        alt={name}
                         loading="lazy"
                         onError={() => setImgFailed(true)}
                         className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
@@ -72,11 +85,14 @@ function PoliticianCard({ pol }: { pol: Politician }) {
                             ★ Former Official
                         </div>
                     )}
-                    <span className={`text-[10px] font-bold uppercase tracking-widest w-fit px-2.5 py-1 mb-2 shadow-sm rounded-sm backdrop-blur-md ${pol.party === "Democrat" ? "bg-blue-500/80 text-white" : pol.party === "Republican" ? "bg-red-500/80 text-white" : "bg-foreground/80 text-background"}`}>
-                        {pol.party}
+                    <span className={`text-[10px] font-bold uppercase tracking-widest w-fit px-2.5 py-1 mb-2 shadow-sm rounded-sm backdrop-blur-md ${party === "Democrat" ? "bg-blue-500/80 text-white" : party === "Republican" ? "bg-red-500/80 text-white" : "bg-foreground/80 text-background"}`}>
+                        {party || "No party listed"}
                     </span>
-                    <h3 className="font-serif text-3xl font-bold leading-none mt-2 group-hover:text-accent transition-colors drop-shadow-sm">{pol.name}</h3>
-                    <p className="text-xs font-semibold text-muted-foreground mt-2 uppercase tracking-widest drop-shadow-sm">{pol.office_held} <span className="opacity-50 mx-1">•</span> {pol.district_state}</p>
+                    <h3 className="font-serif text-3xl font-bold leading-none mt-2 group-hover:text-accent transition-colors drop-shadow-sm">{name}</h3>
+                    <p className="text-xs font-semibold text-muted-foreground mt-2 uppercase tracking-widest drop-shadow-sm">
+                        {office || "Office not on file"}
+                        {districtState && <><span className="opacity-50 mx-1">•</span>{districtState}</>}
+                    </p>
                 </div>
             </div>
             <div className="px-6 py-4 bg-background flex justify-between items-center text-xs font-bold uppercase tracking-wider relative z-20">
@@ -117,6 +133,10 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
     const [pinnedIds, setPinnedIds] = useState<string[]>([]);
     const [partyFilter, setPartyFilter] = useState<string | null>(null);
     const [sortBy, setSortBy] = useState<SortOption>("name-asc");
+    const [page, setPage] = useState(1);
+
+    const dialogRef = useRef<HTMLDivElement | null>(null);
+    const modalTriggerRef = useRef<HTMLButtonElement | null>(null);
 
     const [formName, setFormName] = useState("");
     const [formLink, setFormLink] = useState("");
@@ -157,6 +177,22 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
         return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
     }, [query]);
 
+    const closeModal = useCallback(() => {
+        setIsModalOpen(false);
+        // Hand focus back to the button that opened the dialog.
+        modalTriggerRef.current?.focus();
+    }, []);
+
+    useEffect(() => {
+        if (!isModalOpen) return;
+        dialogRef.current?.focus();
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") closeModal();
+        };
+        document.addEventListener("keydown", onKeyDown);
+        return () => document.removeEventListener("keydown", onKeyDown);
+    }, [isModalOpen, closeModal]);
+
     const navigate = (next: { level?: Level; state?: string | null; former?: boolean }) => {
         const params = new URLSearchParams();
         const l = next.level ?? level;
@@ -173,12 +209,14 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
         const q = query.trim().toLowerCase();
         const base: Politician[] = remoteResults ?? initialPoliticians;
         const result = base.filter(p => {
+            const districtState = text(p.district_state);
+            const stateCode = districtState.split("-")[0] || text(p.state);
             const matchesSearch = !q || remoteResults !== null ||
-                p.name.toLowerCase().includes(q) ||
-                p.district_state.toLowerCase().includes(q) ||
-                p.office_held.toLowerCase().includes(q) ||
-                (STATE_NAMES[p.district_state.split("-")[0]]?.toLowerCase().includes(q) ?? false);
-            const matchesParty = !partyFilter || p.party === partyFilter;
+                text(p.name).toLowerCase().includes(q) ||
+                districtState.toLowerCase().includes(q) ||
+                text(p.office_held).toLowerCase().includes(q) ||
+                (STATE_NAMES[stateCode]?.toLowerCase().includes(q) ?? false);
+            const matchesParty = !partyFilter || text(p.party) === partyFilter;
             return matchesSearch && matchesParty;
         });
 
@@ -190,8 +228,8 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
                 if (!aPinned && bPinned) return 1;
             }
             switch (sortBy) {
-                case "name-asc": return a.name.localeCompare(b.name);
-                case "name-desc": return b.name.localeCompare(a.name);
+                case "name-asc": return text(a.name).localeCompare(text(b.name));
+                case "name-desc": return text(b.name).localeCompare(text(a.name));
                 case "trustworthy": return (b.trustworthiness_score ?? -1) - (a.trustworthiness_score ?? -1);
                 case "popular": return (b.popularity_score ?? 0) - (a.popularity_score ?? 0);
                 default: return 0;
@@ -199,6 +237,16 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
         });
         return result;
     }, [initialPoliticians, remoteResults, query, partyFilter, sortBy, pinnedIds]);
+
+    // Client side paging. The whole filtered list stays in memory; only one page of cards is rendered.
+    const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+    const currentPage = Math.min(page, totalPages);
+    const pageStart = (currentPage - 1) * PAGE_SIZE;
+    const pageItems = visible.slice(pageStart, pageStart + PAGE_SIZE);
+
+    useEffect(() => {
+        setPage(1);
+    }, [query, partyFilter, sortBy, remoteResults, initialPoliticians]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -240,7 +288,7 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search every official by name..."
-                        className="w-full bg-background border border-border outline-none pl-12 pr-12 py-4 text-base font-medium rounded-full shadow-sm hover:shadow-md focus:border-accent focus:shadow-md focus:ring-4 focus:ring-accent/10 transition-all placeholder:text-muted-foreground/60"
+                        className="w-full bg-background border border-border pl-12 pr-12 py-4 text-base font-medium rounded-full shadow-sm hover:shadow-md focus:border-accent focus:shadow-md focus:ring-2 focus:ring-foreground/40 transition-all placeholder:text-muted-foreground/60"
                     />
                     {searching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
                 </div>
@@ -283,7 +331,7 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
                             <select
                                 value={state || ""}
                                 onChange={(e) => navigate({ state: e.target.value || null })}
-                                className="w-full appearance-none bg-background border border-border rounded-xl py-3 px-5 text-sm font-bold uppercase tracking-widest cursor-pointer shadow-sm hover:border-accent hover:shadow-md transition-all outline-none focus:border-accent focus:ring-4 focus:ring-accent/10"
+                                className="w-full appearance-none bg-background border border-border rounded-xl py-3 px-5 text-sm font-bold uppercase tracking-widest cursor-pointer shadow-sm hover:border-accent hover:shadow-md transition-all focus:border-accent focus:ring-2 focus:ring-foreground/40"
                             >
                                 <option value="">Choose a state</option>
                                 {US_STATES.map(s => <option key={s} value={s}>{STATE_NAMES[s]} [{s}]</option>)}
@@ -352,9 +400,37 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
             </div>
 
             {visible.length > 0 ? (
-                <NewsGrid>
-                    {visible.map(pol => <PoliticianCard key={pol.id} pol={pol} />)}
-                </NewsGrid>
+                <>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-4">
+                        Showing {pageItems.length} of {visible.length}
+                    </p>
+                    <NewsGrid>
+                        {pageItems.map(pol => <PoliticianCard key={pol.id} pol={pol} />)}
+                    </NewsGrid>
+                    {totalPages > 1 && (
+                        <nav aria-label="Directory pages" className="flex items-center justify-between gap-4 mt-10 border-t border-border/50 pt-6">
+                            <button
+                                type="button"
+                                onClick={() => setPage(Math.max(1, currentPage - 1))}
+                                disabled={currentPage <= 1}
+                                className="px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest border border-border hover:border-foreground focus:ring-2 focus:ring-foreground/40 transition-colors bg-background disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border"
+                            >
+                                Previous
+                            </button>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                                Page {currentPage} of {totalPages}
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                                disabled={currentPage >= totalPages}
+                                className="px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest border border-border hover:border-foreground focus:ring-2 focus:ring-foreground/40 transition-colors bg-background disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border"
+                            >
+                                Next
+                            </button>
+                        </nav>
+                    )}
+                </>
             ) : (
                 <div className="py-24 border border-border rounded-3xl bg-muted/5 text-center flex flex-col items-center">
                     <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-6">
@@ -366,8 +442,9 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
                     </p>
                     <div className="w-full max-w-sm h-px bg-border my-6"></div>
                     <button
-                        onClick={() => { setFormName(query); setIsModalOpen(true); }}
-                        className="bg-foreground text-background font-bold uppercase tracking-widest text-xs px-8 py-4 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">
+                        type="button"
+                        onClick={(e) => { modalTriggerRef.current = e.currentTarget; setFormName(query); setIsModalOpen(true); }}
+                        className="bg-foreground text-background font-bold uppercase tracking-widest text-xs px-8 py-4 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 focus:ring-2 focus:ring-foreground/40 transition-all">
                         Request an Official
                     </button>
                 </div>
@@ -375,12 +452,19 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
 
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 bg-background/60 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-background border border-border rounded-3xl w-full max-w-xl shadow-2xl relative overflow-hidden">
-                        <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors p-2 bg-muted/40 hover:bg-muted rounded-full" aria-label="Close">
+                    <div
+                        ref={dialogRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="request-official-heading"
+                        tabIndex={-1}
+                        className="bg-background border border-border rounded-3xl w-full max-w-xl shadow-2xl relative overflow-hidden focus:outline focus:outline-2 focus:outline-foreground/40"
+                    >
+                        <button type="button" onClick={closeModal} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors p-2 bg-muted/40 hover:bg-muted rounded-full focus:ring-2 focus:ring-foreground/40" aria-label="Close">
                             <X className="w-5 h-5" />
                         </button>
                         <div className="p-10 md:p-12">
-                            <h2 className="font-serif text-3xl font-bold mb-3 tracking-tight">Request an Official</h2>
+                            <h2 id="request-official-heading" className="font-serif text-3xl font-bold mb-3 tracking-tight">Request an Official</h2>
                             <p className="text-sm text-muted-foreground mb-10 leading-relaxed max-w-md">
                                 Give us the full name of a currently serving United States official. We verify the office against public records (Wikidata) before a profile is created, usually within the hour.
                             </p>
@@ -389,15 +473,15 @@ export function PoliticianDirectoryClient({ initialPoliticians, level, state, in
                                     <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mb-4"><CheckCircle2 className="w-8 h-8" /></div>
                                     <h3 className="font-bold text-xl mb-2">Request received</h3>
                                     <p className="text-sm opacity-90 max-w-xs mb-8">If the office checks out, the profile goes live and you get an email.</p>
-                                    <button onClick={() => setIsModalOpen(false)} className="bg-success text-success-foreground px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest hover:brightness-110 transition-all">Close</button>
+                                    <button type="button" onClick={closeModal} className="bg-foreground text-background px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest hover:opacity-90 focus:ring-2 focus:ring-foreground/40 transition-all">Close</button>
                                 </div>
                             ) : (
                                 <form onSubmit={handleSubmit} className="space-y-6">
                                     {submitError && <div className="p-4 text-xs font-bold bg-destructive/10 text-destructive rounded-xl text-center">{submitError}</div>}
                                     <div className="space-y-5">
-                                        <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} required minLength={4} maxLength={80} className="w-full bg-muted/30 border border-border rounded-xl p-4 text-sm font-medium focus:border-accent focus:bg-background focus:ring-4 focus:ring-accent/10 outline-none transition-all" placeholder="Official's full name *" />
-                                        <input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} required className="w-full bg-muted/30 border border-border rounded-xl p-4 text-sm font-medium focus:border-accent focus:bg-background focus:ring-4 focus:ring-accent/10 outline-none transition-all" placeholder="Your email *" />
-                                        <input type="url" value={formLink} onChange={(e) => setFormLink(e.target.value)} className="w-full bg-muted/30 border border-border rounded-xl p-4 text-sm font-medium focus:border-accent focus:bg-background focus:ring-4 focus:ring-accent/10 outline-none transition-all" placeholder="Reference link (optional)" />
+                                        <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} required minLength={4} maxLength={80} className="w-full bg-muted/30 border border-border rounded-xl p-4 text-sm font-medium focus:border-accent focus:bg-background focus:ring-2 focus:ring-foreground/40 transition-all" placeholder="Official's full name *" />
+                                        <input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} required className="w-full bg-muted/30 border border-border rounded-xl p-4 text-sm font-medium focus:border-accent focus:bg-background focus:ring-2 focus:ring-foreground/40 transition-all" placeholder="Your email *" />
+                                        <input type="url" value={formLink} onChange={(e) => setFormLink(e.target.value)} className="w-full bg-muted/30 border border-border rounded-xl p-4 text-sm font-medium focus:border-accent focus:bg-background focus:ring-2 focus:ring-foreground/40 transition-all" placeholder="Reference link (optional)" />
                                     </div>
                                     <div className="pt-6">
                                         <button type="submit" disabled={isSubmitting} className="w-full bg-foreground text-background font-bold text-xs uppercase tracking-widest py-4 rounded-full shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0">

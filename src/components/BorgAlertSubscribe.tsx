@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Loader2, Mail, MessageSquare, AlertCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Mail } from "lucide-react";
 
 interface BorgAlertParams {
     politicianSlug: string;
@@ -9,7 +9,8 @@ interface BorgAlertParams {
 }
 
 export function BorgAlertSubscribe({ politicianSlug, politicianName }: BorgAlertParams) {
-    const [channel, setChannel] = useState<"email" | "whatsapp">("email");
+    // Email only. WhatsApp delivery does not exist yet (the worker only logs a stub), so it is not offered.
+    const channel = "email" as const;
     const [contactInfo, setContactInfo] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [result, setResult] = useState<{ success?: boolean; message?: string } | null>(null);
@@ -22,10 +23,8 @@ export function BorgAlertSubscribe({ politicianSlug, politicianName }: BorgAlert
         try {
             const payload = {
                 delivery_channel: channel,
-                email: channel === "email" ? contactInfo : undefined,
-                phone_number: channel === "whatsapp" ? contactInfo : undefined,
-                tracked_politician: politicianSlug,
-                plan_type: 'free', // Defaults to standard alerts unless they upgrade in the main portal
+                email: contactInfo,
+                tracked_politicians: [politicianSlug],
                 frequency: 'daily'
             };
 
@@ -73,40 +72,26 @@ export function BorgAlertSubscribe({ politicianSlug, politicianName }: BorgAlert
             <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-2 h-2 rounded-full bg-[#DFA823] animate-pulse"></div>
-                    <h3 className="font-sans font-black text-xs uppercase tracking-[0.2em] text-[#DFA823]">
+                    <span className="font-sans font-black text-xs uppercase tracking-[0.2em] text-[#DFA823]">
                         Set Borg Alert
-                    </h3>
+                    </span>
                 </div>
 
-                <h4 className="font-serif text-2xl md:text-3xl font-bold mb-2">Track {politicianName}</h4>
+                <h3 className="font-serif text-2xl md:text-3xl font-bold mb-2">Track {politicianName}</h3>
                 <p className="text-background/80 text-sm mb-6 max-w-md">
                     Receive immediate notifications if statements contradict the record, or if a documented promise is broken.
                 </p>
 
                 <form onSubmit={handleSubscribe} className="flex flex-col gap-4">
-                    {/* Channel Toggle */}
-                    <div className="flex items-center gap-2 bg-background/10 p-1 w-fit rounded-sm">
-                        <button
-                            type="button"
-                            onClick={() => setChannel("email")}
-                            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${channel === 'email' ? 'bg-background text-foreground' : 'text-background/60 hover:text-background'}`}
-                        >
-                            <Mail className="w-3 h-3" /> Email
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setChannel("whatsapp")}
-                            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${channel === 'whatsapp' ? 'bg-[#25D366] text-background' : 'text-background/60 hover:text-background'}`}
-                        >
-                            <MessageSquare className="w-3 h-3" /> WhatsApp
-                        </button>
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-background/80">
+                        <Mail className="w-3 h-3" /> Email alerts
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-3">
                         <input
-                            type={channel === 'email' ? 'email' : 'tel'}
-                            className="flex-1 bg-background/10 border border-background/20 px-4 py-3 text-sm text-background placeholder:text-background/50 focus:outline-none focus:border-background transition-colors"
-                            placeholder={channel === 'email' ? 'secure@email.com' : '+1 (555) 000-0000'}
+                            type="email"
+                            className="flex-1 bg-background/10 border border-background/20 px-4 py-3 text-sm text-background placeholder:text-background/50 focus:ring-2 focus:ring-background/60 focus:border-background transition-colors"
+                            placeholder="you@example.com"
                             value={contactInfo}
                             onChange={(e) => setContactInfo(e.target.value)}
                             required
@@ -119,12 +104,6 @@ export function BorgAlertSubscribe({ politicianSlug, politicianName }: BorgAlert
                             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Track"}
                         </button>
                     </div>
-
-                    {channel === 'whatsapp' && (
-                        <p className="text-[10px] text-background/60 inline-flex items-center gap-1 mt-1">
-                            <AlertCircle className="w-3 h-3" /> Include country code for WhatsApp (e.g. +1)
-                        </p>
-                    )}
 
                     {result?.message && !result.success && (
                         <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold mt-2">

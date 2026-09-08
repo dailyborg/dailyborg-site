@@ -57,15 +57,17 @@ export function LiarLiarClient() {
 
     // Styling logic for the "Ignis Veritas" fiery gradient
     const getBarColor = (entry: any) => {
-        const severity = entry.severe_lies / entry.total_lies;
+        const total = Number(entry?.total_lies) || 0;
+        if (total <= 0) return "url(#mostlyFalse)"; // Nothing to weigh, stay on the warning gradient
+        const severity = (Number(entry?.severe_lies) || 0) / total;
         if (severity > 0.5) return "url(#pantsOnFire)"; // Fiery red
         return "url(#mostlyFalse)"; // Orange warning
     };
 
     return (
         <div className="min-h-screen bg-[#0c0e12] text-[#f6f6fc] font-inter">
-            {/* TopAppBar Concept from Obsidian Lens */}
-            <header className="sticky top-0 z-50 bg-[#111318]/80 backdrop-blur-md border-b border-[#46484d]/30 px-6 py-4 flex items-center justify-between">
+            {/* TopAppBar Concept from Obsidian Lens. Plain div: the site layout already owns the header and main landmarks. */}
+            <div className="sticky top-0 z-50 bg-[#111318]/80 backdrop-blur-md border-b border-[#46484d]/30 px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                     <Flame className="w-8 h-8 text-[#ff4d00]" style={{ filter: 'drop-shadow(0 0 10px rgba(255, 77, 0, 0.5))' }} />
                     <h1 className="text-2xl font-bold font-space-grotesk tracking-tight text-[#f9f9ff]">
@@ -75,17 +77,18 @@ export function LiarLiarClient() {
                 <Link href="/borg-record" className="text-sm font-medium hover:text-[#ff906d] transition-colors">
                     &larr; Back to Borg Record
                 </Link>
-            </header>
+            </div>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
                 
                 {/* Dashboard Intro */}
                 <div className="bg-[#171a1f] rounded-xl border border-[#46484d]/20 p-6 relative overflow-hidden shadow-2xl">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-[#ff4d00]/5 blur-[100px] rounded-full pointer-events-none"></div>
                     <h2 className="text-xl font-bold font-space-grotesk text-white">The Accountability Index</h2>
                     <p className="text-[#aaabb0] mt-2 max-w-3xl">
-                        This forensic terminal tracks objectively veriafiable false statements, promises, and claims made by public officials. 
-                        Records are analyzed autonomously by the edge matrix. Data is not an opinion; it is a ledger.
+                        This forensic terminal tracks objectively verifiable false statements, promises, and claims made by public officials.
+                        Rulings come from PolitiFact and link to the source; no language model decides them.
+                        Data is not an opinion, it is a ledger.
                     </p>
                 </div>
 
@@ -99,7 +102,7 @@ export function LiarLiarClient() {
                     <select 
                         value={partyFilter} 
                         onChange={(e) => setPartyFilter(e.target.value)}
-                        className="bg-[#23262c] text-[#f6f6fc] border border-[#46484d] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#ff906d] transition-colors appearance-none"
+                        className="bg-[#23262c] text-[#f6f6fc] border border-[#46484d] rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#ff906d] focus:border-[#ff906d] transition-colors appearance-none"
                     >
                         <option value="all">Any Party</option>
                         <option value="Democrat">Democrat</option>
@@ -110,7 +113,7 @@ export function LiarLiarClient() {
                     <select 
                         value={roleFilter} 
                         onChange={(e) => setRoleFilter(e.target.value)}
-                        className="bg-[#23262c] text-[#f6f6fc] border border-[#46484d] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#ff906d] transition-colors appearance-none"
+                        className="bg-[#23262c] text-[#f6f6fc] border border-[#46484d] rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#ff906d] focus:border-[#ff906d] transition-colors appearance-none"
                     >
                         <option value="all">Any Office</option>
                         <option value="President">President</option>
@@ -121,7 +124,7 @@ export function LiarLiarClient() {
                     <select 
                         value={stateFilter} 
                         onChange={(e) => setStateFilter(e.target.value)}
-                        className="bg-[#23262c] text-[#f6f6fc] border border-[#46484d] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#ff906d] transition-colors appearance-none"
+                        className="bg-[#23262c] text-[#f6f6fc] border border-[#46484d] rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#ff906d] focus:border-[#ff906d] transition-colors appearance-none"
                     >
                         <option value="all">Any State</option>
                         {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -218,7 +221,7 @@ export function LiarLiarClient() {
                         </div>
                     </div>
                 )}
-            </main>
+            </div>
         </div>
     );
 }

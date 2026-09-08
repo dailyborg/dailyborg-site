@@ -6,17 +6,32 @@ export interface Env {
     TWILIO_WHATSAPP_NUMBER: string;
 }
 
+/**
+ * A subscriber's private unsubscribe key: 32 lowercase hex characters from the runtime CSPRNG.
+ * It is the only thing https://dailyborg.com/api/unsubscribe needs, so no shared secret travels by email.
+ */
+function newUnsubscribeToken(): string {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export async function processDeliveries(env: Env, timeWindowMs: number) {
     console.log(`[DELIVERY ENGINE] Waking up. Processing subscribers for window: ${timeWindowMs / (60 * 60 * 1000)} hours`);
 
     // 1. Fetch recent articles from the specified window
+    // D1 stores these timestamps as "YYYY-MM-DD HH:MM:SS" text, so the cutoff has to be written the same
+    // way. An ISO string with its "T" and "Z" sorts after every real row and matched nothing.
     const now = new Date();
-    const windowStart = new Date(now.getTime() - timeWindowMs).toISOString();
+    const windowStart = new Date(now.getTime() - timeWindowMs).toISOString().slice(0, 19).replace('T', ' ');
 
+    // article_type carries the shape of the row, not the category, but rows written before that rule
+    // landed still hold a feed type such as 'politics'. Everything that is not a draft and has been
+    // approved goes out; the desk column is what says which section it belongs to.
     const articlesQuery = await env.DB.prepare(`
-        SELECT slug, title, excerpt, content_html, desk, publish_date, hero_image_url 
-        FROM articles 
-        WHERE publish_date >= ? AND article_type IN ('standard', 'breaking')
+        SELECT slug, title, excerpt, content_html, desk, publish_date, hero_image_url
+        FROM articles
+        WHERE publish_date >= ? AND approval_status = 'approved' AND article_type <> 'draft'
         ORDER BY publish_date DESC
     `).bind(windowStart).all();
 
@@ -56,19 +71,38 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
     // 2. Fetch subscribers
     const frequencyTarget = timeWindowMs > (48 * 60 * 60 * 1000) ? 'weekly' : 'daily';
 
+    // frequency is set to 'unsubscribed' by the unsubscribe route, so the frequency match already excludes
+    // those rows; the second clause states the contract so it cannot be lost in a later edit. WhatsApp is
+    // still a stub, so only the email channel is selected.
     const subscribersQuery = await env.DB.prepare(`
-        SELECT id, email, phone_number, plan_type, delivery_channel, frequency, topics, tracked_politicians
+        SELECT id, email, phone_number, plan_type, delivery_channel, frequency, topics, tracked_politicians, unsubscribe_token
         FROM subscribers
-        WHERE frequency = ?
+        WHERE frequency = ? AND (frequency <> 'unsubscribed') AND delivery_channel = 'email'
     `).bind(frequencyTarget).all();
 
     const subscribers = subscribersQuery.results as any[];
     if (subscribers.length === 0) {
-        console.log(`[DELIVERY ENGINE] No subscribers configured for '${frequencyTarget}' delivery.`);
+        console.log(`[DELIVERY ENGINE] No email subscribers configured for '${frequencyTarget}' delivery.`);
         return;
     }
 
     console.log(`[DELIVERY ENGINE] Analyzing preferences for ${subscribers.length} '${frequencyTarget}' subscribers...`);
+
+    // Every email needs a working one-click unsubscribe link, so any subscriber still without a token gets
+    // one before a single message goes out. If this write fails the run fails with it, on purpose: sending
+    // a brief whose unsubscribe link cannot be honoured is worse than sending nothing.
+    const tokenWrites: D1PreparedStatement[] = [];
+    for (const sub of subscribers) {
+        if (sub.unsubscribe_token) continue;
+        sub.unsubscribe_token = newUnsubscribeToken();
+        tokenWrites.push(
+            env.DB.prepare("UPDATE subscribers SET unsubscribe_token = ? WHERE id = ?").bind(sub.unsubscribe_token, sub.id)
+        );
+    }
+    if (tokenWrites.length > 0) {
+        await env.DB.batch(tokenWrites);
+        console.log(`[DELIVERY ENGINE] Issued ${tokenWrites.length} new unsubscribe tokens.`);
+    }
 
     const canSendEmails = env.RESEND_API_KEY && env.RESEND_API_KEY.length > 5;
 
@@ -87,7 +121,8 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
         } catch (e) { }
 
         const relevantArticles = articles.filter(art => {
-            const mappedContentStr = `${art.desk} ${art.title}`.toLowerCase();
+            // desk is nullable on older rows, and "null politics briefing" must never reach a reader.
+            const mappedContentStr = `${art.desk || 'News'} ${art.title}`.toLowerCase();
             return userTopics.some((t: string) => {
                 const topicNorm = t.toLowerCase().replace('u.s. ', '');
                 return mappedContentStr.includes(topicNorm) || t === 'All';
@@ -114,9 +149,11 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
                 continue;
             }
 
-            const htmlContent = buildEmailHtml(relevantArticles, relevantAlerts, isPaid, frequencyTarget, userTopics);
-
             try {
+                // Assembling the message sits inside the try as well, so one malformed article row costs
+                // that subscriber their brief and not the whole run.
+                const htmlContent = buildEmailHtml(relevantArticles, relevantAlerts, isPaid, frequencyTarget, userTopics, sub.unsubscribe_token);
+
                 const resendRes = await fetch("https://api.resend.com/emails", {
                     method: "POST",
                     headers: {
@@ -137,7 +174,7 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
                     console.error("Resend API failed:", await resendRes.text());
                 }
             } catch (e) {
-                console.error("Fetch email dispatch failed:", e);
+                console.error(`Email dispatch failed for ${sub.email}:`, e);
             }
 
         } else if (sub.delivery_channel === 'whatsapp') {
@@ -170,13 +207,17 @@ export async function processDeliveries(env: Env, timeWindowMs: number) {
             } catch (e) {
                 console.error("Fetch WhatsApp dispatch failed:", e);
             }
+        } else {
+            // The subscriber query only returns the email channel while WhatsApp is a stub, so a row that
+            // reaches here has a channel nobody serves yet. Say so instead of dropping it in silence.
+            console.log(`  -> Skip: ${sub.email || sub.phone_number || sub.id} is on the '${sub.delivery_channel}' channel, which is not delivered yet.`);
         }
     }
 
     console.log(`[DELIVERY ENGINE] Complete. Sent ${emailsSent} emails, logged ${whatsappTracked} whatsapp triggers.`);
 }
 
-function buildEmailHtml(articles: any[], alerts: any, isPaid: boolean, frequency: string, topics: string[]): string {
+function buildEmailHtml(articles: any[], alerts: any, isPaid: boolean, frequency: string, topics: string[], unsubscribeToken: string): string {
     let output = `
         <div style="font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb; padding: 20px; color: #1a2b4c;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-top: 5px solid #1a2b4c;">
@@ -215,7 +256,7 @@ function buildEmailHtml(articles: any[], alerts: any, isPaid: boolean, frequency
     }
 
     articles.forEach(art => {
-        const urlPath = art.desk.toLowerCase().replace(' grid', '').replace(/ /g, '-');
+        const urlPath = (art.desk || 'News').toLowerCase().replace(' grid', '').replace(/ /g, '-');
 
         output += `
             <div style="margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9;">
@@ -237,9 +278,13 @@ function buildEmailHtml(articles: any[], alerts: any, isPaid: boolean, frequency
         `;
     });
 
+    // Every brief carries a working one-click unsubscribe link and a postal identity line, because a
+    // commercial email without both is not lawful mail in the United States.
     output += `
             <div style="margin-top: 40px; font-size: 12px; color: #94a3b8; text-align: center;">
                 <p>This transmission is secure. ${isPaid ? 'Premium Director Account' : 'Standard Agent Account'}</p>
+                <p><a href="https://dailyborg.com/api/unsubscribe?t=${unsubscribeToken}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a></p>
+                <p>The Daily Borg, dailyborg.com</p>
                 <p>&copy; ${new Date().getFullYear()} The Daily Borg Operations</p>
             </div>
         </div>
@@ -268,7 +313,7 @@ function buildWhatsAppMarkdown(articles: any[], alerts: any, isPaid: boolean): s
     }
 
     articles.forEach(art => {
-        const urlPath = art.desk.toLowerCase().replace(' grid', '').replace(/ /g, '-');
+        const urlPath = (art.desk || 'News').toLowerCase().replace(' grid', '').replace(/ /g, '-');
 
         output += `*■ ${art.title}*\n`;
         if (isPaid) {

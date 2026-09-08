@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 // Types mirroring our D1 schema
 export interface Claim {
@@ -28,9 +28,25 @@ interface CredibilityChartProps {
 
 export default function CredibilityChart({ politicianName, claims, evidenceMap }: CredibilityChartProps) {
     const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
+    const dialogRef = useRef<HTMLDivElement | null>(null);
+    const triggerRef = useRef<HTMLButtonElement | null>(null);
 
-    // Simple stats calculation
-    const totalClaims = claims.length;
+    const closeClaim = useCallback(() => {
+        setSelectedClaim(null);
+        // Send focus back to the card that opened the dialog.
+        triggerRef.current?.focus();
+    }, []);
+
+    useEffect(() => {
+        if (!selectedClaim) return;
+        dialogRef.current?.focus();
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') closeClaim();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [selectedClaim, closeClaim]);
+
     const promises = claims.filter(c => c.type === 'Promise');
     const facts = claims.filter(c => c.type === 'Fact');
 
@@ -44,76 +60,94 @@ export default function CredibilityChart({ politicianName, claims, evidenceMap }
                         Accountability Engine
                     </h2>
                     <p className="text-gray-500 dark:text-gray-400">
-                        Real-time verification of `{politicianName}`'s public statements.
+                        Real-time verification of {politicianName}&apos;s public statements.
                     </p>
                 </div>
 
-                <div className="flex gap-4">
-                    <div className="text-center px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                        <span className="block text-2xl font-bold text-blue-600 dark:text-blue-400">{promises.length}</span>
-                        <span className="text-xs text-blue-800 dark:text-blue-300 uppercase tracking-wider font-semibold">Promises</span>
+                {claims.length > 0 && (
+                    <div className="flex gap-4">
+                        <div className="text-center px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                            <span className="block text-2xl font-bold text-blue-600 dark:text-blue-400">{promises.length}</span>
+                            <span className="text-xs text-blue-800 dark:text-blue-300 uppercase tracking-wider font-semibold">Promises</span>
+                        </div>
+                        <div className="text-center px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg">
+                            <span className="block text-2xl font-bold text-emerald-600 dark:text-emerald-400">{facts.length}</span>
+                            <span className="text-xs text-emerald-800 dark:text-emerald-300 uppercase tracking-wider font-semibold">Facts Checked</span>
+                        </div>
                     </div>
-                    <div className="text-center px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg">
-                        <span className="block text-2xl font-bold text-emerald-600 dark:text-emerald-400">{facts.length}</span>
-                        <span className="text-xs text-emerald-800 dark:text-emerald-300 uppercase tracking-wider font-semibold">Facts Checked</span>
-                    </div>
-                </div>
+                )}
             </div>
 
             {/* The Timeline / List View */}
-            <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Recent Public Record</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {claims.map((claim) => (
-                        <div
-                            key={claim.id}
-                            onClick={() => setSelectedClaim(claim)}
-                            className="p-4 border rounded-lg cursor-pointer hover:border-blue-500 transition-colors bg-gray-50 dark:bg-gray-800"
-                        >
-                            <div className="flex justify-between items-center mb-2">
-                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${claim.type === 'Promise' ? 'bg-purple-100 text-purple-700' :
-                                    claim.type === 'Fact' ? 'bg-teal-100 text-teal-700' :
-                                        'bg-gray-200 text-gray-700'
-                                    }`}>
-                                    {claim.type}
-                                </span>
-                                <span className="text-xs text-gray-500">{claim.date}</span>
-                            </div>
-                            <p className="text-sm font-medium text-gray-800 dark:text-gray-200 line-clamp-3">
-                                &quot;{claim.content}&quot;
-                            </p>
-                            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                {claim.context}
-                            </p>
-                        </div>
-                    ))}
+            {claims.length === 0 ? (
+                <div className="p-8 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg text-center">
+                    <p className="text-gray-500 dark:text-gray-400 italic">No verified claims on file yet.</p>
                 </div>
-            </div>
+            ) : (
+                <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">Recent Public Record</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {claims.map((claim) => (
+                            <button
+                                key={claim.id}
+                                type="button"
+                                onClick={(e) => { triggerRef.current = e.currentTarget; setSelectedClaim(claim); }}
+                                className="p-4 border rounded-lg text-left w-full cursor-pointer hover:border-blue-500 focus:ring-2 focus:ring-blue-500 transition-colors bg-gray-50 dark:bg-gray-800"
+                            >
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${claim.type === 'Promise' ? 'bg-purple-100 text-purple-700' :
+                                        claim.type === 'Fact' ? 'bg-teal-100 text-teal-700' :
+                                            'bg-gray-200 text-gray-700'
+                                        }`}>
+                                        {claim.type}
+                                    </span>
+                                    <span className="text-xs text-gray-500">{claim.date}</span>
+                                </div>
+                                <p className="text-sm font-medium text-gray-800 dark:text-gray-200 line-clamp-3">
+                                    &quot;{claim.content}&quot;
+                                </p>
+                                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                    {claim.context}
+                                </p>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Verification Modal / Slide-out Panel */}
             {selectedClaim && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-gray-900 rounded-xl max-w-2xl w-full p-6 shadow-2xl relative overflow-hidden">
+                    <div
+                        ref={dialogRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="credibility-claim-heading"
+                        tabIndex={-1}
+                        className="bg-white dark:bg-gray-900 rounded-xl max-w-2xl w-full p-6 shadow-2xl relative overflow-hidden focus:outline focus:outline-2 focus:outline-blue-500"
+                    >
 
                         {/* Close Button */}
                         <button
-                            onClick={() => setSelectedClaim(null)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                            type="button"
+                            onClick={closeClaim}
+                            aria-label="Close claim details"
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:hover:text-white focus:ring-2 focus:ring-blue-500 rounded"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
 
                         <div className="mb-6">
                             <span className="text-sm font-bold text-blue-600 uppercase tracking-wider">{selectedClaim.type} Analysis</span>
-                            <h3 className="text-xl font-medium mt-2 italic text-gray-800 dark:text-gray-200">
+                            <h3 id="credibility-claim-heading" className="text-xl font-medium mt-2 italic text-gray-800 dark:text-gray-200">
                                 &quot;{selectedClaim.content}&quot;
                             </h3>
                             <p className="text-sm text-gray-500 mt-2">Said on {selectedClaim.date} at {selectedClaim.context}</p>
                         </div>
 
                         <div className="border-t pt-4">
-                            <h4 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">Verification Sources</h4>
+                            <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">Verification Sources</h3>
 
                             {evidenceMap[selectedClaim.id] && evidenceMap[selectedClaim.id].length > 0 ? (
                                 <ul className="space-y-3">

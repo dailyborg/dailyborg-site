@@ -20,6 +20,14 @@ export type ArticleData = {
 
 // Time formatting functions moved to @/lib/utils
 
+/**
+ * When the story has no picture of its own we fall back to a stock photograph.
+ * Say so in the alt text rather than describing the photo as the news event.
+ */
+export function imageAlt(story: { title: string }, src: string): string {
+  return src.includes("images.unsplash.com") ? `Illustration for: ${story.title}` : story.title;
+}
+
 export function getDeskColor(desk: string): string {
   const d = desk?.toLowerCase() || '';
   if (d.includes('politic') || d.includes('congress')) return 'text-desk-politics';
@@ -47,8 +55,12 @@ export function getDeskBgColor(desk: string): string {
 // =============================================
 // SECTION: Lead Hero + Sidebar (Top of Page)
 // =============================================
-export function LeadHeroSection({ lead, sideStories }: { lead: ArticleData; sideStories: ArticleData[] }) {
+export function LeadHeroSection({ lead, sideStories, leadHeading = "h2", priority = false }: { lead: ArticleData; sideStories: ArticleData[]; leadHeading?: "h1" | "h2"; priority?: boolean }) {
   if (!lead) return null;
+  const leadImage = getImageForContext(lead);
+  const LeadHeading = leadHeading;
+  // Side stories sit one level under the lead, so the outline never skips a level.
+  const SideHeading = leadHeading === "h1" ? "h2" : "h3";
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative">
       <div className="lg:col-span-8 flex flex-col gap-4 border-r-0 lg:border-r border-border pr-0 lg:pr-6">
@@ -56,22 +68,24 @@ export function LeadHeroSection({ lead, sideStories }: { lead: ArticleData; side
           <Link href={`/${lead.desk.toLowerCase()}/${lead.slug}`} className="block">
             <div className="bg-muted aspect-[16/9] w-full relative overflow-hidden group">
               <Image
-                src={getImageForContext(lead)}
-                alt={lead.title}
+                src={leadImage}
+                alt={imageAlt(lead, leadImage)}
                 fill
+                sizes="(max-width: 1024px) 100vw, 60vw"
+                priority={priority}
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
               />
             </div>
           </Link>
           <div className="flex flex-col gap-3 px-2">
             <div className="flex items-center gap-3">
-              <span className={`${getDeskBgColor(lead.desk)} text-white px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold`}>{lead.desk}</span>
+              <span className={`${getDeskBgColor(lead.desk)} text-white dark:text-background px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold`}>{lead.desk}</span>
             </div>
-            <h2 className="font-[family-name:var(--font-playfair)] font-black text-4xl md:text-5xl leading-tight tracking-tight hover:opacity-70 transition-opacity cursor-pointer">
+            <LeadHeading className="font-[family-name:var(--font-playfair)] font-black text-4xl md:text-5xl leading-tight tracking-tight hover:opacity-70 transition-opacity cursor-pointer">
               <Link href={`/${lead.desk.toLowerCase()}/${lead.slug}`}>
                 {lead.title}
               </Link>
-            </h2>
+            </LeadHeading>
             <div className="flex items-center gap-2 mt-1 mb-1">
               <div className="text-sm font-sans">By <span className="font-bold uppercase tracking-wider text-xs">{(lead as any).author?.name || `${lead.desk} Desk`}</span></div>
               <span className="text-muted-foreground mx-1">•</span>
@@ -90,19 +104,21 @@ export function LeadHeroSection({ lead, sideStories }: { lead: ArticleData; side
       </div>
 
       <div className="lg:col-span-4 flex flex-col gap-6">
-        {sideStories.map((story, idx) => (
+        {sideStories.map((story, idx) => {
+          const src = getImageForContext(story);
+          return (
           <article key={idx} className="border-b border-border pb-5 flex flex-col gap-2">
             <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)}`}>{story.desk}</span>
             <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block">
               <div className="bg-muted aspect-[3/2] w-full relative mb-1 overflow-hidden">
-                <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform hover:scale-105 duration-500" />
+                <Image src={src} alt={imageAlt(story, src)} fill sizes="(max-width: 1024px) 100vw, 30vw" className="object-cover transition-transform hover:scale-105 duration-500" />
               </div>
             </Link>
-            <h3 className="font-serif font-bold text-xl leading-tight hover:opacity-70 transition-opacity cursor-pointer">
+            <SideHeading className="font-serif font-bold text-xl leading-tight hover:opacity-70 transition-opacity cursor-pointer">
               <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>
                 {story.title}
               </Link>
-            </h3>
+            </SideHeading>
             <p className="text-sm text-muted-foreground line-clamp-2">
               {story.excerpt}
             </p>
@@ -117,7 +133,8 @@ export function LeadHeroSection({ lead, sideStories }: { lead: ArticleData; side
               )}
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -160,7 +177,7 @@ export function TrendingSplitSection({ stories, title = "Trending Now" }: { stor
           <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(rightStory.desk)}`}>{rightStory.desk}</span>
           <Link href={`/${rightStory.desk.toLowerCase()}/${rightStory.slug}`} className="block">
             <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
-              <Image src={getImageForContext(rightStory)} alt={rightStory.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
+              <Image src={getImageForContext(rightStory)} alt={imageAlt(rightStory, getImageForContext(rightStory))} fill sizes="(max-width: 768px) 100vw, 45vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
             </div>
           </Link>
           <h3 className="font-serif font-bold text-2xl leading-tight hover:opacity-70 transition-opacity cursor-pointer">
@@ -189,11 +206,13 @@ export function HeadlinesGridSection({ stories, title = "More Headlines" }: { st
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {stories.map((story, idx) => (
+        {stories.map((story, idx) => {
+          const src = getImageForContext(story);
+          return (
           <article key={idx} className="flex gap-4 border-b border-border pb-4">
             <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="flex-shrink-0 block">
               <div className="bg-muted w-24 h-24 relative overflow-hidden">
-                <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform hover:scale-105 duration-500" />
+                <Image src={src} alt={imageAlt(story, src)} fill sizes="96px" className="object-cover transition-transform hover:scale-105 duration-500" />
               </div>
             </Link>
             <div className="flex flex-col gap-1 min-w-0">
@@ -206,7 +225,8 @@ export function HeadlinesGridSection({ stories, title = "More Headlines" }: { st
               <span className="text-xs text-muted-foreground font-sans mt-auto">{story.fullTimestamp || story.timeAgo}</span>
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -247,7 +267,7 @@ export function InDepthSection({ story, title = "In Depth" }: { story: ArticleDa
 
         <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block">
           <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
-            <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform duration-700 group-hover:scale-105" />
+            <Image src={getImageForContext(story)} alt={imageAlt(story, getImageForContext(story))} fill sizes="(max-width: 768px) 100vw, 45vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
           </div>
         </Link>
       </div>
@@ -265,7 +285,7 @@ export function ReversedFeatureSection({ story }: { story: ArticleData }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
         <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block order-2 md:order-1">
           <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
-            <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform duration-700 group-hover:scale-105" />
+            <Image src={getImageForContext(story)} alt={imageAlt(story, getImageForContext(story))} fill sizes="(max-width: 768px) 100vw, 45vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
           </div>
         </Link>
         <div className="flex flex-col gap-3 order-1 md:order-2">

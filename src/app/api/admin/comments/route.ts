@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ comments });
     } catch (error: any) {
         console.error('Admin Comments GET Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
     }
 }
 
@@ -53,7 +53,7 @@ export async function PUT(request: Request) {
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error('Admin Comments PUT Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
     }
 }
 
@@ -75,6 +75,6 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error('Admin Comments DELETE Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
     }
 }

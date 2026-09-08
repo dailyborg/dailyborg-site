@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckCircle2, ChevronRight, Mail, MessageSquare, Loader2, ArrowRight, AlertCircle, Search } from "lucide-react";
+import { CheckCircle2, ChevronRight, Mail, Loader2, ArrowRight, Search } from "lucide-react";
 
 const MACRO_TOPICS = [
     "The Daily Borg (Newsletter)",
@@ -22,11 +22,8 @@ const TOPICS = [
 ];
 
 export default function SubscribePage() {
-    const [step, setStep] = useState(1);
-
-    // Form State
+    // Form State. Email is the only delivery channel that exists today, so there is no channel picker.
     const [topics, setTopics] = useState<string[]>([]);
-    const [channel, setChannel] = useState<"email" | "whatsapp">("email");
     const [frequency, setFrequency] = useState<"daily" | "weekly">("daily");
     const [plan, setPlan] = useState<"free" | "paid">("free");
 
@@ -71,51 +68,50 @@ export default function SubscribePage() {
         setIsLoading(true);
         setResult(null);
 
-        try {
-            const payload = {
-                topics,
-                tracked_politicians: selectedPoliticians,
-                delivery_channel: channel,
-                frequency,
-                plan_type: plan,
-                email: channel === "email" ? contactInfo : undefined,
-                phone_number: channel === "whatsapp" ? contactInfo : undefined,
-            };
+        const email = contactInfo.trim().toLowerCase();
 
+        try {
+            // Premium goes to Stripe first. Nothing is created here until the checkout session exists.
+            if (plan === "paid") {
+                const checkoutRes = await fetch("/api/stripe/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email })
+                });
+
+                if (checkoutRes.status === 503) {
+                    setResult({ success: false, message: "Premium is not available yet. Free briefings are open." });
+                    return;
+                }
+
+                const checkoutData = (await checkoutRes.json().catch(() => ({}))) as any;
+                if (checkoutRes.ok && checkoutData.url) {
+                    window.location.href = checkoutData.url;
+                    return;
+                }
+
+                setResult({ success: false, message: checkoutData.error || "Payment setup failed. Please try again." });
+                return;
+            }
+
+            // Free plan: create the subscription straight away.
             const res = await fetch("/api/subscribe", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    topics,
+                    tracked_politicians: selectedPoliticians,
+                    delivery_channel: "email",
+                    frequency,
+                    email
+                })
             });
 
-            const data = (await res.json()) as any;
+            const data = (await res.json().catch(() => ({}))) as any;
             if (res.ok) {
                 setResult({ success: true, message: data.message });
-                // Redirect to Stripe checkout for Premium
-                if (plan === "paid") {
-                    setTimeout(async () => {
-                        try {
-                            const checkoutRes = await fetch("/api/stripe/checkout", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    subscriberId: data.id,
-                                    email: channel === "email" ? contactInfo : undefined
-                                })
-                            });
-                            const checkoutData = (await checkoutRes.json()) as any;
-                            if (checkoutData.url) {
-                                window.location.href = checkoutData.url;
-                            } else {
-                                setResult({ success: false, message: "Payment setup failed." });
-                            }
-                        } catch (err) {
-                            setResult({ success: false, message: "Payment network error." });
-                        }
-                    }, 1500);
-                }
             } else {
-                setResult({ success: false, message: data.error });
+                setResult({ success: false, message: data.error || "We could not save your preferences. Please try again." });
             }
         } catch (err: any) {
             setResult({ success: false, message: "A network error occurred." });
@@ -128,9 +124,9 @@ export default function SubscribePage() {
         return (
             <div className="container mx-auto px-4 py-24 min-h-[60vh] flex flex-col items-center justify-center text-center">
                 <CheckCircle2 className="w-16 h-16 text-success mb-6" />
-                <h1 className="font-serif text-4xl lg:text-5xl font-extrabold tracking-tight mb-4">You're on the Grid.</h1>
+                <h1 className="font-serif text-4xl lg:text-5xl font-extrabold tracking-tight mb-4">You&apos;re on the Grid.</h1>
                 <p className="text-xl text-muted-foreground font-serif max-w-2xl mx-auto leading-relaxed mb-8">
-                    {plan === 'paid' ? "We are redirecting you to complete your premium activation." : "We've logged your preferences. You'll strictly receive notifications for the topics you care about."}
+                    We&apos;ve logged your preferences. You&apos;ll strictly receive notifications for the topics you care about.
                 </p>
                 <a href="/" className="font-bold uppercase tracking-widest text-xs border-b-2 border-foreground pb-1 hover:text-accent hover:border-accent transition-colors">
                     Return to Homepage
@@ -168,7 +164,7 @@ export default function SubscribePage() {
                                     key={topic}
                                     type="button"
                                     onClick={() => toggleTopic(topic)}
-                                    className={`p-5 border text-left flex justify-between items-center transition-all duration-200 ${topics.includes(topic) ? 'border-accent bg-accent text-accent-foreground shadow-md transform -translate-y-1' : 'border-border bg-muted/10 hover:border-foreground/50 hover:bg-muted/30'}`}
+                                    className={`p-5 border text-left flex justify-between items-center transition-all duration-200 ${topics.includes(topic) ? 'border-accent bg-accent text-[#181D25] shadow-md transform -translate-y-1' : 'border-border bg-muted/10 hover:border-foreground/50 hover:bg-muted/30'}`}
                                 >
                                     <span className="font-bold text-lg leading-tight w-full">{topic}</span>
                                     {topics.includes(topic) && <CheckCircle2 className="w-5 h-5 ml-2" />}
@@ -207,13 +203,16 @@ export default function SubscribePage() {
                                 placeholder="Search by name or office..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-background border border-border p-2 pl-9 font-medium outline-none focus:border-foreground transition-colors"
+                                className="w-full bg-background border border-border p-2 pl-9 font-medium focus:ring-2 focus:ring-foreground/40 focus:border-foreground transition-colors"
                             />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                             {availablePoliticians
-                                .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.office_held.toLowerCase().includes(searchQuery.toLowerCase()))
+                                .filter(p => {
+                                    const q = searchQuery.toLowerCase();
+                                    return String(p.name || "").toLowerCase().includes(q) || String(p.office_held || "").toLowerCase().includes(q);
+                                })
                                 .map(pol => (
                                 <button
                                     key={pol.slug}
@@ -254,23 +253,11 @@ export default function SubscribePage() {
 
                         <div className="space-y-8">
                             <div>
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Select Channel</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setChannel("email")}
-                                        className={`flex items-center justify-center gap-3 p-4 border font-bold ${channel === 'email' ? 'border-foreground bg-muted/20' : 'border-border text-muted-foreground hover:border-foreground/50'}`}
-                                    >
-                                        <Mail className="w-5 h-5" /> Email
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setChannel("whatsapp")}
-                                        className={`flex items-center justify-center gap-3 p-4 border font-bold ${channel === 'whatsapp' ? 'border-[#25D366] bg-[#25D366]/10 text-[#25D366]' : 'border-border text-muted-foreground hover:border-foreground/50'}`}
-                                    >
-                                        <MessageSquare className="w-5 h-5" /> WhatsApp
-                                    </button>
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Delivery Channel</h3>
+                                <div className="flex items-center gap-3 p-4 border border-foreground bg-muted/20 font-bold">
+                                    <Mail className="w-5 h-5" /> Email
                                 </div>
+                                <p className="text-xs text-muted-foreground mt-2">Briefings are delivered by email only.</p>
                             </div>
 
                             <div>
@@ -314,7 +301,7 @@ export default function SubscribePage() {
                                     <span className="text-muted-foreground font-bold text-sm uppercase tracking-widest">/forever</span>
                                 </div>
                                 <ul className="space-y-3 text-sm font-medium">
-                                    <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-foreground/50 mt-0.5" /> Curated notifications via {channel}</li>
+                                    <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-foreground/50 mt-0.5" /> Curated notifications by email</li>
                                     <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-foreground/50 mt-0.5" /> Direct links to articles on site</li>
                                     <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-foreground/50 mt-0.5" /> Save topics and preferences</li>
                                 </ul>
@@ -325,14 +312,14 @@ export default function SubscribePage() {
                                 onClick={() => setPlan("paid")}
                                 className={`cursor-pointer p-6 border-2 relative transition-all ${plan === 'paid' ? 'border-accent shadow-lg bg-accent/5' : 'border-border/50 hover:border-accent/40 opacity-70'}`}
                             >
-                                {plan === 'paid' && <div className="absolute top-0 right-0 bg-accent text-accent-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1 -mt-3 mr-4">Recommended</div>}
+                                {plan === 'paid' && <div className="absolute top-0 right-0 bg-accent text-[#181D25] text-[10px] font-bold uppercase tracking-widest px-3 py-1 -mt-3 mr-4">Recommended</div>}
                                 <h3 className="font-serif text-2xl font-bold text-accent mb-1">Premium Director</h3>
                                 <div className="flex items-baseline gap-1 mb-6 text-accent">
                                     <span className="text-3xl font-extrabold font-serif">$0.99</span>
                                     <span className="text-accent/70 font-bold text-sm uppercase tracking-widest">/month</span>
                                 </div>
                                 <ul className="space-y-3 text-sm font-medium">
-                                    <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-accent mt-0.5" /> <strong className="text-accent">Full articles delivered securely to your {channel} inbox</strong></li>
+                                    <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-accent/50 mt-0.5" /> Full articles delivered to your inbox every morning</li>
                                     <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-accent/50 mt-0.5" /> No need to click away or visit the site</li>
                                     <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-accent/50 mt-0.5" /> Supports independent architecture</li>
                                 </ul>
@@ -349,18 +336,18 @@ export default function SubscribePage() {
 
                         <form onSubmit={handleSubscribe} className="space-y-6">
                             <div>
-                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 block">
-                                    {channel === 'email' ? 'Secure Email Address' : 'WhatsApp Phone Number'}
+                                <label htmlFor="subscribe-email" className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 block">
+                                    Secure Email Address
                                 </label>
                                 <input
-                                    type={channel === 'email' ? 'email' : 'tel'}
-                                    className="w-full bg-background border border-border p-3 font-medium outline-none focus:border-foreground transition-colors"
-                                    placeholder={channel === 'email' ? 'you@secure.net' : '+1 (555) 000-0000'}
+                                    id="subscribe-email"
+                                    type="email"
+                                    className="w-full bg-background border border-border p-3 font-medium focus:ring-2 focus:ring-foreground/40 focus:border-foreground transition-colors"
+                                    placeholder="you@secure.net"
                                     value={contactInfo}
                                     onChange={(e) => setContactInfo(e.target.value)}
                                     required
                                 />
-                                {channel === 'whatsapp' && <p className="text-[10px] text-muted-foreground mt-2 inline-flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Include country code (e.g. +1)</p>}
                             </div>
 
                             {result?.message && !result.success && (

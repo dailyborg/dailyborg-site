@@ -51,27 +51,29 @@ export default function FollowPoliticianButton({ politicianId, initialPinned = f
 
     return (
         <div className="flex flex-col gap-2 mt-6">
-            <button 
+            <button
+                type="button"
                 onClick={handleFollowToggle}
+                aria-pressed={isFollowing}
                 className={`flex items-center gap-2 px-6 py-3 font-black text-sm uppercase tracking-widest transition-all ${
-                    isFollowing 
-                    ? 'bg-accent/10 text-accent border-2 border-accent' 
+                    isFollowing
+                    ? 'bg-accent/10 text-accent border-2 border-accent'
                     : 'bg-foreground text-background hover:bg-foreground/80'
                 }`}
             >
                 {isFollowing ? <BookmarkCheck className="w-5 h-5" /> : <Bookmark className="w-5 h-5" />}
-                {isFollowing ? 'Tracking Enabled' : 'Track Official'}
+                {isFollowing ? 'Saved in this browser' : 'Save to my list'}
             </button>
-            
+
             {isFollowing && (
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-muted-foreground hover:text-foreground transition-colors p-2 bg-muted/20 border border-border/50">
-                    <input 
-                        type="checkbox" 
-                        checked={isPinned} 
+                    <input
+                        type="checkbox"
+                        checked={isPinned}
                         onChange={handlePinToggle}
                         className="accent-foreground w-4 h-4"
                     />
-                    Always show this first in my Borg Record dashboard
+                    Show this official first in the Borg Record directory
                 </label>
             )}
         </div>

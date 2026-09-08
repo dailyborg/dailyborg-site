@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Activity, Radio, Zap, Globe, ShieldAlert, Users, BarChart3, FileText, TrendingUp } from "lucide-react";
+import { Activity, Zap, ShieldAlert, Users, BarChart3, FileText, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { formatTimeAgo } from "@/lib/utils";
 
@@ -14,48 +14,41 @@ interface LiveUpdate {
 
 interface DynamicLiveStripProps {
     isAdmin?: boolean;
+    edition?: string;
 }
 
-const FALLBACK_UPDATES: LiveUpdate[] = [
-    { icon: Activity, text: "Grid Status: Operational", time: "LIVE", href: "" },
-    { icon: Globe, text: "Public Record Sync: Complete", time: "NOW", href: "" },
-    { icon: ShieldAlert, text: "Borg Security: Green", time: "SECURE", href: "" },
-    { icon: Radio, text: "Autonomous Feeders: Scouting", time: "ACTIVE", href: "" }
-];
-
-export function DynamicLiveStrip({ isAdmin = false }: DynamicLiveStripProps) {
-    const [liveUpdates, setLiveUpdates] = useState<LiveUpdate[]>(FALLBACK_UPDATES);
+export function DynamicLiveStrip({ isAdmin = false, edition }: DynamicLiveStripProps) {
+    const [liveUpdates, setLiveUpdates] = useState<LiveUpdate[]>([]);
     const [adminUpdates, setAdminUpdates] = useState<LiveUpdate[]>([]);
     const [liveIndex, setLiveIndex] = useState(0);
 
-    // Fetch public headlines for non-admin
+    // Real published headlines, nothing else. Refreshed every 5 minutes.
     useEffect(() => {
         if (isAdmin) return;
-        
-        async function fetchLiveIntelligence() {
+
+        async function fetchLiveHeadlines() {
             try {
-                const res = await fetch(`/api/headlines?t=${Date.now()}`);
+                const res = await fetch("/api/headlines");
                 if (res.ok) {
-                    const data = await res.json() as { title: string; slug: string; desk: string }[];
-                    const icons = [Activity, Zap, Globe, Radio];
-                    const updates = data.map((item: any, i) => ({
-                        icon: icons[i % icons.length],
-                        text: item.title.length > 55 ? item.title.substring(0, 55) + "..." : item.title,
-                        time: formatTimeAgo(item.publish_date),
-                        href: item.slug ? `/${item.desk}/${item.slug}` : "",
-                    }));
-                    
-                    if (updates.length > 0) {
-                        setLiveUpdates(updates);
-                    }
+                    const data = await res.json() as { title: string; slug: string; desk: string; publish_date?: string }[];
+                    const updates = data
+                        .filter((item) => item.slug)
+                        .map((item) => ({
+                            icon: null,
+                            text: item.title.length > 55 ? item.title.substring(0, 55) + "..." : item.title,
+                            time: item.publish_date ? formatTimeAgo(item.publish_date) : "",
+                            href: `/${item.desk}/${item.slug}`,
+                        }));
+
+                    setLiveUpdates(updates);
                 }
             } catch (err) {
-                console.error("Failed to pulse live updates:", err);
+                console.error("Failed to load headlines:", err);
             }
         }
 
-        fetchLiveIntelligence();
-        const interval = setInterval(fetchLiveIntelligence, 5 * 60 * 1000);
+        fetchLiveHeadlines();
+        const interval = setInterval(fetchLiveHeadlines, 5 * 60 * 1000);
         return () => clearInterval(interval);
     }, [isAdmin]);
 
@@ -92,10 +85,10 @@ export function DynamicLiveStrip({ isAdmin = false }: DynamicLiveStripProps) {
         return () => clearInterval(interval);
     }, [isAdmin]);
 
-    const displayUpdates = isAdmin ? (adminUpdates.length > 0 ? adminUpdates : FALLBACK_UPDATES) : liveUpdates;
+    const displayUpdates = isAdmin ? adminUpdates : liveUpdates;
 
-    // Create chunks of 3 updates per view for denser ticker
-    const liveUpdateSets = [];
+    // Create chunks of 3 updates per view for a denser strip
+    const liveUpdateSets: LiveUpdate[][] = [];
     for (let i = 0; i < displayUpdates.length; i += 3) {
         liveUpdateSets.push(displayUpdates.slice(i, i + 3));
     }
@@ -111,48 +104,60 @@ export function DynamicLiveStrip({ isAdmin = false }: DynamicLiveStripProps) {
     return (
         <div className={`${isAdmin ? 'bg-slate-800' : 'bg-primary'} w-full font-sans overflow-hidden`}>
             <div className="flex items-center w-full max-w-[1400px] mx-auto px-4 md:px-6 py-3">
-                <div className={`flex flex-shrink-0 items-center gap-2 ${isAdmin ? 'text-amber-400' : 'text-accent'} font-bold uppercase tracking-wider text-xs whitespace-nowrap`}>
+                <div className="flex flex-shrink-0 items-center gap-2 text-amber-300 font-bold uppercase tracking-wider text-xs whitespace-nowrap">
                     <Activity className="w-3.5 h-3.5 animate-sparkline" />
                     <span>{isAdmin ? 'Admin' : 'Live'}</span>
                 </div>
 
-                <div className={`w-px h-4 ${isAdmin ? 'bg-slate-600' : 'bg-primary-foreground/20'} ml-4 mr-4 flex-shrink-0`}></div>
+                {!isAdmin && edition && (
+                    <>
+                        <div className="w-px h-4 bg-primary-foreground/30 ml-4 mr-4 flex-shrink-0"></div>
+                        <span className="hidden sm:inline text-xs uppercase tracking-wider text-primary-foreground whitespace-nowrap flex-shrink-0">
+                            {edition}
+                        </span>
+                    </>
+                )}
+
+                {liveUpdateSets.length > 0 && (
+                    <div className={`w-px h-4 ${isAdmin ? 'bg-slate-500' : 'bg-primary-foreground/30'} ml-4 mr-4 flex-shrink-0`}></div>
+                )}
 
                 <div className="flex flex-1 overflow-hidden relative items-center min-h-[20px]">
-                    {liveUpdateSets.length > 0 ? liveUpdateSets.map((set, setIndex) => {
+                    {liveUpdateSets.map((set, setIndex) => {
                         const isActive = setIndex === liveIndex;
                         return (
                             <div
                                 key={setIndex}
+                                aria-hidden={!isActive}
                                 className={`absolute inset-y-0 left-0 flex items-center gap-4 md:gap-8 w-max transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                             >
                                 {set.map((update, index) => {
                                     const Icon = update.icon;
                                     const content = (
-                                        <div className={`flex items-center gap-2 flex-shrink-0 font-sans text-xs ${isAdmin ? 'text-slate-300' : 'text-primary-foreground/80'} ${update.href ? `hover:${isAdmin ? 'text-white' : 'text-primary-foreground'} cursor-pointer` : 'cursor-default'} transition-colors`}>
-                                            <Icon className={`w-3.5 h-3.5 ${isAdmin ? 'text-slate-400' : 'text-primary-foreground'}`} />
+                                        <span className={`flex items-center gap-2 flex-shrink-0 font-sans text-xs ${isAdmin ? 'text-slate-200' : 'text-primary-foreground'} transition-colors`}>
+                                            {Icon && <Icon className={`w-3.5 h-3.5 ${isAdmin ? 'text-slate-300' : 'text-primary-foreground'}`} />}
                                             <span className="truncate max-w-[200px] md:max-w-[400px]">{update.text}</span>
-                                            <span className={`text-[10px] ${isAdmin ? 'text-amber-400' : 'text-accent'} font-bold ml-1 tracking-wider`}>{update.time}</span>
-                                        </div>
+                                            {update.time && (
+                                                <span className="text-[10px] text-amber-300 font-bold ml-1 tracking-wider">{update.time}</span>
+                                            )}
+                                        </span>
                                     );
                                     return (
                                         <React.Fragment key={index}>
                                             {update.href ? (
-                                                <Link href={update.href}>{content}</Link>
+                                                <Link href={update.href} tabIndex={isActive ? 0 : -1} className="hover:underline focus-visible:underline focus-visible:outline-none">{content}</Link>
                                             ) : (
                                                 content
                                             )}
                                             {index < set.length - 1 && (
-                                                <div className={`w-px h-3 ${isAdmin ? 'bg-slate-600' : 'bg-primary-foreground/20'} ml-2 md:ml-4 flex-shrink-0`}></div>
+                                                <div className={`w-px h-3 ${isAdmin ? 'bg-slate-500' : 'bg-primary-foreground/30'} ml-2 md:ml-4 flex-shrink-0`}></div>
                                             )}
                                         </React.Fragment>
                                     );
                                 })}
                             </div>
                         );
-                    }) : (
-                        <div className={`text-xs ${isAdmin ? 'text-slate-500' : 'text-primary-foreground/50'} animate-pulse`}>Establishing uplink...</div>
-                    )}
+                    })}
                 </div>
             </div>
         </div>

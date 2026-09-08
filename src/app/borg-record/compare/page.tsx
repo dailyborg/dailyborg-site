@@ -42,6 +42,7 @@ export default async function CompareOfficialsPage({ searchParams }: { searchPar
         return (
             <div className="bg-[#12110a] text-slate-100 min-h-screen font-sans antialiased w-full pb-16">
                 <div className="container mx-auto max-w-5xl px-4 md:px-8 py-12 md:py-16">
+                    <h1 className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400 mb-3 text-center">Compare officials</h1>
                     <h2 className="font-serif text-4xl md:text-5xl font-black mb-3 text-center tracking-tighter uppercase text-white">The Head-to-Head</h2>
                     <p className="text-center text-slate-400 mb-10 max-w-xl mx-auto">
                         {chosen ? `Pick an opponent for ${chosen.name}.` : "Pick two officials to compare their published records side by side."}
@@ -118,6 +119,7 @@ export default async function CompareOfficialsPage({ searchParams }: { searchPar
     return (
         <div className="bg-[#12110a] text-slate-100 min-h-screen font-sans antialiased w-full relative pb-16">
             <div className="container mx-auto max-w-5xl px-4 md:px-8 py-8 md:py-16">
+                <h1 className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400 mb-3">Compare officials</h1>
                 <div className="flex items-center justify-between mb-8">
                     <h2 className="font-serif text-4xl md:text-5xl font-black tracking-tighter uppercase text-white">The Head-to-Head</h2>
                     <Link href="/borg-record/compare" className="text-xs uppercase tracking-widest font-bold text-[#f2b90d] hover:text-white transition-colors flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" /> Change matchup</Link>

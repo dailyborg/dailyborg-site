@@ -5,23 +5,24 @@ import { usePathname } from "next/navigation";
 
 export function AnalyticsTracker() {
     const pathname = usePathname();
-    const hasSentRef = useRef(false);
+    // Remembers the last path we reported, so React Strict Mode's double effect does not
+    // double count, but a real navigation to a new path still gets tracked.
+    const lastPathRef = useRef<string | null>(null);
 
     useEffect(() => {
-        // Prevent double tracking in React Strict Mode
-        if (hasSentRef.current) return;
-        hasSentRef.current = true;
+        if (typeof window === "undefined") return;
+        if (!pathname) return;
+        if (lastPathRef.current === pathname) return;
+        lastPathRef.current = pathname;
 
-        if (typeof window !== "undefined") {
-            fetch("/api/admin/analytics/track", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    path: pathname,
-                    userAgent: navigator.userAgent
-                })
-            }).catch(() => { /* silent fail for analytics */ });
-        }
+        fetch("/api/admin/analytics/track", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                path: pathname,
+                referrer: document.referrer || ""
+            })
+        }).catch(() => { /* analytics never blocks the page */ });
     }, [pathname]);
 
     return null; // Invisible component

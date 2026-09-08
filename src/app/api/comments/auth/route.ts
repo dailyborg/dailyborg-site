@@ -1,20 +1,26 @@
 import { NextResponse } from 'next/server';
 import { getDbBinding } from '@/lib/db';
+import { makeCommentToken } from '@/lib/comment-token';
 
 export const runtime = 'edge';
 
-// POST /api/comments/auth — Verify subscriber email for commenting
+const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+const MAX_EMAIL_LENGTH = 254;
+const GENERIC_ERROR = 'Something went wrong. Please try again.';
+
+// POST /api/comments/auth — verify a subscriber email and hand back a signed commenting token.
 export async function POST(request: Request) {
     try {
-        const { email } = await request.json() as any;
+        const body = await request.json().catch(() => ({})) as any;
+        const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
 
-        if (!email || typeof email !== 'string') {
-            return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+        if (!email || email.length > MAX_EMAIL_LENGTH || !EMAIL_RE.test(email)) {
+            return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 });
         }
 
         const db = await getDbBinding();
 
-        const result = await db.prepare('SELECT id, email FROM subscribers WHERE email = ?').bind(email.trim().toLowerCase()).first();
+        const result = await db.prepare('SELECT id, email FROM subscribers WHERE email = ?').bind(email).first();
 
         if (!result) {
             return NextResponse.json({
@@ -23,18 +29,28 @@ export async function POST(request: Request) {
             }, { status: 404 });
         }
 
-        const displayName = (result.email as string).split('@')[0].charAt(0).toUpperCase() +
-            (result.email as string).split('@')[0].slice(1);
+        const subscriberId = result.id as string;
+        const localPart = (result.email as string).split('@')[0];
+        const displayName = localPart.charAt(0).toUpperCase() + localPart.slice(1);
 
-        // Set a cookie so they don't have to re-authenticate on every page
+        // The token is what actually authorizes a comment. It is signed, carries the subscriber id,
+        // and expires after 30 days, so a copied subscriber id is no longer enough to post.
+        const token = await makeCommentToken(subscriberId);
+        if (!token) {
+            console.error('Comment Auth Error: ADMIN_PASSPHRASE is not configured, so no token could be signed.');
+            return NextResponse.json({ error: GENERIC_ERROR }, { status: 500 });
+        }
+
         const response = NextResponse.json({
             success: true,
-            subscriber_id: result.id,
+            token,
+            subscriber_id: subscriberId,
             display_name: displayName
         });
 
+        // Convenience only: the browser uses this to remember who is signed in. It grants nothing.
         response.cookies.set('borg_commenter', JSON.stringify({
-            id: result.id,
+            id: subscriberId,
             name: displayName,
             email: result.email
         }), {
@@ -48,6 +64,6 @@ export async function POST(request: Request) {
         return response;
     } catch (error: any) {
         console.error('Comment Auth Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: GENERIC_ERROR }, { status: 500 });
     }
 }

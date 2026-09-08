@@ -1,35 +1,57 @@
 export const runtime = 'edge';
 
-import { notFound } from "next/navigation";
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import Image from 'next/image';
+import { notFound } from 'next/navigation';
 import { ArticleService, deskFromSlug } from '@/lib/services/article-service';
+import { getImageForContext } from '@/lib/image-utils';
 import { formatTimeAgo, formatFullTimestamp } from '@/lib/utils';
 import {
     ArticleData,
+    getDeskColor,
+    imageAlt,
     LeadHeroSection,
     TrendingSplitSection,
     HeadlinesGridSection,
     InDepthSection,
     ReversedFeatureSection
 } from '@/components/layout/news-sections';
-import CommentSection from '@/components/CommentSection';
 
-const SUBSECTIONS: Record<string, string[]> = {
-    politics: ["All", "White House", "Congress", "Federal Agencies", "Campaigns & Elections", "State of the Race", "Policy Tracker"],
-    crime: ["All", "Breaking Crime", "Courts & Justice", "Public Safety", "Investigations", "Major Cases"],
-    business: ["All", "Economy", "Markets", "Startups", "Mergers & Acquisitions", "Labor", "Policy & Regulation"],
-    entertainment: ["All", "Film & TV", "Music", "Celebrity", "Streaming", "Culture", "Viral Internet"],
-    sports: ["All", "Headlines", "Scores", "Trades", "College Sports", "Pro Sports"],
-    science: ["All", "Space", "Health Research", "Climate", "Physics", "Biology", "Tech Science"],
-    education: ["All", "Standardized Testing", "Education Funding", "Curriculum Reform", "School Technology", "Higher Education", "K-12 Policy"]
-};
+function deskTitleFor(slug: string, deskName: string) {
+    return slug === 'crime' ? 'Crime & Justice' : deskName;
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ desk: string }> }): Promise<Metadata> {
+    const resolvedParams = await params;
+    const slug = resolvedParams.desk.toLowerCase();
+    const deskName = deskFromSlug(slug);
+    if (!deskName) return { title: 'Desk not found' };
+
+    const title = deskTitleFor(slug, deskName);
+    const description = `The latest ${title} reporting from The Daily Borg, written from published reporting and updated through the day.`;
+    const canonical = `https://dailyborg.com/${slug}`;
+
+    return {
+        title,
+        description,
+        alternates: { canonical },
+        openGraph: {
+            type: 'website',
+            url: canonical,
+            title: `${title} | The Daily Borg`,
+            description,
+            images: ['/og-default.png'],
+        },
+        twitter: { card: 'summary_large_image', title: `${title} | The Daily Borg`, description, images: ['/og-default.png'] },
+    };
+}
 
 export default async function DeskPage({ params }: { params: Promise<{ desk: string }> }) {
     const resolvedParams = await params;
     const desk = resolvedParams.desk.toLowerCase();
     const deskName = deskFromSlug(desk);
     if (!deskName) notFound();
-
-    const tabs = SUBSECTIONS[desk] || ["All"];
 
     // Exact desk match on the (desk, publish_date) index, cached for two minutes.
     let articles: any[] = [];
@@ -39,14 +61,15 @@ export default async function DeskPage({ params }: { params: Promise<{ desk: str
         articles = [];
     }
 
-    const deskTitle = desk === 'crime' ? 'Crime & Justice' : deskName;
+    const deskTitle = deskTitleFor(desk, deskName);
 
     if (articles.length === 0) {
         return (
-            <div className="container max-w-[1400px] mx-auto px-4 md:px-6 py-8 md:py-12 flex flex-col items-center justify-center min-h-[60vh]">
-                <div className="text-muted-foreground font-mono uppercase tracking-widest border p-8 bg-muted/10">
+            <div className="container max-w-[1400px] mx-auto px-4 md:px-6 py-8 md:py-12 flex flex-col items-center justify-center min-h-[60vh] gap-6">
+                <h1 className="font-[family-name:var(--font-playfair)] text-4xl md:text-6xl font-black tracking-tight uppercase leading-none text-center">{deskTitle}</h1>
+                <p className="text-muted-foreground font-sans uppercase tracking-widest border border-border p-8 bg-muted/30 text-center">
                     No published reporting on the {deskTitle} desk yet
-                </div>
+                </p>
             </div>
         );
     }
@@ -70,7 +93,7 @@ export default async function DeskPage({ params }: { params: Promise<{ desk: str
     const gridStories = allStories.slice(5, 11);
     const inDepthStory = allStories[11];
     const reversedFeature = allStories[12];
-    const subsectionArticles = allStories.slice(13);
+    const remainingStories = allStories.slice(13);
 
     return (
         <div className="container max-w-[1400px] mx-auto px-4 md:px-6 py-8 md:py-12 space-y-12 min-h-screen">
@@ -79,34 +102,39 @@ export default async function DeskPage({ params }: { params: Promise<{ desk: str
                     <h1 className="font-[family-name:var(--font-playfair)] text-5xl md:text-7xl font-black tracking-tight uppercase leading-none">{deskTitle}</h1>
                     <span className="font-[family-name:var(--font-source-sans)] text-xs font-bold text-accent uppercase tracking-[0.2em] hidden md:inline-block">The Daily Borg</span>
                 </div>
-                <div className="w-full overflow-x-auto no-scrollbar">
-                    <div className="flex gap-8 whitespace-nowrap px-2">
-                        {tabs.map((tab, idx) => (
-                            <span key={idx} className={`font-[family-name:var(--font-source-sans)] text-[11px] font-bold uppercase tracking-widest pb-3 ${idx === 0 ? 'text-foreground border-b-2 border-foreground' : 'text-muted-foreground'}`}>
-                                {tab}
-                            </span>
-                        ))}
-                    </div>
-                </div>
             </div>
 
-            {leadStory && <LeadHeroSection lead={leadStory} sideStories={sideStories} />}
+            {leadStory && <LeadHeroSection lead={leadStory} sideStories={sideStories} priority />}
             {trendingStories.length >= 2 && <TrendingSplitSection stories={trendingStories} title={`Trending in ${deskTitle}`} />}
             {gridStories.length > 0 && <HeadlinesGridSection stories={gridStories} title={`More ${deskTitle} Headlines`} />}
             {inDepthStory && <InDepthSection story={inDepthStory} title={`${deskTitle} In Depth`} />}
             {reversedFeature && <ReversedFeatureSection story={reversedFeature} />}
 
-            {tabs.length > 1 && subsectionArticles.length > 0 && (
-                <div className="flex flex-col gap-6 pb-16">
-                    {tabs.filter(t => t !== "All").slice(0, Math.ceil(subsectionArticles.length / 3)).map((subsection, idx) => {
-                        const rowArticles = subsectionArticles.slice(idx * 3, (idx * 3) + 3);
-                        if (rowArticles.length === 0) return null;
-                        return <HeadlinesGridSection key={idx} stories={rowArticles} title={subsection} />;
-                    })}
-                </div>
+            {remainingStories.length > 0 && (
+                <section className="border-t-2 border-border pt-6">
+                    <h2 className="font-sans uppercase font-bold text-xs tracking-widest mb-5">Latest in {deskTitle}</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-16">
+                        {remainingStories.map((story) => {
+                            const src = getImageForContext(story);
+                            return (
+                                <article key={story.slug} className="border-b border-border pb-4 flex flex-col gap-2">
+                                    <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block">
+                                        <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
+                                            <Image src={src} alt={imageAlt(story, src)} fill sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        </div>
+                                    </Link>
+                                    <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)} mt-2`}>{story.desk}</span>
+                                    <h3 className="font-serif font-bold text-lg leading-snug hover:opacity-70 transition-opacity">
+                                        <Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>{story.title}</Link>
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground line-clamp-2">{story.excerpt}</p>
+                                    <span className="text-xs text-muted-foreground font-sans">{story.fullTimestamp || story.timeAgo}</span>
+                                </article>
+                            );
+                        })}
+                    </div>
+                </section>
             )}
-
-            <CommentSection pageType="article" pageSlug={desk} />
         </div>
     );
 }

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ settings });
     } catch (error: any) {
         console.error("Admin Settings GET API Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
     }
 }
 
@@ -69,6 +69,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, updatedKeys: updates.map(u => u.key) });
     } catch (error: any) {
         console.error("Admin Settings POST API Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
     }
 }

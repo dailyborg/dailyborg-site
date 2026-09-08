@@ -44,6 +44,12 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
     const trustScore = derivedScores.trustScore as number | null;
     const falseRulings = derivedScores.trustFalseRulings as number;
 
+    // The service only publishes an attendance rate once an official has ten recorded votes.
+    // Below that we still have the two numbers, so the page does the division itself.
+    const attendanceRate = voteStats && voteStats.total > 0
+        ? (voteStats.attendanceRate ?? Math.round(((voteStats.total - voteStats.missed) / voteStats.total) * 1000) / 10)
+        : null;
+
     const getPromiseStyles = (status: string) => {
         switch (status) {
             case "Fulfilled": return { Icon: CheckCircle2, color: "text-success", iconColor: "text-success" };
@@ -72,7 +78,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                 <div className="bg-red-500/10 border-l-4 border-red-500 p-4 mb-8 flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                     <div>
-                        <h3 className="text-red-500 font-black uppercase tracking-widest text-xs mb-1">Former Official</h3>
+                        <p className="text-red-500 font-black uppercase tracking-widest text-xs mb-1">Former Official</p>
                         <p className="text-muted-foreground text-sm">This person no longer holds the office listed. The profile is kept for the historical record.</p>
                     </div>
                 </div>
@@ -98,7 +104,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                             <div className="h-1.5 w-full bg-muted overflow-hidden relative">
                                 <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 transition-all duration-1000 ease-out" style={{ width: `${trustScore ?? 0}%` }} />
                             </div>
-                            <div className="absolute top-10 left-0 w-full bg-popover text-popover-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
+                            <div className="absolute top-10 left-0 w-full bg-background text-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
                                 100 minus the average falseness of this official&apos;s published PolitiFact rulings. Shown once at least {MIN_RULINGS_FOR_TRUST} rulings exist.
                             </div>
                         </div>
@@ -113,7 +119,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                             <div className="h-1.5 w-full bg-muted overflow-hidden relative">
                                 <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#fe8f00] to-[#ff0000] transition-all duration-1000 ease-out" style={{ width: `${factChecks.length > 0 ? Math.round((falseRulings / factChecks.length) * 100) : 0}%` }} />
                             </div>
-                            <div className="absolute top-14 left-0 w-full bg-popover text-popover-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
+                            <div className="absolute top-14 left-0 w-full bg-background text-foreground text-xs p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none border border-border">
                                 Rulings of Mostly False, False or Pants on Fire, out of every PolitiFact ruling we hold for this official.
                             </div>
                         </div>
@@ -201,12 +207,12 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                         {voteStats && voteStats.total > 0 && (
                             <p className="text-sm text-muted-foreground font-serif mb-6">
                                 {voteStats.total} recorded roll-call vote{voteStats.total === 1 ? "" : "s"} on file: {voteStats.yeas} Yea, {voteStats.nays} Nay, {voteStats.missed} not voting.
-                                {voteStats.attendanceRate !== null && <> Attendance {voteStats.attendanceRate}%.</>}
+                                {attendanceRate !== null && <> Attendance {attendanceRate}%.</>}
                             </p>
                         )}
                         {(!recentVotes || recentVotes.length === 0) ? (
                             <div className="p-8 border border-border bg-muted/10 text-center">
-                                <p className="text-muted-foreground font-serif italic text-lg opacity-80">No roll-call votes are recorded for this official yet. Federal votes are collected hourly from the House Clerk and the Senate and cross-checked before they appear here.</p>
+                                <p className="text-muted-foreground font-serif italic text-lg opacity-80">No roll-call votes are recorded for this official yet. House votes are cross-checked against congress.gov; Senate votes against the Senate vote menu.</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -324,7 +330,7 @@ export default async function PoliticianProfilePage({ params }: { params: Promis
                         <div className="absolute top-0 right-0 w-32 h-32 bg-accent/20 rounded-full blur-3xl group-hover:bg-accent/40 transition-colors"></div>
                         <h3 className="font-serif text-4xl font-black mb-4 tracking-tighter">Head-to-Head</h3>
                         <p className="text-background/80 text-sm mb-8 leading-relaxed font-medium">Compare {politician.name}&apos;s published record against another official side by side.</p>
-                        <Link href={`/borg-record/compare?p1=${encodeURIComponent(politician.slug)}`} className="w-full bg-background text-foreground hover:bg-accent hover:text-accent-foreground font-black uppercase tracking-[0.2em] text-[10px] py-4 text-center block transition-all border border-transparent hover:border-accent">Choose an Opponent</Link>
+                        <Link href={`/borg-record/compare?p1=${encodeURIComponent(politician.slug)}`} className="w-full bg-background text-foreground hover:bg-accent hover:text-foreground font-black uppercase tracking-[0.2em] text-[10px] py-4 text-center block transition-all border border-transparent hover:border-accent">Choose an Opponent</Link>
                     </div>
 
                     <BorgAlertSubscribe politicianSlug={slug} politicianName={politician.name} />

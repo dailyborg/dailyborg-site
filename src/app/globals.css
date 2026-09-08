@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -94,6 +95,12 @@
 }
 
 @layer base {
+
+  /*
+    Light palette. Every colour used for text has been checked against the cream
+    background at 4.5:1 or better. The numbers live in docs; do not lighten these
+    without re-checking the ratio.
+  */
   :root {
     --background: 36 33% 97%;
     --foreground: 220 20% 12%;
@@ -102,23 +109,55 @@
     --muted: 36 20% 92%;
     --muted-foreground: 220 10% 45%;
     --border: 36 20% 88%;
-    --accent: 40 80% 50%;
+    --accent: 40 90% 30%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --success: 145 60% 35%;
 
     --desk-politics: 220 70% 45%;
     --desk-crime: 0 70% 45%;
-    --desk-business: 145 60% 35%;
+    --desk-business: 145 65% 28%;
     --desk-entertainment: 280 60% 50%;
-    --desk-sports: 25 90% 50%;
-    --desk-science: 185 70% 40%;
-    --desk-education: 45 80% 45%;
+    --desk-sports: 25 90% 35%;
+    --desk-science: 185 75% 28%;
+    --desk-education: 45 90% 27%;
     --desk-borg: 220 60% 20%;
   }
 
+  /*
+    Dark palette. next-themes puts .dark on <html>, so this is the real switch:
+    it covers both "dark" and "system when the system is dark".
+    Every value is checked against the dark background at 4.5:1 or better.
+  */
+  .dark {
+    --background: 220 20% 12%;
+    --foreground: 36 33% 97%;
+    --primary: 220 60% 20%;
+    --primary-foreground: 36 33% 97%;
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 10% 60%;
+    --border: 220 20% 25%;
+    --accent: 40 85% 60%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 145 55% 58%;
+
+    --desk-politics: 220 80% 72%;
+    --desk-crime: 0 80% 72%;
+    --desk-business: 145 55% 58%;
+    --desk-entertainment: 280 70% 76%;
+    --desk-sports: 25 90% 62%;
+    --desk-science: 185 65% 58%;
+    --desk-education: 45 85% 62%;
+    --desk-borg: 220 75% 74%;
+  }
+
+  /*
+    System fallback only. It applies when no explicit theme class is present,
+    so a reader who picked Light on a dark-mode machine still gets Light.
+  */
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not(.light):not(.dark) {
       --background: 220 20% 12%;
       --foreground: 36 33% 97%;
       --primary: 220 60% 20%;
@@ -126,10 +165,19 @@
       --muted: 220 20% 18%;
       --muted-foreground: 220 10% 60%;
       --border: 220 20% 25%;
-      --accent: 40 80% 50%;
+      --accent: 40 85% 60%;
       --destructive: 0 72% 51%;
       --destructive-foreground: 0 0% 100%;
-      --success: 145 60% 35%;
+      --success: 145 55% 58%;
+
+      --desk-politics: 220 80% 72%;
+      --desk-crime: 0 80% 72%;
+      --desk-business: 145 55% 58%;
+      --desk-entertainment: 280 70% 76%;
+      --desk-sports: 25 90% 62%;
+      --desk-science: 185 65% 58%;
+      --desk-education: 45 85% 62%;
+      --desk-borg: 220 75% 74%;
     }
   }
 
@@ -191,6 +239,12 @@
     animation: ticker-scroll 50s linear infinite;
   }
 
+  /* Give readers a way to stop the crawl and read a headline. */
+  .ticker-animate:hover,
+  .ticker-animate:focus-within {
+    animation-play-state: paused;
+  }
+
   /* Custom scrollbar for the Live strip */
   .custom-scrollbar-header::-webkit-scrollbar {
     height: 6px;
@@ -209,5 +263,38 @@
 
   .custom-scrollbar-header::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.6);
+  }
+}
+
+/*
+  Readers who ask their operating system for less motion get a still page:
+  no smooth scrolling, no crawling ticker, no pulsing dots.
+  Unlayered, so it wins over the animation rules above.
+*/
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .ticker-animate,
+  .animate-sparkline {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .animate-pulse,
+  .animate-ping,
+  .animate-bounce,
+  .animate-spin {
+    animation: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -1,3 +1,15 @@
+import type { Metadata } from "next";
+
+const DESCRIPTION =
+    "What The Daily Borg stores about you: your subscription email, an optional phone number, the topics you pick, and your comments. Nothing is sold.";
+
+export const metadata: Metadata = {
+    title: "Privacy Policy",
+    description: DESCRIPTION,
+    alternates: { canonical: "https://dailyborg.com/privacy" },
+    openGraph: { type: "article", url: "https://dailyborg.com/privacy", title: "Privacy Policy | The Daily Borg", description: DESCRIPTION, images: ["/og-default.png"] },
+};
+
 export default function PrivacyPage() {
     return (
         <div className="container max-w-[900px] mx-auto px-4 py-16 md:py-24">
@@ -7,38 +19,75 @@ export default function PrivacyPage() {
                         Privacy Policy
                     </h1>
                     <p className="font-[family-name:var(--font-source-sans)] text-xl font-semibold uppercase tracking-widest text-muted-foreground">
-                        Data Ingestion & Telemetry Standards
+                        What we store, and where
                     </p>
                 </header>
 
                 <article className="prose prose-lg dark:prose-invert font-[family-name:var(--font-source-sans)] text-foreground prose-headings:font-[family-name:var(--font-playfair)] prose-headings:font-black pb-16">
                     <p className="lead text-2xl font-[family-name:var(--font-playfair)] text-muted-foreground leading-relaxed">
-                        The Daily Borg is fundamentally engineered for transparency in all operations. This protocol governs the minimal data required to maintain Broadcast Operations.
+                        You can read The Daily Borg without giving us anything. If you subscribe or leave a
+                        comment, here is exactly what we keep.
                     </p>
 
-                    <h2>1. Telemetry and System Logs</h2>
+                    <h2>1. If you subscribe</h2>
                     <p>
-                        Our edge network automatically logs non-identifying telemetry data, including network latency, rendering times, and algorithmic layout state preferences. This data is utilized strictly for system diagnostics and optimizing load times across global nodes.
+                        We store your email address, a phone number if you choose to give one, and the
+                        topics or officials you asked to follow. These are stored as you typed them, in our
+                        database, so that we can send you what you signed up for. They are not encrypted or
+                        hashed, so treat the phone number as optional and skip it if you would rather not.
+                    </p>
+                    <p>
+                        We do not sell, rent, or share subscriber lists with anyone: not advertisers, not
+                        data brokers, not campaigns. Ask us to delete your record and we will.
                     </p>
 
-                    <h2>2. Subscriber Manifests</h2>
+                    <h2>2. If you leave a comment</h2>
                     <p>
-                        If you execute a subscription protocol, your provided contact vector (e.g., Email Address or Signal Number) is cryptographically hashed and stored in our D1 database. We do not sell, rent, or distribute subscriber manifests to third-party entities, brokers, or political action committees.
+                        We store the comment text, the display name you chose, and the email address you
+                        signed in with. Your comment and display name are public. Your email address is
+                        not shown on the site; it is visible only to site administrators, who use it to
+                        moderate and to contact you if there is a problem with a comment.
                     </p>
 
-                    <h2>3. Cookies and Persistent States</h2>
+                    <h2>3. What your browser stores</h2>
                     <p>
-                        The Broadcast Operations & Reporting Grid utilizes minimal persistent storage (e.g., local storage) solely to preserve your visual theme preference (Light/Dark/System) and your last known Time of Day Edition state.
+                        This site uses your browser&apos;s local storage rather than tracking cookies. It holds:
+                    </p>
+                    <ul>
+                        <li>Your light or dark theme choice.</li>
+                        <li>The edition label you were last shown.</li>
+                        <li>The officials you have chosen to follow.</li>
+                        <li>For site administrators only, a marker showing you are signed in to the admin tools.</li>
+                    </ul>
+                    <p>
+                        All of that lives on your device. Clearing your browser data removes it.
                     </p>
 
-                    <h2>4. Public Record Ingestion</h2>
+                    <h2>4. Server logs and analytics</h2>
                     <p>
-                        Please note that the <strong>Borg Record</strong> sub-system algorithmically ingests and indexes public statements, legislative votes, and official disclosures made by public figures. If you are a sworn representative of a legislative body, your official actions are subject to permanent ingestion and classification. We do not remove public records.
+                        Our host records ordinary request information such as page addresses, timing, and
+                        general location, in the same way any web server does. We keep a simple count of
+                        page views so we know what is being read. We do not build advertising profiles and
+                        we do not run third-party tracking scripts.
+                    </p>
+
+                    <h2>5. Payments</h2>
+                    <p>
+                        Paid subscriptions are handled by Stripe. Card details go to Stripe directly and
+                        never touch our servers. We keep only the identifier Stripe gives us so we know
+                        which subscription is yours.
+                    </p>
+
+                    <h2>6. Public officials</h2>
+                    <p>
+                        The Borg Record holds information about public officials taken from public records:
+                        official rosters, published fact-check rulings, and recorded votes. That material is
+                        already public and is not personal data we collected from you.
                     </p>
 
                     <div className="p-6 bg-muted border-l-4 border-foreground mt-12">
                         <p className="m-0 text-sm font-bold uppercase tracking-widest">
-                            Effective Date: Version 2026.04.1
+                            Effective September 2026. Deletion requests: pressroom@dailyborg.com
                         </p>
                     </div>
                 </article>

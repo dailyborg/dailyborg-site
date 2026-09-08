@@ -71,6 +71,13 @@ export const US_STATE_CODES = [
     "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC", "PR",
 ];
 
+/**
+ * What a public name search may contain: a letter, then 1 to 39 more letters, spaces, dots,
+ * apostrophes or hyphens. Two characters minimum, so a single letter cannot ask for a huge slice
+ * of the index, and no wildcard character can reach the query.
+ */
+export const SEARCH_QUERY_RE = /^[a-z][a-z .'-]{1,39}$/i;
+
 // How much each PolitiFact ruling pulls a trust score down. Mirrors workers/truth-engine.
 const FALSENESS: Record<string, number> = { true: 0, mostly_true: 0.2, half_true: 0.5, mostly_false: 0.8, false: 1, pants_on_fire: 1 };
 export const MIN_RULINGS_FOR_TRUST = 3;
@@ -155,15 +162,28 @@ export class PoliticianService {
     }
 
     static calculateTrust(factChecks: FactCheck[]): { score: number | null; rulings: number; falseRulings: number; breakdown: Record<string, number> } {
+        const counts: Record<string, number> = {};
+        for (const fc of factChecks) counts[fc.rating] = (counts[fc.rating] || 0) + 1;
+        return this.calculateTrustFromCounts(counts);
+    }
+
+    /**
+     * Same formula, from grouped counts instead of rows. The profile page lists only the newest 25
+     * rulings but the score and the breakdown must reflect every ruling on file, so it passes counts
+     * that came from a GROUP BY rather than the 25 rows it displays.
+     */
+    static calculateTrustFromCounts(counts: Record<string, number>): { score: number | null; rulings: number; falseRulings: number; breakdown: Record<string, number> } {
         const breakdown: Record<string, number> = {};
         let sum = 0, counted = 0, falseRulings = 0;
-        for (const fc of factChecks) {
-            const w = FALSENESS[fc.rating];
+        for (const rating of Object.keys(counts)) {
+            const w = FALSENESS[rating];
             if (w === undefined) continue;
-            counted++;
-            sum += w;
-            breakdown[fc.rating] = (breakdown[fc.rating] || 0) + 1;
-            if (w >= 0.8) falseRulings++;
+            const n = Number(counts[rating]) || 0;
+            if (n <= 0) continue;
+            counted += n;
+            sum += w * n;
+            breakdown[rating] = (breakdown[rating] || 0) + n;
+            if (w >= 0.8) falseRulings += n;
         }
         if (counted < MIN_RULINGS_FOR_TRUST) return { score: null, rulings: counted, falseRulings, breakdown };
         return { score: Math.round(100 - (sum / counted) * 100), rulings: counted, falseRulings, breakdown };
@@ -199,17 +219,45 @@ export class PoliticianService {
         });
     }
 
-    /** Prefix search on the indexed name column, used by the directory search box and the subscribe page. */
+    /**
+     * Prefix search for the directory search box and the subscribe page.
+     *
+     * A range scan over idx_politicians_name_nocase (migration 0014), not a LIKE scan: the upper
+     * bound is the query plus "~", which sorts after every letter and digit, so the query reads only
+     * the matching slice of the index instead of the whole table. The COLLATE NOCASE must stay,
+     * character for character, the way the index declares it or SQLite stops using the index.
+     * Plan on the local rehearsal database:
+     *   SEARCH politicians USING INDEX idx_politicians_name_nocase (name>? AND name<?)
+     *
+     * The last-word branch (idx_politicians_lastword_nocase, so "Sanders" finds Bernie Sanders) is
+     * deliberately not ORed in here: SQLite's OR optimization only accepts equality terms, so
+     * "(name range) OR (last word range)" plans as a full table scan and would defeat both indexes.
+     * Restoring last-name search needs a UNION ALL of the two branches, which does use both indexes
+     * but is a shape change the Director has to approve.
+     */
     static async search(query: string): Promise<PoliticianCard[]> {
-        const q = query.trim().replace(/[%_]/g, "").slice(0, 60);
-        if (q.length < 2) return [];
+        const q = query.trim();
+        if (!SEARCH_QUERY_RE.test(q)) return [];
         return cachedJson(`search:${q.toLowerCase()}`, 600, async () => {
             const db = await getDbBinding();
             try {
-                // Two indexed prefix probes (first name, then anywhere) so "Sanders" and "Bernie" both work.
+                // Two index-backed range scans joined with UNION: "starts with" on the full name
+                // (idx_politicians_name_nocase) and "starts with" on the last word of the name
+                // (idx_politicians_lastword_nocase, an expression index; the expression text below must
+                // match migration 0014 character for character). An OR of the two branches would make
+                // SQLite scan the whole table, which is the cost this replaces.
+                const upper = `${q}~`;
                 const res = await db.prepare(
-                    `SELECT ${DIRECTORY_COLUMNS} FROM politicians WHERE name LIKE ? OR name LIKE ? ORDER BY candidate_status ASC, popularity_score DESC, name ASC LIMIT 25`
-                ).bind(`${q}%`, `% ${q}%`).all();
+                    `SELECT ${DIRECTORY_COLUMNS} FROM politicians
+                     WHERE candidate_status = 'Active'
+                       AND name COLLATE NOCASE >= ? AND name COLLATE NOCASE < ?
+                     UNION
+                     SELECT ${DIRECTORY_COLUMNS} FROM politicians
+                     WHERE candidate_status = 'Active'
+                       AND substr(name, length(rtrim(name, replace(name, ' ', ''))) + 1) COLLATE NOCASE >= ?
+                       AND substr(name, length(rtrim(name, replace(name, ' ', ''))) + 1) COLLATE NOCASE < ?
+                     ORDER BY popularity_score DESC, name ASC LIMIT 25`
+                ).bind(q, upper, q, upper).all();
                 return (res?.results || []).map(normalizeCard);
             } catch (e) {
                 console.error("[politicians] search failed", e);
@@ -256,7 +304,7 @@ export class PoliticianService {
             if (!politician) return null;
             const id = (politician as any).id as string;
 
-            const [promisesRes, positionsRes, claimsRes, stanceRes, trustHistRes, votesRes, voteStatsRes, fcRes, methodologyRes] = await Promise.all([
+            const [promisesRes, positionsRes, claimsRes, stanceRes, trustHistRes, votesRes, voteStatsRes, fcRes, fcCountsRes, methodologyRes] = await Promise.all([
                 db.prepare("SELECT * FROM promises WHERE politician_id = ? ORDER BY date_said DESC LIMIT 50").bind(id).all(),
                 db.prepare("SELECT * FROM positions WHERE politician_id = ? ORDER BY topic ASC, statement_date DESC LIMIT 100").bind(id).all(),
                 db.prepare("SELECT * FROM claims WHERE politician_id = ? ORDER BY date DESC LIMIT 20").bind(id).all(),
@@ -272,6 +320,9 @@ export class PoliticianService {
                                    SUM(CASE WHEN position = 'Yea' THEN 1 ELSE 0 END) AS yeas, SUM(CASE WHEN position = 'Nay' THEN 1 ELSE 0 END) AS nays
                             FROM politician_votes WHERE politician_id = ?`).bind(id).all(),
                 db.prepare("SELECT id, statement, rating, analysis_text, source_url, date FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 25").bind(safeSlug).all(),
+                // The page lists the newest 25 rulings, but the score and the breakdown count every
+                // ruling on file. Index: idx_fact_checks_politician_date.
+                db.prepare("SELECT rating, COUNT(*) AS n FROM fact_checks WHERE politician_slug = ? GROUP BY rating").bind(safeSlug).all(),
                 db.prepare("SELECT version_name, description, formula FROM methodology_versions ORDER BY created_at DESC LIMIT 1").all(),
             ]);
 
@@ -297,7 +348,12 @@ export class PoliticianService {
 
             const promiseMetrics = this.calculatePromises(promises);
             const consistencyMetrics = this.calculateConsistency(positions);
-            const trust = this.calculateTrust(factChecks);
+
+            const ratingCounts: Record<string, number> = {};
+            for (const row of (fcCountsRes?.results || []) as any[]) {
+                if (row && typeof row.rating === "string") ratingCounts[row.rating] = Number(row.n) || 0;
+            }
+            const trust = this.calculateTrustFromCounts(ratingCounts);
 
             return {
                 politician: politician as any,

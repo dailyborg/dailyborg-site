@@ -1,5 +1,10 @@
 import { getRequestContext } from '@cloudflare/next-on-pages';
 
+/**
+ * Empty stand-in used only by `next dev` on this machine, where there is no Cloudflare request
+ * context at all. It is never used on Pages: inside a real request a missing binding throws, so a
+ * misconfigured deployment fails loudly instead of quietly answering "no rows" on every page.
+ */
 const dummyDb = {
     prepare: () => ({
         bind: () => ({
@@ -14,17 +19,23 @@ const dummyDb = {
     batch: () => Promise.resolve([])
 };
 
+let warnedAboutMissingContext = false;
+
 export async function getDbBinding() {
+    let ctx: ReturnType<typeof getRequestContext> | null = null;
     try {
-        const ctx = getRequestContext();
-        if (ctx && ctx.env) {
-            const env = ctx.env as any;
-            if (env.DB) return env.DB;
-            if (env['dailyborg-db']) return env['dailyborg-db'];
-            if (env.dailyborg_db) return env.dailyborg_db;
-        }
+        ctx = getRequestContext();
     } catch (e) {
-        // Fallback to dummy
+        // No Cloudflare request context: local `next dev` under Node. Warn once per process.
+        if (!warnedAboutMissingContext) {
+            warnedAboutMissingContext = true;
+            console.warn("[db] No Cloudflare request context. Using the empty local stand-in database (next dev only).");
+        }
+        return dummyDb;
     }
-    return dummyDb;
+
+    const env = (ctx?.env || {}) as any;
+    const db = env.DB || env['dailyborg-db'] || env.dailyborg_db;
+    if (!db) throw new Error("D1 binding DB is missing");
+    return db;
 }

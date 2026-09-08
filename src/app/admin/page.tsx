@@ -1,11 +1,40 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { CheckCircle2, XCircle, FileText, AlertTriangle, ShieldCheck, BarChart3, Users, Activity, Zap, RefreshCcw, MessageSquare, Trash2, Eye, EyeOff, Pencil } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { formatTimeAgo } from "@/lib/utils";
 
+/** Article sources are stored as a JSON string. Anything unparseable reads as an empty list, never a crash. */
+function safeParse(raw: unknown): any[] {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw !== "string" || raw.trim() === "") return [];
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+/** Complete class strings, because Tailwind cannot see classes built by string interpolation. */
+const STATUS_TONES = {
+    idle: { badge: "bg-slate-100 text-slate-600", label: "text-slate-600" },
+    warn: { badge: "bg-orange-100 text-orange-600", label: "text-orange-600" },
+    ok: { badge: "bg-emerald-100 text-emerald-600", label: "text-emerald-600" },
+} as const;
+
+type StatusTone = keyof typeof STATUS_TONES;
+
+/** Flags this browser as the operator's so analytics can skip it. The passphrase never goes into a cookie. */
+function setAdminUiCookie() {
+    document.cookie = "borg_admin_ui=1; Path=/; SameSite=Lax; Max-Age=2592000";
+}
+
+function clearAdminUiCookie() {
+    document.cookie = "borg_admin_ui=; Path=/; SameSite=Lax; Max-Age=0";
+}
 
 function AdminDashboardContent() {
     const searchParams = useSearchParams();
@@ -55,6 +84,24 @@ function AdminDashboardContent() {
     // Editor State
     const [selectedArticle, setSelectedArticle] = useState<any>(null);
     const [editForm, setEditForm] = useState({ title: "", excerpt: "", content_html: "" });
+    const editorDialogRef = useRef<HTMLDivElement | null>(null);
+    const editorTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+    const closeEditor = useCallback(() => {
+        setSelectedArticle(null);
+        // Focus goes back to the Review Draft button that opened the dialog.
+        editorTriggerRef.current?.focus();
+    }, []);
+
+    useEffect(() => {
+        if (!selectedArticle) return;
+        editorDialogRef.current?.focus();
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') closeEditor();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [selectedArticle, closeEditor]);
 
     // Scraper UI
     const [scraperCategory, setScraperCategory] = useState<string>('all');
@@ -78,12 +125,9 @@ function AdminDashboardContent() {
                 setMetrics(data);
                 setIsAuthenticated(true);
                 localStorage.setItem("borg_admin_token", passphrase);
-                // The cookies API (which actually bypasses our tracking) could be hit here or set by server, 
-                // but setting in localStorage + manually checking on tracking works. 
-                // Wait, our tracker checks cookie. We should set cookie to bypass tracker!
-                document.cookie = `borg_admin_token=${passphrase}; path=/; max-age=31536000`;
+                setAdminUiCookie();
                 window.dispatchEvent(new Event('borg_admin_change'));
-                
+
                 fetchArticles(passphrase);
                 fetchSettings(passphrase);
             } else {
@@ -101,20 +145,20 @@ function AdminDashboardContent() {
         const token = localStorage.getItem("borg_admin_token");
         if (token) {
             setPassphrase(token);
-            document.cookie = `borg_admin_token=${token}; path=/; max-age=31536000`;
             fetch(`/api/admin/metrics?days=${dateRange}`, { headers: { 'Authorization': `Bearer ${token}` } })
                 .then(res => res.json() as any)
                 .then(data => {
                     if (data.error) throw new Error();
                     setMetrics(data);
                     setIsAuthenticated(true);
+                    setAdminUiCookie();
                     window.dispatchEvent(new Event('borg_admin_change'));
                     fetchArticles(token);
                     fetchSettings(token);
                 })
                 .catch(() => {
                     localStorage.removeItem("borg_admin_token");
-                    document.cookie = "borg_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+                    clearAdminUiCookie();
                     window.dispatchEvent(new Event('borg_admin_change'));
                 });
         }
@@ -304,7 +348,7 @@ function AdminDashboardContent() {
         });
 
         if (res.ok) {
-            setSelectedArticle(null);
+            closeEditor();
             fetchArticles(passphrase);
             const metricsRes = await fetch(`/api/admin/metrics?days=${dateRange}`, { headers: { 'Authorization': `Bearer ${passphrase}` } });
             if (metricsRes.ok) setMetrics(await metricsRes.json() as any);
@@ -335,7 +379,7 @@ function AdminDashboardContent() {
                         value={passphrase}
                         onChange={(e) => setPassphrase(e.target.value)}
                         placeholder="Passphrase"
-                        className="p-3 bg-background border border-border text-center font-mono focus:outline-none focus:border-primary"
+                        className="p-3 bg-background border border-border text-center font-mono focus:ring-2 focus:ring-foreground/40 focus:border-primary"
                         required
                     />
 
@@ -392,11 +436,11 @@ function AdminDashboardContent() {
                 </nav>
 
                 <div className="p-4 border-t border-slate-800">
-                    <button onClick={() => { 
-                        localStorage.removeItem("borg_admin_token"); 
-                        document.cookie = "borg_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+                    <button onClick={() => {
+                        localStorage.removeItem("borg_admin_token");
+                        clearAdminUiCookie();
                         window.dispatchEvent(new Event('borg_admin_change'));
-                        setIsAuthenticated(false); 
+                        setIsAuthenticated(false);
                     }} className="w-full text-sm uppercase tracking-wider text-slate-400 hover:text-white font-bold text-left px-4">
                         Lock Terminal
                     </button>
@@ -489,13 +533,13 @@ function AdminDashboardContent() {
                         </div>
 
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                            <div className="p-4 bg-slate-50 border-b border-slate-200">
                                 <h3 className="font-bold text-slate-700">Subscriber Directory</h3>
-                                <input type="text" placeholder="Search audiences..." className="px-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
                             <div className="p-12 text-center text-slate-500">
                                 <Users className="w-12 h-12 mx-auto text-slate-300 mb-4" />
-                                <p>Subscriber grid view is loading...</p>
+                                <p className="font-bold text-slate-700 mb-1">Subscriber management is not built yet.</p>
+                                <p className="text-sm">The counts above are live. Browsing, searching and editing individual subscribers is still to come.</p>
                             </div>
                         </div>
                     </div>
@@ -554,7 +598,7 @@ function AdminDashboardContent() {
                                                 type="number"
                                                 value={settings.daily_article_cap}
                                                 onChange={(e) => setSettings({...settings, daily_article_cap: e.target.value})}
-                                                className="w-full text-lg font-mono p-3 bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none" 
+                                                className="w-full text-lg font-mono p-3 bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
                                             />
                                         </div>
                                         <button 
@@ -606,7 +650,7 @@ function AdminDashboardContent() {
                                 <div className="flex flex-col gap-3">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Category Filter</label>
                                     <select 
-                                        className="w-full text-sm font-bold p-3 bg-slate-100 border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none text-slate-700"
+                                        className="w-full text-sm font-bold p-3 bg-slate-100 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500 text-slate-700"
                                         value={scraperCategory}
                                         onChange={(e) => setScraperCategory(e.target.value)}
                                     >
@@ -629,7 +673,7 @@ function AdminDashboardContent() {
                                             max="10"
                                             value={scraperAmount} 
                                             onChange={(e) => setScraperAmount(parseInt(e.target.value) || 1)}
-                                            className="w-24 text-lg font-mono p-2.5 bg-white border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                                            className="w-24 text-lg font-mono p-2.5 bg-white border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                                         />
                                         <button 
                                             onClick={handleTriggerScraper}
@@ -701,16 +745,16 @@ function AdminDashboardContent() {
                                 const last = relevant[0];
                                 const bad = last && ['error', 'auth_error', 'quota_exceeded', 'provider_error', 'fetch_failure', 'failed'].includes(last.status);
                                 const status = !last ? 'No activity' : bad ? (last.status === 'quota_exceeded' ? 'Cap reached' : 'Degraded') : 'Active';
-                                const color = !last ? 'slate' : bad ? 'orange' : 'emerald';
-                                return { name: w.name, status, icon: w.icon, color };
+                                const tone: StatusTone = !last ? 'idle' : bad ? 'warn' : 'ok';
+                                return { name: w.name, status, icon: w.icon, tone };
                             }).map((s) => (
                                 <div key={s.name} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                                    <div className={`p-3 rounded-xl bg-${s.color}-100 text-${s.color}-600`}>
+                                    <div className={`p-3 rounded-xl ${STATUS_TONES[s.tone].badge}`}>
                                         <s.icon className="w-6 h-6" />
                                     </div>
                                     <div>
                                         <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">{s.name}</div>
-                                        <div className={`text-sm font-black text-${s.color}-600 uppercase`}>{s.status}</div>
+                                        <div className={`text-sm font-black uppercase ${STATUS_TONES[s.tone].label}`}>{s.status}</div>
                                     </div>
                                 </div>
                             ))}
@@ -917,15 +961,16 @@ function AdminDashboardContent() {
                                                 <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-wider">{article.desk}</span>
                                                 <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">Score: {article.confidence_score}</span>
                                                 {article.sources && (
-                                                    <span className="text-xs text-slate-500">Sources: {JSON.parse(article.sources).length}</span>
+                                                    <span className="text-xs text-slate-500">Sources: {safeParse(article.sources).length}</span>
                                                 )}
                                             </div>
                                             <h3 className="font-serif text-2xl font-bold text-slate-900">{article.title}</h3>
                                             <p className="text-sm text-slate-600 line-clamp-2 max-w-3xl">{article.excerpt}</p>
                                         </div>
                                         <button
-                                            onClick={() => openEditor(article)}
-                                            className="whitespace-nowrap bg-slate-900 text-white px-8 py-3 rounded-xl uppercase tracking-wider text-xs font-bold hover:bg-blue-600 transition-colors shadow-sm"
+                                            type="button"
+                                            onClick={(e) => { editorTriggerRef.current = e.currentTarget; openEditor(article); }}
+                                            className="whitespace-nowrap bg-slate-900 text-white px-8 py-3 rounded-xl uppercase tracking-wider text-xs font-bold hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 transition-colors shadow-sm"
                                         >
                                             Review Draft
                                         </button>
@@ -940,13 +985,20 @@ function AdminDashboardContent() {
             {/* Editorial Modal Overlay */}
             {selectedArticle && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 md:p-8">
-                    <div className="bg-white rounded-3xl w-full max-w-6xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div
+                        ref={editorDialogRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="editorial-review-heading"
+                        tabIndex={-1}
+                        className="bg-white rounded-3xl w-full max-w-6xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 focus:outline focus:outline-2 focus:outline-blue-500"
+                    >
                         <div className="bg-slate-900 text-white p-6 flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <FileText className="w-5 h-5 text-blue-400" />
-                                <h2 className="font-sans font-bold tracking-widest uppercase text-sm">Manual Editorial Review</h2>
+                                <h2 id="editorial-review-heading" className="font-sans font-bold tracking-widest uppercase text-sm">Manual Editorial Review</h2>
                             </div>
-                            <button onClick={() => setSelectedArticle(null)} className="text-slate-400 hover:text-white transition-colors"><XCircle className="w-6 h-6" /></button>
+                            <button type="button" onClick={closeEditor} aria-label="Close editorial review" className="text-slate-400 hover:text-white focus:ring-2 focus:ring-blue-500 rounded transition-colors"><XCircle className="w-6 h-6" /></button>
                         </div>
 
                         <div className="p-8 overflow-y-auto flex-1 flex flex-col lg:flex-row gap-10 bg-slate-50">
@@ -989,7 +1041,7 @@ function AdminDashboardContent() {
                                 </div>
                                 <div className="flex flex-col gap-3">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2 mb-1 block">Parsed Sources</span>
-                                    {selectedArticle.sources && JSON.parse(selectedArticle.sources).map((s: any, idx: number) => (
+                                    {safeParse(selectedArticle.sources).map((s: any, idx: number) => (
                                         <div key={idx} className="bg-slate-50 border border-slate-100 p-3 rounded-xl text-xs break-all flex flex-col gap-1">
                                             <strong className="text-slate-800">{s.name}</strong>
                                             {s.url ? <a href={s.url} target="_blank" className="text-blue-600 hover:text-blue-800 hover:underline">{s.url}</a> : <span className="text-slate-400">No URL Provided</span>}

@@ -11,7 +11,9 @@ export async function GET(request: Request) {
 
     try {
         const url = new URL(request.url);
-        const days = parseInt(url.searchParams.get('days') || '7', 10);
+        // Whole days only, 1 to 90. Anything else (missing, text, 0, 100000) falls back to a week.
+        const rawDays = parseInt(url.searchParams.get('days') || '7', 10);
+        const days = Number.isFinite(rawDays) ? Math.min(90, Math.max(1, Math.trunc(rawDays))) : 7;
 
         const db = await getDbBinding();
 
@@ -88,6 +90,6 @@ export async function GET(request: Request) {
 
     } catch (error: any) {
         console.error("Admin Metrics API Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
     }
 }

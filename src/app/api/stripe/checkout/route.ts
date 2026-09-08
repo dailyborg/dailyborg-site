@@ -4,14 +4,25 @@ import { readEnv } from '@/lib/admin-auth';
 
 export const runtime = 'edge';
 
+const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+const MAX_EMAIL_LENGTH = 254;
+
 export async function POST(request: Request) {
     try {
-        const body = await request.json() as any;
-        const { subscriberId, email } = body;
+        const body = await request.json().catch(() => ({})) as any;
+        const subscriberId = typeof body.subscriberId === 'string' ? body.subscriberId.trim() : '';
+        const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
 
-        if (!subscriberId) {
-            return NextResponse.json({ error: "Missing subscriber ID" }, { status: 400 });
+        // Stripe needs a real address to send the receipt to, and it is how the webhook ties a completed
+        // checkout back to a person. A subscriber id is optional: the page starts checkout before any
+        // subscriber row exists, so the email itself is the reference when there is no id.
+        if (!email || email.length > MAX_EMAIL_LENGTH || !EMAIL_RE.test(email)) {
+            return NextResponse.json({ error: "A valid email address is required for checkout." }, { status: 400 });
         }
+        if (subscriberId.length > 64) {
+            return NextResponse.json({ error: "Invalid subscriber reference." }, { status: 400 });
+        }
+        const clientReference = subscriberId || `email:${email}`;
 
         const stripeSecret = readEnv('STRIPE_SECRET_KEY');
         if (!stripeSecret) {
@@ -23,7 +34,7 @@ export async function POST(request: Request) {
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             customer_email: email, // Pre-fill email so they don't have to type it again
-            client_reference_id: subscriberId, // Crucial connection back to our D1 database UUID
+            client_reference_id: clientReference, // subscriber id when known, otherwise "email:<address>"
             mode: 'subscription', // Since we don't have a pre-created price ID, we'll use inline price_data. For subscriptions, Stripe requires a saved Price ID or inline recurring prices.
             line_items: [
                 {
@@ -31,7 +42,7 @@ export async function POST(request: Request) {
                         currency: 'usd',
                         product_data: {
                             name: 'Premium Director Access',
-                            description: 'Full articles delivered securely to your inbox (Email / WhatsApp).',
+                            description: 'Full articles delivered to your inbox every morning.',
                         },
                         unit_amount: 99, // $0.99
                         recurring: {
@@ -48,6 +59,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ url: session.url }, { status: 200 });
     } catch (err: any) {
         console.error("Stripe Checkout Error:", err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ error: "Checkout could not be started. Please try again." }, { status: 500 });
     }
 }

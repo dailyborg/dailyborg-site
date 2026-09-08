@@ -27,8 +27,8 @@ export async function POST(request: Request) {
             // Edge runtime: signature verification must use the async (SubtleCrypto) variant.
             event = await stripe.webhooks.constructEventAsync(payload, signature, webhookSecret);
         } catch (err: any) {
-            console.error(`Webhook signature verification failed: ${err.message}`);
-            return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
+            console.error("Webhook signature verification failed:", err);
+            return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
         }
 
         // Handle the event
@@ -99,6 +99,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true }, { status: 200 });
     } catch (err: any) {
         console.error("Stripe Webhook Error:", err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
     }
 }

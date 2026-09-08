@@ -44,7 +44,7 @@ export default function StanceTimeline({ politicianName, stanceChanges }: Stance
                     Stance Evolution Explorer
                 </h2>
                 <p className="text-gray-500 dark:text-gray-400">
-                    Tracking how `{politicianName}`'s positions have shifted over time, including before and after taking office.
+                    Tracking how {politicianName}&apos;s positions have shifted over time, including before and after taking office.
                 </p>
             </div>
 

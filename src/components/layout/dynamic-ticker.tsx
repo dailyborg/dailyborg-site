@@ -14,7 +14,6 @@ interface DynamicTickerProps {
 
 export function DynamicTicker({ children }: DynamicTickerProps) {
     const [headlines, setHeadlines] = useState<HeadlineItem[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         async function fetchHeadlines() {
@@ -25,14 +24,12 @@ export function DynamicTicker({ children }: DynamicTickerProps) {
                     setHeadlines(data);
                 }
             } catch (err) {
-                console.error("Failed to pulse headlines:", err);
-            } finally {
-                setIsLoading(false);
+                console.error("Failed to load headlines:", err);
             }
         }
 
         fetchHeadlines();
-        // Refresh every 5 minutes to keep it "Live" without hammering the D1
+        // Refresh every 10 minutes so the crawl stays current without hammering D1.
         const interval = setInterval(fetchHeadlines, 10 * 60 * 1000);
         return () => clearInterval(interval);
     }, []);

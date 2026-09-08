@@ -40,13 +40,15 @@ export default async function BorgRecordDirectory({ searchParams }: { searchPara
 
     return (
         <>
-            <PoliticianDirectoryClient
-                initialPoliticians={politicians}
-                level={level}
-                state={state}
-                includeFormer={includeFormer}
-                geoState={geoState}
-            />
+            <div className="container mx-auto px-4 md:px-8">
+                <PoliticianDirectoryClient
+                    initialPoliticians={politicians}
+                    level={level}
+                    state={state}
+                    includeFormer={includeFormer}
+                    geoState={geoState}
+                />
+            </div>
             <div className="container mx-auto px-4 md:px-8 pb-16">
                 <CommentSection pageType="borg-record" pageSlug="directory" />
             </div>

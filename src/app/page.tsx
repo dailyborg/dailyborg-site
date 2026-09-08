@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Activity, Flame } from "lucide-react";
@@ -9,6 +10,7 @@ import { PoliticianService } from "@/lib/services/politician-service";
 import {
     ArticleData,
     getDeskColor,
+    imageAlt,
     LeadHeroSection,
     TrendingSplitSection,
     HeadlinesGridSection,
@@ -18,6 +20,23 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "edge";
+
+const HOME_DESCRIPTION =
+    "An autonomous newsroom. Stories are written from published reporting, and the Borg Record tracks United States officials using only structured public records.";
+
+export const metadata: Metadata = {
+    title: "The Daily Borg",
+    description: HOME_DESCRIPTION,
+    alternates: { canonical: "https://dailyborg.com/" },
+    openGraph: {
+        type: "website",
+        url: "https://dailyborg.com/",
+        title: "The Daily Borg",
+        description: HOME_DESCRIPTION,
+        images: ["/og-default.png"],
+    },
+    twitter: { card: "summary_large_image", title: "The Daily Borg", description: HOME_DESCRIPTION, images: ["/og-default.png"] },
+};
 
 const RATING_LABEL: Record<string, string> = {
     true: "True", mostly_true: "Mostly True", half_true: "Half True", mostly_false: "Mostly False", false: "False", pants_on_fire: "Pants on Fire",
@@ -71,15 +90,17 @@ export default async function Home() {
     try {
         articles = await ArticleService.getRecentArticles(32);
     } catch (e: any) {
-        errorState = e?.message || "database unavailable";
+        console.error("[home] article read failed", e);
+        errorState = "The newsroom database is not answering right now.";
     }
 
     if (articles.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="text-muted-foreground font-mono uppercase tracking-widest border p-8 bg-muted/10 text-center">
-                    {errorState ? "The newsroom database is unreachable right now. Please try again in a minute." : "No verified reporting is live yet. The newsroom publishes throughout the day."}
-                </div>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-4">
+                <h1 className="font-[family-name:var(--font-playfair)] text-4xl md:text-5xl font-black tracking-tight text-center">The Daily Borg</h1>
+                <p className="text-muted-foreground font-sans uppercase tracking-widest border border-border p-8 bg-muted/30 text-center max-w-xl">
+                    {errorState ? "The newsroom database is unreachable right now. Please try again in a minute." : "No reporting is live yet. The newsroom publishes throughout the day."}
+                </p>
             </div>
         );
     }
@@ -110,13 +131,13 @@ export default async function Home() {
 
     return (
         <div className="flex flex-col min-h-screen relative">
-            <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-6 py-8">
+            <div className="flex-1 max-w-[1400px] w-full mx-auto px-4 md:px-6 py-8">
                 <div className="mb-4 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-destructive animate-pulse"></span>
                     <span className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">{currentEdition}</span>
                 </div>
 
-                <LeadHeroSection lead={leadStory} sideStories={sideStories} />
+                <LeadHeroSection lead={leadStory} sideStories={sideStories} leadHeading="h1" priority />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
                     <BorgRecordSidebar />
@@ -132,19 +153,22 @@ export default async function Home() {
                     <section className="border-t-2 border-border pt-6 mt-10">
                         <div className="flex items-center gap-2 mb-5"><h2 className="font-sans uppercase font-bold text-xs tracking-widest">From the Desks</h2></div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {extraGridStories.map((story, idx) => (
-                                <article key={idx} className="border-b border-border pb-4 flex flex-col gap-2">
-                                    <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block">
-                                        <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
-                                            <Image src={getImageForContext(story)} alt={story.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
-                                        </div>
-                                    </Link>
-                                    <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)} mt-2`}>{story.desk}</span>
-                                    <h3 className="font-serif font-bold text-lg leading-snug hover:opacity-70 transition-opacity"><Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>{story.title}</Link></h3>
-                                    <p className="text-sm text-muted-foreground line-clamp-2">{story.excerpt}</p>
-                                    <span className="text-xs text-muted-foreground font-sans">{story.timeAgo}</span>
-                                </article>
-                            ))}
+                            {extraGridStories.map((story, idx) => {
+                                const src = getImageForContext(story);
+                                return (
+                                    <article key={idx} className="border-b border-border pb-4 flex flex-col gap-2">
+                                        <Link href={`/${story.desk.toLowerCase()}/${story.slug}`} className="block">
+                                            <div className="bg-muted aspect-[16/10] w-full relative overflow-hidden group">
+                                                <Image src={src} alt={imageAlt(story, src)} fill sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                                            </div>
+                                        </Link>
+                                        <span className={`uppercase text-[10px] font-bold tracking-wider ${getDeskColor(story.desk)} mt-2`}>{story.desk}</span>
+                                        <h3 className="font-serif font-bold text-lg leading-snug hover:opacity-70 transition-opacity"><Link href={`/${story.desk.toLowerCase()}/${story.slug}`}>{story.title}</Link></h3>
+                                        <p className="text-sm text-muted-foreground line-clamp-2">{story.excerpt}</p>
+                                        <span className="text-xs text-muted-foreground font-sans">{story.timeAgo}</span>
+                                    </article>
+                                );
+                            })}
                         </div>
                     </section>
                 )}
@@ -171,7 +195,7 @@ export default async function Home() {
                         </div>
                     </section>
                 )}
-            </main>
+            </div>
         </div>
     );
 }

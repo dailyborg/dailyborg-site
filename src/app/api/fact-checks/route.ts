@@ -8,13 +8,18 @@ export const dynamic = 'force-dynamic';
 
 const FALSE_RATINGS = "('mostly_false', 'false', 'pants_on_fire')";
 
+// The only offices the Liar Liar board offers. Anything else is ignored, so the LIKE pattern
+// can never be chosen by the caller.
+const ROLES = ['President', 'Senator', 'Representative'];
+
 export async function GET(request: NextRequest) {
     try {
         const params = request.nextUrl.searchParams;
         const slug = (params.get('slug') || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 120);
         const state = (params.get('state') || '').toUpperCase();
         const party = params.get('party') || '';
-        const role = (params.get('role') || '').replace(/[%_]/g, '').slice(0, 40);
+        const requestedRole = (params.get('role') || '').trim();
+        const role = ROLES.includes(requestedRole) ? requestedRole : '';
 
         if (slug) {
             const fact_checks = await cachedJson(`fc:${slug}`, 300, async () => {

@@ -13,8 +13,7 @@ import {
     AreaChart,
     Area,
     CartesianGrid,
-    Cell,
-    Legend
+    Cell
 } from 'recharts';
 import { Shield, TrendingUp, Award, AlertCircle } from 'lucide-react';
 
