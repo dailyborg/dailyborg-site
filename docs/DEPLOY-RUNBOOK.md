@@ -78,23 +78,31 @@ Cache Rule for HTML, Bot Fight Mode, Browser Integrity Check, Email Routing chec
 
 Migrations 0013 and 0014 were applied to production on 2026-09-08 (statement by statement with `--command`, because the permission classifier in Claude Code auto mode blocks `--file` against production; a DROP INDEX costs 0 rows written, a CREATE INDEX costs one row per table row). The five workers changed on the same day. Deploy order, each from inside its folder, each safe to repeat:
 
+The desktop app's Run button executes in PowerShell, where `&&` is an error, so these use a semicolon (which also works in bash):
+
 ```bash
-cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/scraper" && npx wrangler deploy
+cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/scraper"; npx wrangler deploy
 ```
 ```bash
-cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/sentinel" && npx wrangler deploy
+cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/sentinel"; npx wrangler deploy
 ```
 ```bash
-cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/ingest" && npx wrangler deploy
+cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/ingest"; npx wrangler deploy
 ```
 ```bash
-cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/discovery-engine" && npx wrangler deploy
+cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/discovery-engine"; npx wrangler deploy
 ```
 ```bash
-cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/truth-engine" && npx wrangler deploy
+cd "C:/Users/mrcat/OneDrive/Desktop/new claude/dailyborg/workers/truth-engine"; npx wrangler deploy
 ```
 
-The classifier blocks `npx wrangler deploy` for Claude in auto mode (from Bash and PowerShell alike). Either Dr. Cato clicks Run on the blocks above, or he tells Claude to add a permission rule for `npx wrangler deploy` in this project; Claude never adds that rule on its own. The site deploys from `git push` (Git-connected Pages).
+The permission classifier blocks `npx wrangler deploy` for Claude in auto mode, and it also blocks Claude from writing a permission rule for itself. Dr. Cato approved the rule on 2026-09-09; this one-line PowerShell command creates it (project scoped, deploys only) in the Drive folder the sessions launch from:
+
+```powershell
+[IO.File]::WriteAllText("C:\Users\mrcat\My Drive (tsyborgrunnings@gmail.com)\claude\code\dailyborg\.claude\settings.local.json", '{ "permissions": { "allow": [ "Bash(npx wrangler deploy:*)" ] } }')
+```
+
+After that, Claude deploys with `npx wrangler deploy --config "<absolute path to the worker's wrangler.jsonc>"` from any directory. The site deploys from `git push` (Git-connected Pages).
 
 After the worker deploys, prove the newsroom is back: `curl -X POST -H "Content-Type: application/json" -d "{\"category\":\"all\",\"amount\":1}" https://dailyborg-scraper.pressroom.workers.dev/` (answers 202), wait two minutes, then `npx wrangler d1 execute dailyborg-db --remote --command "SELECT status, substr(message,1,120) FROM ingestion_logs ORDER BY created_at DESC LIMIT 12"` should show `inserted` rows, and https://dailyborg.com/ shows today's date on the lead stories. The scraper's budget (`daily_article_cap`, today 43 through the old key `cloudflare_daily_operations_cap`) caps the first day.
 
