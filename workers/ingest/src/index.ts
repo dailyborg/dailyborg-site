@@ -275,7 +275,7 @@ export class IngestCoordinator extends Agent<Env> {
             "keyTakeaways": ["...", "..."],
             "confidenceScore": 95,
             "suggestedHeroImagePrompt": "...",
-            "desk": "Politics",
+            "desk": "one of Politics, Crime, Business, Entertainment, Sports, Science, Education (pick the desk that fits the story; this story came from the ${DESK_MAP[(type || '').toLowerCase()] || 'general news'} feed)",
             "sources": [{"source_name": "...", "source_url": "...", "source_type": "..."}],
             "mentioned_candidates": ["First Last", "First Last"]
           }
@@ -392,10 +392,16 @@ export class IngestCoordinator extends Agent<Env> {
             }
 
             if (articleObject) {
-                // Normalize AI desk to valid categories only
-                if (articleObject.desk && !VALID_DESKS.includes(articleObject.desk)) {
-                    articleObject.desk = DESK_MAP[(type || '').toLowerCase()] || 'Politics';
-                    console.log(`[Ingest] AI returned invalid desk, normalized to: ${articleObject.desk}`);
+                // The feed a story came from is curated by us (NYT Science, ESPN, CBS Crime, ...), so it decides
+                // the desk. Only the general feed (type "standard") leaves the choice to the model, and an
+                // invalid model answer falls back to Politics. Before this, the model copied the "Politics"
+                // example from the prompt and filed NFL and science stories under Politics.
+                const feedDesk = (type || '').toLowerCase() === 'standard' ? null : DESK_MAP[(type || '').toLowerCase()];
+                if (feedDesk) {
+                    articleObject.desk = feedDesk;
+                } else if (!articleObject.desk || !VALID_DESKS.includes(articleObject.desk)) {
+                    articleObject.desk = 'Politics';
+                    console.log(`[Ingest] AI returned an invalid desk, normalized to: ${articleObject.desk}`);
                 }
             } else {
                 console.error(`Cloudflare AI Failure on every model: ${modelAttempts.join('; ')}`);

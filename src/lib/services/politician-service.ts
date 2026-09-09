@@ -298,11 +298,16 @@ export class PoliticianService {
     static async getProfile(slug: string) {
         const safeSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 120);
         if (!safeSlug) return null;
-        return cachedJson(`profile:${safeSlug}`, 300, async () => {
+        // Fifteen minutes: crawlers load thousands of profiles a day, and nothing here changes faster than hourly.
+        return cachedJson(`profile:${safeSlug}`, 900, async () => {
             const db = await getDbBinding();
             const politician = await db.prepare("SELECT * FROM politicians WHERE slug = ?").bind(safeSlug).first();
             if (!politician) return null;
             const id = (politician as any).id as string;
+            const pol = politician as any;
+            const chamber = /senator/i.test(String(pol.office_held || "")) ? "Senate" : "House";
+            // Migration 0015 keeps running vote totals on the row; until it is applied the count query below runs.
+            const hasCounters = pol.votes_total !== undefined && pol.votes_total !== null;
 
             const [promisesRes, positionsRes, claimsRes, stanceRes, trustHistRes, votesRes, voteStatsRes, fcRes, fcCountsRes, methodologyRes] = await Promise.all([
                 db.prepare("SELECT * FROM promises WHERE politician_id = ? ORDER BY date_said DESC LIMIT 50").bind(id).all(),
@@ -313,10 +318,15 @@ export class PoliticianService {
                             FROM stance_changes sc JOIN claims oc ON sc.old_claim_id = oc.id JOIN claims nc ON sc.new_claim_id = nc.id
                             WHERE sc.politician_id = ? ORDER BY sc.created_at DESC LIMIT 10`).bind(id).all(),
                 db.prepare("SELECT score, promises_kept, promises_broken, scored_at FROM trustworthiness_history WHERE politician_id = ? ORDER BY scored_at ASC LIMIT 30").bind(id).all(),
-                // v.* keeps this query valid before and after migration 0012 (which adds chamber, question, tallies, verification).
-                db.prepare(`SELECT v.*, pv.position, pv.rationale FROM politician_votes pv JOIN votes v ON v.id = pv.vote_id
-                            WHERE pv.politician_id = ? ORDER BY v.vote_date DESC LIMIT 12`).bind(id).all(),
-                db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN position = 'Not Voting' THEN 1 ELSE 0 END) AS missed,
+                // Newest roll calls first: walk the votes table by date (idx_votes_date) for this official's chamber and
+                // probe politician_votes by its primary key, so the read stops after 12 matches instead of reading
+                // every vote row the official has (hundreds by the end of a session). CROSS JOIN fixes the loop order.
+                db.prepare(`SELECT v.*, pv.position, pv.rationale FROM votes v INDEXED BY idx_votes_date CROSS JOIN politician_votes pv
+                            ON pv.vote_id = v.id AND pv.politician_id = ?
+                            WHERE v.chamber = ? ORDER BY v.vote_date DESC LIMIT 12`).bind(id, chamber).all(),
+                hasCounters
+                    ? Promise.resolve(null)
+                    : db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN position = 'Not Voting' THEN 1 ELSE 0 END) AS missed,
                                    SUM(CASE WHEN position = 'Yea' THEN 1 ELSE 0 END) AS yeas, SUM(CASE WHEN position = 'Nay' THEN 1 ELSE 0 END) AS nays
                             FROM politician_votes WHERE politician_id = ?`).bind(id).all(),
                 db.prepare("SELECT id, statement, rating, analysis_text, source_url, date FROM fact_checks WHERE politician_slug = ? ORDER BY date DESC LIMIT 25").bind(safeSlug).all(),
@@ -364,7 +374,9 @@ export class PoliticianService {
                 aiStanceChanges,
                 trustHistory: (trustHistRes?.results || []) as any[],
                 recentVotes: (votesRes?.results || []) as any[],
-                voteStats: this.calculateAttendance((voteStatsRes?.results?.[0] as any) || null),
+                voteStats: this.calculateAttendance(hasCounters
+                    ? { total: Number(pol.votes_total) || 0, missed: Number(pol.votes_missed) || 0, yeas: Number(pol.votes_yea) || 0, nays: Number(pol.votes_nay) || 0 }
+                    : ((voteStatsRes as any)?.results?.[0] as any) || null),
                 factChecks,
                 methodology: (methodologyRes?.results?.[0] as any) || null,
                 derivedScores: {

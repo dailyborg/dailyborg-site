@@ -330,14 +330,22 @@ function voteStatements(env: Env, v: ParsedVote, verification: Verification, not
             stmts.push(env.DB.prepare(
                 "INSERT INTO politician_votes (politician_id, vote_id, position, rationale, member_key, created_at) VALUES (?, ?, ?, NULL, ?, ?) ON CONFLICT(politician_id, vote_id) DO UPDATE SET position = excluded.position, member_key = excluded.member_key"
             ).bind(pid, id, m.position, m.key, now));
+            // Running totals on the politicians row (migration 0015), so the profile page never has to count
+            // an official's vote rows. One written row each (none of these columns is indexed). A roll call is
+            // stored as published exactly once (the cursor and the unverified re-check never overlap), so the
+            // totals cannot double count.
+            stmts.push(env.DB.prepare(
+                "UPDATE politicians SET votes_total = votes_total + 1, votes_missed = votes_missed + ?, votes_yea = votes_yea + ?, votes_nay = votes_nay + ? WHERE id = ?"
+            ).bind(m.position === "Not Voting" ? 1 : 0, m.position === "Yea" ? 1 : 0, m.position === "Nay" ? 1 : 0, pid));
         }
     }
     return { stmts, matched, unmatched };
 }
 
-/** Rows one stored roll call writes: the vote row plus its indexes, then three rows per member statement. */
+/** Rows one stored roll call writes: the vote row plus its indexes, then two statements per member (the member row with
+ *  its two index rows, and the one-row counter update), about four rows per member. */
 function estimateRows(stmts: D1PreparedStatement[]): number {
-    return 5 + stmts.length * 3;
+    return 5 + stmts.length * 2;
 }
 
 /** True when storing this roll call would push the step past its share of the daily D1 write budget. */

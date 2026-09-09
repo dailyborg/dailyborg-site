@@ -1,8 +1,19 @@
-# Status (updated 2026-09-08, 04:30 UTC, limits and stalled newsroom session)
+# Status (updated 2026-09-09, 21:30 UTC, limits and stalled newsroom session, day two)
+
+## Day two, 2026-09-09 (read this first)
+
+- **All five workers were deployed at 21:11 UTC** (Dr. Cato ran the commands; the first set failed because the desktop app's Run button uses PowerShell, where `&&` is invalid). Dr. Cato then added the permission rule (`.claude/settings.local.json` in the Drive folder: `Bash(npx wrangler deploy:*)`), and Claude deployed the ingest worker itself at 21:17 UTC with `npx wrangler deploy --config "<absolute path to wrangler.jsonc>"`. Future deploys need no clicks.
+- **The newsroom is publishing again.** One manual scraper run at 21:12 UTC queued 11 stories; all 11 were written and published within two minutes (Unsplash hero images, read times, `article_type` standard). First article since 2026-06-12.
+- **Bug found and fixed on the spot:** every new article was filed under Politics because the model copied the example desk from the prompt. The feed a story comes from now decides the desk (NYT Science stays Science, ESPN stays Sports); only the general feed leaves it to the model. Deployed 21:17 UTC. The 11 already published articles are re-filed by the midnight job below.
+- **KV namespace deleted** (`dailyborg-scraper-SENTINEL_CACHE`). The account has no KV namespaces now.
+- **Duplicate Spanish ruling for Byron Donalds deleted;** he shows "Not enough data" (2 rulings) instead of a double-counted score.
+- **Today's D1 write limit was spent by the old workers before the deploys** (about 105,000 rows by 21:00 UTC), so every write fails until 00:00 UTC. Scheduled for 00:02 UTC on 2026-09-10 by a background job in the session: migration 0015 (vote counter columns plus backfill), the 9 desk corrections, then the discovery worker deploy. If the job did not run, do those three things by hand (statements in `src/migrations/0015_vote_counters.sql`, the desk list in git history of this file, then `npx wrangler deploy --config` for discovery-engine).
+- **Third budget, rows read, was heading for trouble:** 3.0 million rows read on 2026-09-09 (limit 5 million), 2.5 million of them from crawlers loading politician profiles, where each page counted every vote row of the official (grows with every roll call). Fixes: running vote totals on the politicians row (migration 0015, kept current by the votes step), a vote list query that stops after the newest 12 (date index, chamber filter), and the profile cache raised to 15 minutes.
+- **Checks for the morning of 2026-09-10 (Eastern):** the homepage shows articles dated today with mixed desks; `SELECT status, COUNT(*) FROM ingestion_logs WHERE created_at >= date('now') GROUP BY status` shows mostly `inserted`; D1 rows written under 60,000 and rows read under 2 million on the dashboard graphs; no KV graph at all.
 
 ## Resume here (next session, any machine)
 
-Everything is committed and pushed. Read this block, then `memory/MEMORY.md`.
+Everything is committed and pushed. Read the day two block above, then this block, then `memory/MEMORY.md`.
 
 1. **First check, every session:** the newest approved article must be under 24 hours old.
    `npx wrangler d1 execute dailyborg-db --remote --command "SELECT MAX(publish_date) FROM articles WHERE approval_status='approved'"`

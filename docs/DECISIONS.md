@@ -1,5 +1,15 @@
 # Decisions (plain language, newest first)
 
+## 2026-09-09, day two of the limits session
+
+**The feed decides the desk, not the model.** The first eleven articles after the restart were all filed under Politics: the writing model copied the "Politics" example from the prompt. Every feed the scraper reads is one we chose for one desk (NYT Science, ESPN, CBS Crime, and so on), so that feed type now sets the desk; only the general world feed leaves the choice to the model, and an invalid answer falls back to Politics.
+
+**Rows read get a budget too.** On 2026-09-09 the site read 3.0 million rows (limit 5 million), 2.5 million of them from crawlers loading politician profiles, each of which counted every stored vote row for the official. That cost grows with every roll call, so it would have crossed the limit within weeks. Four running totals now live on the politicians row (migration 0015), kept current by the votes step (one written row per member per roll call, about a third more writes than before, still inside the 30,000 rows a day votes budget), the vote list reads only the newest 12 through the date index, and profiles are cached for 15 minutes.
+
+**Deploys from a session.** Dr. Cato approved and installed a project-scoped rule (`Bash(npx wrangler deploy:*)` in `.claude/settings.local.json` of the Drive folder). Claude deploys with `npx wrangler deploy --config "<absolute wrangler.jsonc path>"` and still runs `wrangler whoami` first. Claude cannot write that rule itself, which is the right safeguard.
+
+**Production data changes made with Dr. Cato's yes:** the unused KV namespace deleted, the duplicate Spanish ruling row deleted and the affected score reset, and the eleven mis-filed articles re-filed by feed.
+
 ## 2026-09-08, limits and stalled newsroom session
 
 **Model roles this session.** Director: Fable 5.1 (this session, every decision here). Workers: the newest Opus available to the agent tool (Opus 5), five of them in parallel: three implementing fixes on disjoint files (scraper plus sentinel, ingest, discovery) and two read-only auditors (site front end, site back end). Dr. Cato asked for Opus 4.8 by name; the agent tool only offers the newest Opus, which the model policy in PROJECT-START.md already prefers.
